@@ -21,7 +21,7 @@
 | 0 | 0.1 | SRS Deep-Read & Module Taxonomy | ✅ Done | [`ee5048d`](https://github.com/sajidchowdhury/MadrashaOS/commit/ee5048d) | 2026-09-16 | `MadrashaOS_Session_0.1_Module_Taxonomy_TechnicalDoc_2026-09-16.docx` |
 | 0 | 0.2 | Personas & Role Journeys | ✅ Done | [`45d07c2`](https://github.com/sajidchowdhury/MadrashaOS/commit/45d07c2) | 2026-09-16 | `MadrashaOS_Session_0.2_Personas_Journeys_TechnicalDoc_2026-09-16.docx` |
 | 0 | 0.3 | Heuristic Review of Competing ERPs | ✅ Done | [`c90c234`](https://github.com/sajidchowdhury/MadrashaOS/commit/c90c234) | 2026-09-16 | `MadrashaOS_Session_0.3_Heuristic_Review_TechnicalDoc_2026-09-16.docx` |
-| 0 | 0.4 | Design Principles & Constraints Lock-In | ✅ Done | _pending push_ | 2026-09-16 | `MadrashaOS_Session_0.4_Design_Principles_TechnicalDoc_2026-09-16.docx` |
+| 0 | 0.4 | Design Principles & Constraints Lock-In | ✅ Done | [`9949cf5`](https://github.com/sajidchowdhury/MadrashaOS/commit/9949cf5) | 2026-09-16 | `MadrashaOS_Session_0.4_Design_Principles_TechnicalDoc_2026-09-16.docx` |
 | 1 | 1.1 | Brand Kit | ⏳ Pending | — | — | — |
 | 1 | 1.2 | Token System | ⏳ Pending | — | — | — |
 | 1 | 1.3 | Component Library v0 | ⏳ Pending | — | — | — |
