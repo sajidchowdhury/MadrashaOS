@@ -19,7 +19,7 @@
 | Phase | Session | Title | Status | Commit | Date | Deliverable |
 |-------|---------|-------|--------|--------|------|-------------|
 | 0 | 0.1 | SRS Deep-Read & Module Taxonomy | ✅ Done | [`ee5048d`](https://github.com/sajidchowdhury/MadrashaOS/commit/ee5048d) | 2026-09-16 | `MadrashaOS_Session_0.1_Module_Taxonomy_TechnicalDoc_2026-09-16.docx` |
-| 0 | 0.2 | Personas & Role Journeys | ⏳ Pending | — | — | — |
+| 0 | 0.2 | Personas & Role Journeys | ✅ Done | _pending push_ | 2026-09-16 | `MadrashaOS_Session_0.2_Personas_Journeys_TechnicalDoc_2026-09-16.docx` |
 | 0 | 0.3 | Heuristic Review of Competing ERPs | ⏳ Pending | — | — | — |
 | 0 | 0.4 | Design Principles & Constraints Lock-In | ⏳ Pending | — | — | — |
 | 1 | 1.1 | Brand Kit | ⏳ Pending | — | — | — |
@@ -51,7 +51,7 @@
 | 7 | 7.3 | Asset Library & Icon Set | ⏳ Pending | — | — | — |
 | 7 | 7.4 | Design QA Contract | ⏳ Pending | — | — | — |
 
-**Summary:** 1 / 32 sessions done · 0 in progress · 31 pending · 0 blocked
+**Summary:** 2 / 32 sessions done · 0 in progress · 30 pending · 0 blocked
 
 ---
 
