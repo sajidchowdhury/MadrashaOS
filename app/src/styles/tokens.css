@@ -1,0 +1,243 @@
+/**
+ * MadrashaOS — Design Tokens (CSS Custom Properties)
+ *
+ * Source of truth: MadrashaOS_Session_1.1_Brand_Kit_Tokens.json v1.0.0 (FROZEN)
+ * Session: C0.1 — Token Ingestion
+ *
+ * Consumption rule (Session 1.2 R-T1 to R-T10):
+ *   Components MUST reference these CSS variables (or the matching Tailwind
+ *   theme keys). Raw hex / px / hardcoded font values are FORBIDDEN outside
+ *   this file. The ESLint rule `no-madrasha-raw-tokens` warns on violations.
+ *
+ * Three-layer hierarchy (Session 1.2):
+ *   Primitive  → raw values, declared here ONLY
+ *   Semantic   → role-based aliases (e.g. --color-action-primary)
+ *   Component  → component-specific aliases (declared in component CSS)
+ */
+
+@layer tokens {
+  :root {
+    /* ============================================================
+     * PRIMITIVE TOKENS (FROZEN v1.0.0 — Session 1.1)
+     * ============================================================ */
+
+    /* --- Color · Primary (Deep Teal — mosque tile glaze) --- */
+    --color-primary-50: #E6F2F2;
+    --color-primary-100: #C2DEDE;
+    --color-primary-200: #8FC2C2;
+    --color-primary-300: #5BA6A6;
+    --color-primary-400: #2E8A8A;
+    --color-primary-500: #0E5C5C; /* DEFAULT */
+    --color-primary-600: #0B4A4A;
+    --color-primary-700: #093838;
+    --color-primary-800: #062626;
+    --color-primary-900: #041818;
+    --color-primary-foreground: #FFFFFF;
+
+    /* --- Color · Accent (Warm Gold — mosque dome + illuminated manuscript) --- */
+    --color-accent-50: #FBF6E8;
+    --color-accent-100: #F3E8C2;
+    --color-accent-500: #C9A961; /* DEFAULT */
+    --color-accent-700: #8A6F2F;
+    --color-accent-foreground: #1A1814;
+
+    /* --- Color · Neutral (Warm grays — sandstone undertone) --- */
+    --color-neutral-0: #FFFFFF;
+    --color-neutral-50: #FAF8F5;
+    --color-neutral-100: #F2EFE8;
+    --color-neutral-200: #E0DCD2;
+    --color-neutral-300: #C7C1B5;
+    --color-neutral-400: #9A9388;
+    --color-neutral-500: #6E6A60;
+    --color-neutral-600: #4A4740;
+    --color-neutral-700: #2E2C27;
+    --color-neutral-800: #1F1E1A;
+    --color-neutral-900: #15140F;
+    --color-neutral-950: #0A0908;
+
+    /* --- Color · Semantic (WCAG 2.1 AA contrast-tuned) --- */
+    --color-semantic-success: #2F7D32;
+    --color-semantic-success-foreground: #FFFFFF;
+    --color-semantic-success-50: #E8F5E9;
+
+    --color-semantic-warning: #B58400;
+    --color-semantic-warning-foreground: #1A1814;
+    --color-semantic-warning-50: #FFF6E5;
+
+    --color-semantic-danger: #B91C1C;
+    --color-semantic-danger-foreground: #FFFFFF;
+    --color-semantic-danger-50: #FDE8E8;
+
+    --color-semantic-info: #1D4ED8;
+    --color-semantic-info-foreground: #FFFFFF;
+    --color-semantic-info-50: #E0EBFD;
+
+    /* ============================================================
+     * SEMANTIC TOKENS (Session 1.2 — role-based aliases)
+     * Point at primitives; never hardcode values here.
+     * ============================================================ */
+
+    /* --- Action colors (mapped to brand) --- */
+    --color-action-primary: var(--color-primary-500);
+    --color-action-primary-hover: var(--color-primary-600);
+    --color-action-primary-pressed: var(--color-primary-700);
+    --color-action-primary-foreground: var(--color-primary-foreground);
+
+    --color-action-accent: var(--color-accent-500);
+    --color-action-accent-foreground: var(--color-accent-foreground);
+
+    --color-action-danger: var(--color-semantic-danger);
+    --color-action-danger-foreground: var(--color-semantic-danger-foreground);
+
+    /* --- Surface colors --- */
+    --color-surface-canvas: var(--color-neutral-50); /* page background (warm) */
+    --color-surface-card: var(--color-neutral-0);    /* card / panel */
+    --color-surface-hover: var(--color-primary-50);  /* row hover */
+    --color-surface-selected: var(--color-primary-50);
+
+    /* --- Text colors --- */
+    --color-text-primary: var(--color-neutral-900);
+    --color-text-secondary: var(--color-neutral-500);
+    --color-text-muted: var(--color-neutral-400);
+    --color-text-inverse: var(--color-neutral-0);
+    --color-text-link: var(--color-primary-500);
+
+    /* --- Border / divider --- */
+    --color-border-default: var(--color-neutral-200);
+    --color-border-strong: var(--color-neutral-300);
+    --color-border-focus: var(--color-primary-500);
+
+    /* ============================================================
+     * TYPOGRAPHY TOKENS
+     * ============================================================ */
+
+    /* Font families (loaded via next/font in layout.tsx) */
+    --font-en: var(--font-inter), system-ui, sans-serif;
+    --font-bn: var(--font-hind-siliguri), var(--font-inter), sans-serif;
+    --font-ar: var(--font-noto-naskh-arabic), serif;
+    --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+    --font-default: var(--font-inter), var(--font-hind-siliguri), var(--font-noto-naskh-arabic), sans-serif;
+
+    /* Type scale (6 steps, FROZEN Session 1.1) */
+    --text-caption-size: 12px;
+    --text-caption-line-height: 16px;
+    --text-caption-weight: 400;
+    --text-caption-letter-spacing: 0.01em;
+
+    --text-body-size: 14px;
+    --text-body-line-height: 20px;
+    --text-body-weight: 400;
+    --text-body-letter-spacing: 0;
+
+    --text-subtitle-size: 16px;
+    --text-subtitle-line-height: 22px;
+    --text-subtitle-weight: 500;
+    --text-subtitle-letter-spacing: 0;
+
+    --text-title-size: 20px;
+    --text-title-line-height: 28px;
+    --text-title-weight: 600;
+    --text-title-letter-spacing: -0.01em;
+
+    --text-headline-size: 24px;
+    --text-headline-line-height: 32px;
+    --text-headline-weight: 700;
+    --text-headline-letter-spacing: -0.02em;
+
+    --text-display-size: 32px;
+    --text-display-line-height: 40px;
+    --text-display-weight: 700;
+    --text-display-letter-spacing: -0.03em;
+
+    /* ============================================================
+     * SPACING TOKENS (8pt grid — 14-step scale)
+     * ============================================================ */
+    --spacing-unit: 8px;
+    --spacing-0: 0px;
+    --spacing-1: 4px;
+    --spacing-2: 8px;
+    --spacing-3: 12px;
+    --spacing-4: 16px;
+    --spacing-5: 20px;
+    --spacing-6: 24px;
+    --spacing-8: 32px;
+    --spacing-10: 40px;
+    --spacing-12: 48px;
+    --spacing-16: 64px;
+    --spacing-20: 80px;
+    --spacing-24: 96px;
+    --spacing-32: 128px;
+
+    /* ============================================================
+     * RADIUS TOKENS
+     * ============================================================ */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-full: 9999px;
+
+    /* ============================================================
+     * ELEVATION TOKENS (5 levels — warm-neutral undertone)
+     * ============================================================ */
+    --elevation-0: none;
+    --elevation-1: 0 1px 2px rgba(10, 9, 8, 0.05);
+    --elevation-2: 0 2px 4px rgba(10, 9, 8, 0.08);
+    --elevation-3: 0 4px 8px rgba(10, 9, 8, 0.10);
+    --elevation-4: 0 8px 16px rgba(10, 9, 8, 0.12);
+    --elevation-5: 0 16px 32px rgba(10, 9, 8, 0.14);
+
+    /* ============================================================
+     * MOTION TOKENS
+     * ============================================================ */
+    --motion-duration-fast: 150ms;
+    --motion-duration-normal: 250ms;
+    --motion-duration-slow: 400ms;
+
+    --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --motion-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
+    --motion-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+    /* ============================================================
+     * GRID + BREAKPOINT TOKENS
+     * ============================================================ */
+    --grid-max-width: 1280px;
+    --grid-columns: 12;
+    --grid-gutter: 24px;
+    --grid-margin: 16px;
+
+    --breakpoint-sm: 375px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1280px;
+    --breakpoint-xl: 1440px;
+    --breakpoint-2xl: 1920px;
+  }
+
+  /* ============================================================
+   * DARK MODE OVERRIDES (P6 — WCAG AA contrast in both modes)
+   * Uses the same FROZEN palette; surfaces flip to dark neutrals.
+   * ============================================================ */
+  .dark {
+    --color-surface-canvas: var(--color-neutral-950);
+    --color-surface-card: var(--color-neutral-900);
+    --color-surface-hover: var(--color-neutral-800);
+    --color-surface-selected: var(--color-primary-800);
+
+    --color-text-primary: var(--color-neutral-50);
+    --color-text-secondary: var(--color-neutral-400);
+    --color-text-muted: var(--color-neutral-600);
+    --color-text-inverse: var(--color-neutral-900);
+
+    --color-border-default: var(--color-neutral-800);
+    --color-border-strong: var(--color-neutral-700);
+  }
+
+  /* ============================================================
+   * RTL MODE (P5 — Arabic first-class)
+   * Directional flip handled per-icon via [dir="rtl"] selector.
+   * ============================================================ */
+  [dir="rtl"] {
+    --font-default: var(--font-noto-naskh-arabic), var(--font-inter), var(--font-hind-siliguri), serif;
+  }
+}

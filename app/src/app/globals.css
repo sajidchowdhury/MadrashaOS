@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../styles/tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+ * MadrashaOS — Tailwind v4 Theme Bridge
+ * Session C0.1 — Token Ingestion
+ *
+ * Maps the FROZEN MadrashaOS tokens (src/styles/tokens.css) into
+ * Tailwind v4's @theme namespace so utility classes like
+ * `bg-primary-500`, `text-accent`, `shadow-elevation-2`, etc.
+ * are generated and reference the CSS variables.
+ *
+ * The shadcn/ui semantic aliases (--background, --foreground,
+ * --primary, --card, --border, --ring) are remapped to point at
+ * MadrashaOS semantic tokens so existing shadcn components inherit
+ * the brand palette without code changes.
+ * ============================================================ */
+
+@theme inline {
+  /* --- MadrashaOS color palette (Tailwind utilities) --- */
+  --color-primary-50: var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+  --color-primary-foreground: var(--color-primary-foreground);
+
+  --color-accent-50: var(--color-accent-50);
+  --color-accent-100: var(--color-accent-100);
+  --color-accent-500: var(--color-accent-500);
+  --color-accent-700: var(--color-accent-700);
+  --color-accent-foreground: var(--color-accent-foreground);
+
+  --color-neutral-0: var(--color-neutral-0);
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-500: var(--color-neutral-500);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-700: var(--color-neutral-700);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-neutral-900: var(--color-neutral-900);
+  --color-neutral-950: var(--color-neutral-950);
+
+  --color-success: var(--color-semantic-success);
+  --color-success-foreground: var(--color-semantic-success-foreground);
+  --color-success-50: var(--color-semantic-success-50);
+
+  --color-warning: var(--color-semantic-warning);
+  --color-warning-foreground: var(--color-semantic-warning-foreground);
+  --color-warning-50: var(--color-semantic-warning-50);
+
+  --color-danger: var(--color-semantic-danger);
+  --color-danger-foreground: var(--color-semantic-danger-foreground);
+  --color-danger-50: var(--color-semantic-danger-50);
+
+  --color-info: var(--color-semantic-info);
+  --color-info-foreground: var(--color-semantic-info-foreground);
+  --color-info-50: var(--color-semantic-info-50);
+
+  /* --- Tailwind shadcn semantic aliases (remapped to brand) --- */
+  --color-background: var(--color-surface-canvas);
+  --color-foreground: var(--color-text-primary);
+  --color-card: var(--color-surface-card);
+  --color-card-foreground: var(--color-text-primary);
+  --color-popover: var(--color-surface-card);
+  --color-popover-foreground: var(--color-text-primary);
+  --color-primary: var(--color-action-primary);
+  --color-primary-foreground: var(--color-action-primary-foreground);
+  --color-secondary: var(--color-neutral-100);
+  --color-secondary-foreground: var(--color-text-primary);
+  --color-muted: var(--color-neutral-100);
+  --color-muted-foreground: var(--color-text-secondary);
+  --color-accent: var(--color-action-accent);
+  --color-accent-foreground: var(--color-action-accent-foreground);
+  --color-destructive: var(--color-action-danger);
+  --color-destructive-foreground: var(--color-action-danger-foreground);
+  --color-border: var(--color-border-default);
+  --color-input: var(--color-border-strong);
+  --color-ring: var(--color-border-focus);
+
+  /* Sidebar tokens (shadcn sidebar) — remapped to brand */
+  --color-sidebar: var(--color-neutral-0);
+  --color-sidebar-foreground: var(--color-text-primary);
+  --color-sidebar-primary: var(--color-action-primary);
+  --color-sidebar-primary-foreground: var(--color-action-primary-foreground);
+  --color-sidebar-accent: var(--color-surface-hover);
+  --color-sidebar-accent-foreground: var(--color-text-primary);
+  --color-sidebar-border: var(--color-border-default);
+  --color-sidebar-ring: var(--color-border-focus);
+
+  /* Chart tokens — use MadrashaOS palette */
+  --color-chart-1: var(--color-primary-500);
+  --color-chart-2: var(--color-accent-500);
+  --color-chart-3: var(--color-semantic-success);
+  --color-chart-4: var(--color-semantic-warning);
+  --color-chart-5: var(--color-semantic-info);
+
+  /* --- Font families (Tailwind font-* utilities) --- */
+  --font-sans: var(--font-default);
+  --font-en: var(--font-en);
+  --font-bn: var(--font-bn);
+  --font-ar: var(--font-ar);
+  --font-mono: var(--font-mono);
+
+  /* --- Radius (Tailwind rounded-*) --- */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-full: var(--radius-full);
+
+  /* --- Elevation (Tailwind shadow-*) --- */
+  --shadow-elevation-0: var(--elevation-0);
+  --shadow-elevation-1: var(--elevation-1);
+  --shadow-elevation-2: var(--elevation-2);
+  --shadow-elevation-3: var(--elevation-3);
+  --shadow-elevation-4: var(--elevation-4);
+  --shadow-elevation-5: var(--elevation-5);
+
+  /* --- Motion (Tailwind duration-*, ease-*) --- */
+  --animate-duration-fast: var(--motion-duration-fast);
+  --animate-duration-normal: var(--motion-duration-normal);
+  --animate-duration-slow: var(--motion-duration-slow);
+
+  /* --- Breakpoints (Tailwind container / responsive) --- */
+  --breakpoint-sm: 375px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1280px;
+  --breakpoint-xl: 1440px;
+  --breakpoint-2xl: 1920px;
+}
+
+/* ============================================================
+ * shadcn / Tailwind v4 legacy :root aliases
+ * (kept for back-compat with shadcn/ui components that read
+ *  --background / --foreground / --radius directly)
+ * ============================================================ */
+
+:root {
+  --radius: var(--radius-lg);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-default);
+  }
+
+  /* Trilingual typography — body picks up font per lang attr */
+  html[lang="bn"] body { font-family: var(--font-bn); }
+  html[lang="ar"] body,
+  html[dir="rtl"] body { font-family: var(--font-ar); }
+
+  /* Focus ring (WCAG 2.4.7) — 2px outline + 2px offset */
+  :focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* RTL directional icon mirroring (Session 1.4 spec) */
+[dir="rtl"] .icon-directional,
+[dir="rtl"] [data-directional="true"] {
+  transform: scaleX(-1);
+}
