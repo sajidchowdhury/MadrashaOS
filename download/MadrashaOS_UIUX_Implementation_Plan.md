@@ -22,7 +22,7 @@
 | 0 | 0.2 | Personas & Role Journeys | ✅ Done | [`45d07c2`](https://github.com/sajidchowdhury/MadrashaOS/commit/45d07c2) | 2026-09-16 | `MadrashaOS_Session_0.2_Personas_Journeys_TechnicalDoc_2026-09-16.docx` |
 | 0 | 0.3 | Heuristic Review of Competing ERPs | ✅ Done | [`c90c234`](https://github.com/sajidchowdhury/MadrashaOS/commit/c90c234) | 2026-09-16 | `MadrashaOS_Session_0.3_Heuristic_Review_TechnicalDoc_2026-09-16.docx` |
 | 0 | 0.4 | Design Principles & Constraints Lock-In | ✅ Done | [`9949cf5`](https://github.com/sajidchowdhury/MadrashaOS/commit/9949cf5) | 2026-09-16 | `MadrashaOS_Session_0.4_Design_Principles_TechnicalDoc_2026-09-16.docx` |
-| 1 | 1.1 | Brand Kit | ✅ Done | _pending push_ | 2026-09-16 | `MadrashaOS_Session_1.1_Brand_Kit_TechnicalDoc_2026-09-16.docx` + `MadrashaOS_Session_1.1_Brand_Kit_Tokens.json` |
+| 1 | 1.1 | Brand Kit | ✅ Done | [`0720829`](https://github.com/sajidchowdhury/MadrashaOS/commit/0720829) | 2026-09-16 | `MadrashaOS_Session_1.1_Brand_Kit_TechnicalDoc_2026-09-16.docx` + `MadrashaOS_Session_1.1_Brand_Kit_Tokens.json` |
 | 1 | 1.2 | Token System | ⏳ Pending | — | — | — |
 | 1 | 1.3 | Component Library v0 | ⏳ Pending | — | — | — |
 | 1 | 1.4 | Iconography & Illustration | ⏳ Pending | — | — | — |
