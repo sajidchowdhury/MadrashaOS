@@ -1,0 +1,181 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-09-16",
+  "session": "1.1",
+  "status": "approved (pending client logo asset delivery)",
+  "color": {
+    "primary": {
+      "_comment": "Deep Teal — evokes mosque tile glaze + water; modern premium SaaS feel",
+      "50": "#E6F2F2",
+      "100": "#C2DEDE",
+      "200": "#8FC2C2",
+      "300": "#5BA6A6",
+      "400": "#2E8A8A",
+      "500": "#0E5C5C",
+      "600": "#0B4A4A",
+      "700": "#093838",
+      "800": "#062626",
+      "900": "#041818",
+      "DEFAULT": "#0E5C5C",
+      "foreground": "#FFFFFF"
+    },
+    "accent": {
+      "_comment": "Warm Gold — premium, evokes mosque dome + illuminated manuscript",
+      "DEFAULT": "#C9A961",
+      "foreground": "#1A1814",
+      "50": "#FBF6E8",
+      "100": "#F3E8C2",
+      "500": "#C9A961",
+      "700": "#8A6F2F"
+    },
+    "neutral": {
+      "_comment": "Warm grays — sandstone undertone, never clinical",
+      "0": "#FFFFFF",
+      "50": "#FAF8F5",
+      "100": "#F2EFE8",
+      "200": "#E0DCD2",
+      "300": "#C7C1B5",
+      "400": "#9A9388",
+      "500": "#6E6A60",
+      "600": "#4A4740",
+      "700": "#2E2C27",
+      "800": "#1F1E1A",
+      "900": "#15140F",
+      "950": "#0A0908"
+    },
+    "semantic": {
+      "success": {
+        "DEFAULT": "#2F7D32",
+        "foreground": "#FFFFFF",
+        "50": "#E8F5E9"
+      },
+      "warning": {
+        "DEFAULT": "#B58400",
+        "foreground": "#1A1814",
+        "50": "#FFF6E5"
+      },
+      "danger": {
+        "DEFAULT": "#B91C1C",
+        "foreground": "#FFFFFF",
+        "50": "#FDE8E8"
+      },
+      "info": {
+        "DEFAULT": "#1D4ED8",
+        "foreground": "#FFFFFF",
+        "50": "#E0EBFD"
+      }
+    }
+  },
+  "typography": {
+    "font_family": {
+      "bangla": "'Hind Siliguri', sans-serif",
+      "english": "'Inter', sans-serif",
+      "arabic": "'Noto Naskh Arabic', serif",
+      "mono": "'JetBrains Mono', monospace",
+      "default": "'Inter', 'Hind Siliguri', 'Noto Naskh Arabic', sans-serif"
+    },
+    "type_scale": {
+      "caption": {
+        "size_px": 12,
+        "line_height_px": 16,
+        "weight": 400,
+        "letter_spacing": "0.01em"
+      },
+      "body": {
+        "size_px": 14,
+        "line_height_px": 20,
+        "weight": 400,
+        "letter_spacing": "0"
+      },
+      "subtitle": {
+        "size_px": 16,
+        "line_height_px": 22,
+        "weight": 500,
+        "letter_spacing": "0"
+      },
+      "title": {
+        "size_px": 20,
+        "line_height_px": 28,
+        "weight": 600,
+        "letter_spacing": "-0.01em"
+      },
+      "headline": {
+        "size_px": 24,
+        "line_height_px": 32,
+        "weight": 700,
+        "letter_spacing": "-0.02em"
+      },
+      "display": {
+        "size_px": 32,
+        "line_height_px": 40,
+        "weight": 700,
+        "letter_spacing": "-0.03em"
+      }
+    },
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    }
+  },
+  "spacing": {
+    "unit_px": 8,
+    "scale_px": [
+      0,
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      32,
+      40,
+      48,
+      64,
+      80,
+      96,
+      128
+    ]
+  },
+  "radius": {
+    "sm": 4,
+    "md": 6,
+    "lg": 8,
+    "xl": 12,
+    "2xl": 16,
+    "full": 9999
+  },
+  "elevation": {
+    "0": "none",
+    "1": "0 1px 2px rgba(10,9,8,0.05)",
+    "2": "0 2px 4px rgba(10,9,8,0.08)",
+    "3": "0 4px 8px rgba(10,9,8,0.10)",
+    "4": "0 8px 16px rgba(10,9,8,0.12)",
+    "5": "0 16px 32px rgba(10,9,8,0.14)"
+  },
+  "motion": {
+    "duration": {
+      "fast": "150ms",
+      "normal": "250ms",
+      "slow": "400ms"
+    },
+    "easing": {
+      "standard": "cubic-bezier(0.4, 0.0, 0.2, 1)",
+      "decelerate": "cubic-bezier(0.0, 0.0, 0.2, 1)",
+      "accelerate": "cubic-bezier(0.4, 0.0, 1, 1)"
+    }
+  },
+  "breakpoints": {
+    "sm": 375,
+    "md": 768,
+    "lg": 1280,
+    "xl": 1440,
+    "2xl": 1920
+  },
+  "grid": {
+    "columns_12_max_width_px": 1280,
+    "gutter_px": 24,
+    "margin_px": 16
+  }
+}
