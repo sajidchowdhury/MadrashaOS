@@ -4,18 +4,20 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
+import { QueryProvider } from "@/lib/query/QueryProvider";
 import { AppShell } from "@/components/shell/AppShell";
 import { DevToolbar } from "@/components/dev/DevToolbar";
 
 /**
- * MadrashaOS — Root Layout (Session C0.3)
+ * MadrashaOS — Root Layout (Session C0.4)
  *
  * Wraps the entire app in:
  *   1. next/font: 4 trilingual fonts (Inter / Hind Siliguri / Noto Naskh Arabic / JetBrains Mono)
  *   2. ThemeProvider (next-themes): light/dark/system with class attribute
  *   3. I18nProvider: locale state + t() + dir + cookie persistence
- *   4. AppShell: TopBar + SideNav + main + sticky Footer
- *   5. DevToolbar: floating dev controls (role / branch / language / theme / network)
+ *   4. QueryProvider: TanStack Query client + cache
+ *   5. AppShell: TopBar + SideNav + main + sticky Footer
+ *   6. DevToolbar: floating dev controls (role / branch / language / theme / network)
  *
  * The <html suppressHydrationWarning> suppresses the theme class mismatch
  * that next-themes injects on the client (SSR renders without a class to
@@ -80,8 +82,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <I18nProvider>
-            <AppShell>{children}</AppShell>
-            <DevToolbar />
+            <QueryProvider>
+              <AppShell>{children}</AppShell>
+              <DevToolbar />
+            </QueryProvider>
           </I18nProvider>
         </ThemeProvider>
         <Toaster />

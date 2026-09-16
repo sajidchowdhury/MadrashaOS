@@ -1,55 +1,46 @@
 "use client";
 
 /**
- * MadrashaOS — DevToolbar
+ * MadrashaOS — DevToolbar (C0.4 upgrade)
  *
- * Session C0.3 — Theme Provider & Global Shell Skeleton
+ * Now wired to the Zustand sessionStore:
+ *   - Role selector → setRole() → re-derives permissions[]
+ *   - Branch selector → setBranch()
+ *   - Network simulator → setNetwork() (Risk R6 — attendance under poor connectivity)
  *
- * Floating toolbar (bottom-end corner) for instant context switching during
- * UI/UX development. Collapses to a small "DEV" badge; expands to show:
- *   - Role selector (8 personas from Session 0.2 — visual placeholder,
- *     wired to Zustand session store in C0.4)
- *   - Branch selector (3 branches — visual placeholder, wired in C2.1)
- *   - Language buttons (functional — reuses I18nProvider)
- *   - Theme toggle (functional — uses next-themes)
- *   - Network simulator (visual placeholder, wired in C3.3 for attendance)
+ * Language + Theme remain on their respective providers (I18nProvider +
+ * next-themes) since those are also persisted separately.
  *
- * Always visible on top of all content (z-50).
+ * Collapses to a small "DEV" badge; expands to show all controls.
  */
 
 import { useState } from "react";
 import {
   Bug,
-  X,
   ChevronUp,
-  type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { useTheme } from "next-themes";
+import { useSessionStore } from "@/stores/sessionStore";
+import {
+  ROLES,
+  BRANCHES,
+  NETWORK_MODES,
+  ROLE_LABELS,
+  BRANCH_LABELS,
+  type Role,
+  type Branch,
+  type NetworkMode,
+} from "@/stores/types";
 import { locales, localeConfig, type Locale } from "@/lib/i18n/config";
-
-/** 8 personas from Session 0.2 (visual placeholders until C0.4 session store) */
-const ROLES = [
-  "super-admin",
-  "authority",
-  "administrator",
-  "accountant",
-  "teacher",
-  "storekeeper",
-  "guardian",
-  "student",
-] as const;
-
-const BRANCHES = ["dhaka", "chittagong", "sylhet"] as const;
-const NETWORKS = ["normal", "slow", "offline"] as const;
+import { getRolePermissions } from "@/lib/auth/role-permissions";
 
 export function DevToolbar() {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
+  const { role, branch, network, permissions, setRole, setBranch, setNetwork } =
+    useSessionStore();
   const [expanded, setExpanded] = useState(false);
-  const [role, setRole] = useState<string>("administrator");
-  const [branch, setBranch] = useState<string>("dhaka");
-  const [network, setNetwork] = useState<string>("normal");
 
   /* --- Collapsed: just a floating DEV badge --- */
   if (!expanded) {
@@ -62,13 +53,16 @@ export function DevToolbar() {
       >
         <Bug className="h-4 w-4" />
         <span>{t("shell.dev.expand")}</span>
+        <span className="ms-1 rounded-full bg-primary-500 px-1.5 py-0.5 text-[10px] font-bold">
+          {ROLE_LABELS[role].native}
+        </span>
       </button>
     );
   }
 
   /* --- Expanded: controls panel --- */
   return (
-    <div className="fixed bottom-4 end-4 z-50 w-72 rounded-xl border border-border-default bg-surface-card shadow-elevation-4">
+    <div className="fixed bottom-4 end-4 z-50 w-80 rounded-xl border border-border-default bg-surface-card shadow-elevation-4">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border-default px-4 py-2.5">
         <div className="flex items-center gap-2">
@@ -89,43 +83,43 @@ export function DevToolbar() {
 
       {/* Controls */}
       <div className="space-y-3 p-4">
-        {/* Role selector */}
+        {/* Role selector — wired to sessionStore */}
         <div>
           <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
-            {t("shell.dev.role")}
+            {t("shell.dev.role")} ({permissions.length} perms)
           </label>
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
+            onChange={(e) => setRole(e.target.value as Role)}
             className="w-full rounded-md border border-border-strong bg-surface-card px-3 py-1.5 text-subtitle text-text-primary focus:border-primary-500 focus:outline-none"
           >
             {ROLES.map((r) => (
               <option key={r} value={r}>
-                {r.replace("-", " ")}
+                {ROLE_LABELS[r].english} ({ROLE_LABELS[r].native})
               </option>
             ))}
           </select>
         </div>
 
-        {/* Branch selector */}
+        {/* Branch selector — wired to sessionStore */}
         <div>
           <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
             {t("shell.dev.branch")}
           </label>
           <select
             value={branch}
-            onChange={(e) => setBranch(e.target.value)}
+            onChange={(e) => setBranch(e.target.value as Branch)}
             className="w-full rounded-md border border-border-strong bg-surface-card px-3 py-1.5 text-subtitle text-text-primary focus:border-primary-500 focus:outline-none"
           >
             {BRANCHES.map((b) => (
               <option key={b} value={b}>
-                {t(`shell.topbar.branch.${b}` as never)}
+                {BRANCH_LABELS[b]}
               </option>
             ))}
           </select>
         </div>
 
-        {/* Language buttons */}
+        {/* Language buttons — wired to I18nProvider */}
         <div>
           <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
             Language
@@ -148,7 +142,7 @@ export function DevToolbar() {
           </div>
         </div>
 
-        {/* Theme toggle */}
+        {/* Theme toggle — wired to next-themes */}
         <div>
           <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
             Theme
@@ -179,13 +173,13 @@ export function DevToolbar() {
           </div>
         </div>
 
-        {/* Network simulator */}
+        {/* Network simulator — wired to sessionStore */}
         <div>
           <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
             {t("shell.dev.network")}
           </label>
           <div className="flex gap-1">
-            {NETWORKS.map((n) => (
+            {NETWORK_MODES.map((n: NetworkMode) => (
               <button
                 key={n}
                 type="button"
@@ -203,6 +197,19 @@ export function DevToolbar() {
                 {t(`shell.dev.network.${n}` as never)}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Permissions preview (truncated) */}
+        <div>
+          <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
+            Permissions ({permissions.length})
+          </label>
+          <div className="max-h-24 overflow-y-auto rounded-md border border-border-default bg-neutral-50 p-2">
+            <code className="text-[10px] leading-relaxed text-text-secondary">
+              {getRolePermissions(role).slice(0, 6).join(", ")}
+              {permissions.length > 6 && ` … +${permissions.length - 6} more`}
+            </code>
           </div>
         </div>
       </div>
