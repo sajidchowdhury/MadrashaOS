@@ -8,13 +8,56 @@
 | Source | MadrashaOS Implementation-Grade SRS v2.0 (2026-09-16) |
 | Author Role | Lead UI/UX Designer (Apple / Google / Tesla design heritage) |
 | Audience | Project Manager, Backend Lead, Frontend Lead, Client Authority |
-| Total Duration | ~5.5 weeks (8 phases, 30 sessions) |
+| Total Duration | ~5.5 weeks (8 phases, 32 sessions) |
+
+---
+
+## 📊 Progress Tracker
+
+> Auto-updated after each session. Status legend: ✅ Done · 🔄 In Progress · ⏳ Pending · ⛔ Blocked
+
+| Phase | Session | Title | Status | Commit | Date | Deliverable |
+|-------|---------|-------|--------|--------|------|-------------|
+| 0 | 0.1 | SRS Deep-Read & Module Taxonomy | ✅ Done | _pending push_ | 2026-09-16 | `MadrashaOS_Session_0.1_Module_Taxonomy_TechnicalDoc_2026-09-16.docx` |
+| 0 | 0.2 | Personas & Role Journeys | ⏳ Pending | — | — | — |
+| 0 | 0.3 | Heuristic Review of Competing ERPs | ⏳ Pending | — | — | — |
+| 0 | 0.4 | Design Principles & Constraints Lock-In | ⏳ Pending | — | — | — |
+| 1 | 1.1 | Brand Kit | ⏳ Pending | — | — | — |
+| 1 | 1.2 | Token System | ⏳ Pending | — | — | — |
+| 1 | 1.3 | Component Library v0 | ⏳ Pending | — | — | — |
+| 1 | 1.4 | Iconography & Illustration | ⏳ Pending | — | — | — |
+| 2 | 2.1 | Module Taxonomy & Dynamic Nav Model | ⏳ Pending | — | — | — |
+| 2 | 2.2 | Role-Based Dashboard Wireframes | ⏳ Pending | — | — | — |
+| 2 | 2.3 | State System Spec | ⏳ Pending | — | — | — |
+| 2 | 2.4 | Permission-Aware UI Rules | ⏳ Pending | — | — | — |
+| 3 | 3.1 | Foundation Modules Wireframes | ⏳ Pending | — | — | — |
+| 3 | 3.2 | People Modules Wireframes | ⏳ Pending | — | — | — |
+| 3 | 3.3 | Academic Modules Wireframes (Mobile-First) | ⏳ Pending | — | — | — |
+| 3 | 3.4 | Finance Modules Wireframes | ⏳ Pending | — | — | — |
+| 4 | 4.1 | Global Shell & Navigation Hi-Fi | ⏳ Pending | — | — | — |
+| 4 | 4.2 | Foundation Module Hi-Fi | ⏳ Pending | — | — | — |
+| 4 | 4.3 | People & Academic Hi-Fi | ⏳ Pending | — | — | — |
+| 4 | 4.4 | Finance & Operations Hi-Fi | ⏳ Pending | — | — | — |
+| 4 | 4.5 | Dashboards Hi-Fi | ⏳ Pending | — | — | — |
+| 4 | 4.6 | Mobile Screens Hi-Fi | ⏳ Pending | — | — | — |
+| 5 | 5.1 | PDF Templates | ⏳ Pending | — | — | — |
+| 5 | 5.2 | Public Website Templates | ⏳ Pending | — | — | — |
+| 5 | 5.3 | Multi-Language Typography Validation | ⏳ Pending | — | — | — |
+| 6 | 6.1 | Interactive Prototype | ⏳ Pending | — | — | — |
+| 6 | 6.2 | Usability Tests with Role Reps | ⏳ Pending | — | — | — |
+| 6 | 6.3 | Iteration & Final Spec | ⏳ Pending | — | — | — |
+| 7 | 7.1 | Design Tokens Export | ⏳ Pending | — | — | — |
+| 7 | 7.2 | Component Spec Sheet | ⏳ Pending | — | — | — |
+| 7 | 7.3 | Asset Library & Icon Set | ⏳ Pending | — | — | — |
+| 7 | 7.4 | Design QA Contract | ⏳ Pending | — | — | — |
+
+**Summary:** 1 / 32 sessions done · 0 in progress · 31 pending · 0 blocked
 
 ---
 
 ## 1. Overview
 
-This document defines the complete plan for delivering a build-ready UI/UX for MadrashaOS, a multi-tenant, multi-branch Madrasha ERP with 40+ modules across Foundation, People, Academic, Finance, Operations, Communication, and Platform layers. The plan is organized into 8 phases and 30 sessions; each session has a single objective, named inputs, concrete deliverables, and explicit exit criteria. After Session 30, the frontend and backend developers receive a complete design system, hi-fi mockups, mobile prototypes, PDF templates, and a design-QA contract — sufficient to build the entire system without further design input.
+This document defines the complete plan for delivering a build-ready UI/UX for MadrashaOS, a multi-tenant, multi-branch Madrasha ERP with 40+ modules across Foundation, People, Academic, Finance, Operations, Communication, and Platform layers. The plan is organized into 8 phases and 32 sessions; each session has a single objective, named inputs, concrete deliverables, and explicit exit criteria. After Session 32, the frontend and backend developers receive a complete design system, hi-fi mockups, mobile prototypes, PDF templates, and a design-QA contract — sufficient to build the entire system without further design input.
 
 Design principles: simplicity over feature-density (Apple), consistent and accessible components (Google Material, WCAG 2.1 AA per SRS §10.6), and minimal, task-focused surfaces (Tesla). The client constraint in SRS §10.8 — "not extremely complicated, not difficult for teachers or accountants, not dependent on one employee" — is the governing north star.
 
