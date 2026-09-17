@@ -1,25 +1,24 @@
 "use client";
 
 /**
- * MadrashaOS — Public Notices Page (Phase C5.2 · SRS §2.7.3)
+ * MadrashaOS — Public Notices Page (Task 8-a redesign)
  *
- * Public notice board — visitors see general announcements, holidays,
- * exam schedules and event notices without any permission gate.
+ * iom.edu.bd-style premium notices page:
+ *   - Page header with title + breadcrumb
+ *   - Search bar + filter chips (All, Holiday, Event, Exam, Admission, General)
+ *   - Each notice as a premium card with date badge + audience badge
+ *   - "Read More" opens a Dialog with the full notice body
+ *   - Pagination at the bottom
  *
- * Features:
- *   - Filter by category (All, General, Holiday, Event, Exam)
- *   - Each notice card shows title, date, body excerpt, "Read more"
- *   - "Read more" opens a Dialog with the full notice body
- *   - Search by title (free text)
- *
- * Per SRS §2.7.3: public notices are world-readable (no permission gate).
- * The internal /notices page (under `(app)`) is the back-office composer.
+ * Public per SRS §2.7.3 — no permission gate.
  */
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Megaphone, CalendarDays, Search, X, AlertCircle,
-  GraduationCap, PartyPopper, FileText,
+  GraduationCap, PartyPopper, FileText, ChevronLeft, ChevronRight,
+  Home, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,13 +31,14 @@ import {
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { formatDate, formatDateLong } from "@/lib/i18n/format";
 
-type Category = "General" | "Holiday" | "Event" | "Exam";
+type Category = "General" | "Holiday" | "Event" | "Exam" | "Admission";
 
 type Notice = {
   id: string;
   title: string;
   date: Date;
   category: Category;
+  audience: "Public" | "Parents" | "Students" | "Staff";
   excerpt: string;
   body: string;
 };
@@ -46,126 +46,101 @@ type Notice = {
 const NOTICES: Notice[] = [
   {
     id: "n-1",
-    title: "Eid-e-Milad-un-Nabi Holiday — Office Closed",
+    title: "Admissions Open for 2026–2027 — Apply Now",
     date: new Date(2026, 8, 26),
-    category: "Holiday",
-    excerpt: "The madrasha office and classes will remain closed on 27 September in observance of Eid-e-Milad-un-Nabi (12 Rabi ul-Awwal 1448). Regular classes resume Monday 29 September.",
-    body: `In the name of Allah, the Most Gracious, the Most Merciful.
-
-Dear parents and guardians,
-
-The madrasha office and all classes (Hifz, Alim, Qirat, Tajweed and Weekend Islamic Studies) will remain closed on Saturday 27 September 2026 in observance of Eid-e-Milad-un-Nabi (12 Rabi ul-Awwal 1448 AH).
-
-Regular classes will resume on Monday 29 September at the usual time of 8:00 AM. Any classes cancelled on Saturday will be rescheduled during the following week.
-
-For emergencies, the office phone (+880 2 555 0199) will be attended between 10 AM and 1 PM on the holiday.
-
-We pray Allah accepts our worship and grants us the intercession of His beloved Messenger ﷺ. Ameen.
-
-Wassalam,
-Madrasha Office`,
+    category: "Admission",
+    audience: "Public",
+    excerpt:
+      "Online admissions for the 2026–2027 academic session are now open. Apply early to secure your seat in the Alim, Hifz and Tajweed programs. Application deadline: 15 October 2026.",
+    body:
+      "In the name of Allah, the Most Gracious, the Most Merciful.\n\nDear parents and guardians,\n\nOnline admissions for the 2026–2027 academic session are now open. Seats are available across all six programs: Alim Course (3 years), Nazera Quran (6 months), One-to-One Private, Hifz-ul-Quran, Tajweed Foundation, and Arabic Language.\n\nApplication deadline: 15 October 2026. Late applications will be considered only if seats remain.\n\nTo apply: visit /public/admission or call +880 9638-113322 during office hours (Sat–Thu, 8:30 AM – 4:30 PM).\n\nWe pray Allah accepts your intention to seek knowledge. Ameen.\n\nWassalam,\nMadrasha Office",
   },
   {
     id: "n-2",
-    title: "Half-Yearly Exam Routine Published",
-    date: new Date(2026, 8, 22),
-    category: "Exam",
-    excerpt: "Half-yearly examination routines for all classes (Hifz + Alim) are now available at the office. Exams begin 5 October 2026.",
-    body: `Dear parents and guardians,
-
-The half-yearly examination routines for the academic year 2026-2027 have been published. The routines cover all classes across both Hifz and Alim programs.
-
-Key dates:
-- Hifz written exams: 5–9 October 2026
-- Alim course exams: 5–12 October 2026
-- Qirat practical: 13 October 2026
-- Result publication: 25 October 2026
-
-The full routine can be collected from the madrasha office during working hours (8:30 AM – 4:30 PM). Please ensure your child arrives at least 15 minutes before each exam.
-
-A printable PDF version is also being emailed to all registered parents. Please check your spam folder if you do not receive it by 25 September.
-
-Wassalam,
-Examination Committee`,
+    title: "Eid-e-Milad-un-Nabi Holiday — Office Closed",
+    date: new Date(2026, 8, 24),
+    category: "Holiday",
+    audience: "Public",
+    excerpt:
+      "The madrasha office and all classes will remain closed on 27 September in observance of Eid-e-Milad-un-Nabi (12 Rabi ul-Awwal 1448). Regular classes resume Monday 29 September.",
+    body:
+      "In the name of Allah, the Most Gracious, the Most Merciful.\n\nDear parents and guardians,\n\nThe madrasha office and all classes (Hifz, Alim, Qirat, Tajweed and Weekend Islamic Studies) will remain closed on Saturday 27 September 2026 in observance of Eid-e-Milad-un-Nabi (12 Rabi ul-Awwal 1448 AH).\n\nRegular classes will resume on Monday 29 September at the usual time of 8:00 AM. Any classes cancelled on Saturday will be rescheduled during the following week.\n\nFor emergencies, the office phone will be attended between 10 AM and 1 PM on the holiday.\n\nWassalam,\nMadrasha Office",
   },
   {
     id: "n-3",
-    title: "Annual Sports Day — 15 October",
-    date: new Date(2026, 8, 18),
-    category: "Event",
-    excerpt: "Annual sports competition on 15 October at the Bashundhara playground. Parents are cordially invited to attend and encourage the students.",
-    body: `Dear parents and guardians,
-
-We are pleased to announce that our Annual Sports Day will be held on Thursday 15 October 2026 at the Bashundhara Sports Ground, Gate-3.
-
-Events:
-- 100m, 200m and 400m races (junior + senior categories)
-- Long jump and high jump
-- Quran recitation competition (special category)
-- Tug-of-war (inter-class)
-- Prize distribution at 4:30 PM
-
-Students should arrive by 8:30 AM in their house t-shirts (color assigned by class teacher). Lunch and snacks will be provided. Parents are warmly invited to attend and encourage the students.
-
-For any queries, please contact the sports coordinator at the office.
-
-Jazak Allah khairan,
-Sports Committee`,
+    title: "Half-Yearly Exam Routine Published",
+    date: new Date(2026, 8, 22),
+    category: "Exam",
+    audience: "Parents",
+    excerpt:
+      "Half-yearly examination routines for all classes (Hifz + Alim) are now available at the office. Exams begin 5 October 2026. Result publication: 25 October 2026.",
+    body:
+      "Dear parents and guardians,\n\nThe half-yearly examination routines for the academic year 2026-2027 have been published. The routines cover all classes across both Hifz and Alim programs.\n\nKey dates:\n- Hifz written exams: 5–9 October 2026\n- Alim course exams: 5–12 October 2026\n- Qirat practical: 13 October 2026\n- Result publication: 25 October 2026\n\nThe full routine can be collected from the madrasha office during working hours (8:30 AM – 4:30 PM). Please ensure your child arrives at least 15 minutes before each exam.\n\nWassalam,\nExamination Committee",
   },
   {
     id: "n-4",
-    title: "Parent-Teacher Meeting — 28 September",
-    date: new Date(2026, 8, 15),
+    title: "Inter-Class Quran Competition — 8 October",
+    date: new Date(2026, 8, 18),
     category: "Event",
-    excerpt: "Half-yearly parent-teacher meeting on 28 September 2026, 10 AM – 1 PM. All parents are requested to attend to discuss their child's progress.",
-    body: `Dear parents and guardians,
-
-A parent-teacher meeting (PTM) is scheduled for Sunday 28 September 2026 from 10:00 AM to 1:00 PM in the main hall of the madrasha.
-
-Agenda:
-- Individual class teacher feedback
-- Half-yearly exam preparation guidance
-- Discussion of student attendance and behaviour
-- Plans for the winter semester (November–February)
-
-All parents are strongly requested to attend. If you cannot attend in person, please notify the class teacher in advance so an alternative time can be arranged.
-
-The meeting will conclude with Maghrib prayer at the madrasha mosque — parents are welcome to join.
-
-Wassalam,
-Madrasha Office`,
+    audience: "Students",
+    excerpt:
+      "Annual Quran recitation and memorization competition on 8 October 2026. Three categories: Tilawah, Hifz, and Qirat. Chief guest: Qari Yusuf Mansur.",
+    body:
+      "Dear parents and guardians,\n\nWe are pleased to announce that our Inter-Class Quran Competition will be held on Thursday 8 October 2026 at the Madrasha Main Hall.\n\nThree competition categories:\n- Tilawah (beautiful recitation) — ages 7–10\n- Hifz (memorization) — ages 10–14\n- Qirat (canonical recitations) — ages 14+\n\nChief guest: Qari Yusuf Mansur (international Qari, ijazah holder).\n\nPrizes: 1st place ৳5,000, 2nd place ৳3,000, 3rd place ৳2,000 — per category.\n\nParticipation is open to all enrolled students. Registration closes 1 October at the office.\n\nJazak Allah khairan,\nSports Committee",
   },
   {
     id: "n-5",
+    title: "Parent-Teacher Meeting — 28 September",
+    date: new Date(2026, 8, 15),
+    category: "Event",
+    audience: "Parents",
+    excerpt:
+      "Half-yearly parent-teacher meeting on 28 September 2026, 10 AM – 1 PM. All parents are requested to attend to discuss their child's progress.",
+    body:
+      "Dear parents and guardians,\n\nA parent-teacher meeting (PTM) is scheduled for Sunday 28 September 2026 from 10:00 AM to 1:00 PM in the main hall of the madrasha.\n\nAgenda:\n- Individual class teacher feedback\n- Half-yearly exam preparation guidance\n- Discussion of student attendance and behaviour\n- Plans for the winter semester (November–February)\n\nAll parents are strongly requested to attend. The meeting will conclude with Maghrib prayer at the madrasha mosque — parents are welcome to join.\n\nWassalam,\nMadrasha Office",
+  },
+  {
+    id: "n-6",
     title: "New Library Books Added — Catalog Update",
     date: new Date(2026, 8, 10),
     category: "General",
-    excerpt: "85 new books have been added to the madrasha library — covering Hadith sciences, Tafsir, Arabic literature and children's Islamic stories.",
-    body: `Dear students and parents,
-
-We are delighted to announce that 85 new titles have been added to the madrasha library this semester. The new collection includes:
-
-- 15 titles on Hadith sciences (including a new commentary on Sahih al-Bukhari)
-- 12 titles on Tafsir (including Tafsir Ibn Kathir in 10 volumes)
-- 20 titles on Arabic literature and grammar
-- 18 children's Islamic story books (ages 6–12)
-- 20 reference titles for Alim Course students
-
-The new catalog is available at the library counter. Library cards are free for all enrolled students. Library hours: Sat–Thu, 9:00 AM – 4:00 PM.
-
-We thank the parents who donated towards this expansion and welcome further book donations in sha Allah.
-
-Wassalam,
-Librarian`,
+    audience: "Students",
+    excerpt:
+      "85 new books added to the madrasha library — covering Hadith sciences, Tafsir, Arabic literature and children's Islamic stories.",
+    body:
+      "Dear students and parents,\n\nWe are delighted to announce that 85 new titles have been added to the madrasha library this semester. The new collection includes:\n\n- 15 titles on Hadith sciences (including a new commentary on Sahih al-Bukhari)\n- 12 titles on Tafsir (including Tafsir Ibn Kathir in 10 volumes)\n- 20 titles on Arabic literature and grammar\n- 18 children's Islamic story books (ages 6–12)\n- 20 reference titles for Alim Course students\n\nThe new catalog is available at the library counter. Library cards are free for all enrolled students.\n\nWassalam,\nLibrarian",
+  },
+  {
+    id: "n-7",
+    title: "Winter Semester Timetable Released",
+    date: new Date(2026, 8, 5),
+    category: "General",
+    audience: "Staff",
+    excerpt:
+      "The winter semester (November–February) timetable has been released. All teachers are requested to review their schedule and confirm by 20 September.",
+    body:
+      "Dear teachers,\n\nThe winter semester (November 2026 – February 2027) timetable is now available in the staff portal. Please review your assigned classes and confirm your availability by 20 September 2026.\n\nKey changes for the winter semester:\n- Morning Hifz session shifts to 6:30 AM (was 7:00 AM)\n- Evening Alim class adds a Hadith specialization module\n- New Saturday Tajweed workshop for adults\n\nFor any scheduling conflicts, please contact the academic coordinator.\n\nWassalam,\nAcademic Committee",
+  },
+  {
+    id: "n-8",
+    title: "Annual Sports Day — 15 October",
+    date: new Date(2026, 8, 2),
+    category: "Event",
+    audience: "Public",
+    excerpt:
+      "Annual sports competition on 15 October at the Bashundhara playground. Parents are cordially invited to attend and encourage the students.",
+    body:
+      "Dear parents and guardians,\n\nWe are pleased to announce that our Annual Sports Day will be held on Thursday 15 October 2026 at the Bashundhara Sports Ground, Gate-3.\n\nEvents:\n- 100m, 200m and 400m races (junior + senior categories)\n- Long jump and high jump\n- Quran recitation competition (special category)\n- Tug-of-war (inter-class)\n- Prize distribution at 4:30 PM\n\nStudents should arrive by 8:30 AM in their house t-shirts. Lunch and snacks will be provided.\n\nJazak Allah khairan,\nSports Committee",
   },
 ];
 
-const CATEGORIES: Array<"All" | Category> = ["All", "General", "Holiday", "Event", "Exam"];
+const CATEGORIES: Array<"All" | Category> = ["All", "Admission", "Holiday", "Event", "Exam", "General"];
 
-const CATEGORY_TONE: Record<Category, {
-  badge: string;
-  icon: React.ComponentType<{ className?: string }>;
-}> = {
+const CATEGORY_TONE: Record<Category, { badge: string; icon: React.ComponentType<{ className?: string }> }> = {
+  Admission: {
+    badge: "border-accent-200 bg-accent-50 text-accent-700",
+    icon: GraduationCap,
+  },
   General: {
     badge: "border-border-default bg-surface-hover text-text-secondary",
     icon: FileText,
@@ -175,7 +150,7 @@ const CATEGORY_TONE: Record<Category, {
     icon: AlertCircle,
   },
   Event: {
-    badge: "border-accent-200 bg-accent-50 text-accent-700",
+    badge: "border-success-200 bg-success-50 text-semantic-success",
     icon: PartyPopper,
   },
   Exam: {
@@ -184,15 +159,24 @@ const CATEGORY_TONE: Record<Category, {
   },
 };
 
+const AUDIENCE_TONE: Record<Notice["audience"], string> = {
+  Public: "border-border-default bg-surface-canvas text-text-secondary",
+  Parents: "border-primary-200 bg-primary-50 text-primary-700",
+  Students: "border-info-200 bg-info-50 text-semantic-info",
+  Staff: "border-accent-200 bg-accent-50 text-accent-700",
+};
+
+const PAGE_SIZE = 5;
+
 export default function PublicNoticesPage() {
   const { locale } = useI18n();
   const [activeCategory, setActiveCategory] = React.useState<"All" | Category>("All");
   const [search, setSearch] = React.useState("");
   const [openNotice, setOpenNotice] = React.useState<Notice | null>(null);
+  const [page, setPage] = React.useState(1);
 
   const filtered = NOTICES.filter((notice) => {
-    const matchesCategory =
-      activeCategory === "All" || notice.category === activeCategory;
+    const matchesCategory = activeCategory === "All" || notice.category === activeCategory;
     const matchesSearch =
       search.trim().length === 0 ||
       notice.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -200,8 +184,30 @@ export default function PublicNoticesPage() {
     return matchesCategory && matchesSearch;
   });
 
+  // Reset page when filter changes.
+  React.useEffect(() => {
+    setPage(1);
+  }, [activeCategory, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="mx-auto max-w-[var(--grid-max-width)] px-4 py-12 md:px-6 md:py-16">
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="mb-6">
+        <ol className="flex flex-wrap items-center gap-1.5 text-caption text-text-muted">
+          <li>
+            <Link href="/public" className="inline-flex items-center gap-1 hover:text-primary-700">
+              <Home className="h-3 w-3" />
+              Home
+            </Link>
+          </li>
+          <li aria-hidden>/</li>
+          <li className="text-text-secondary" aria-current="page">Notices</li>
+        </ol>
+      </nav>
+
       {/* Header */}
       <header className="mb-8 max-w-3xl">
         <Badge variant="outline" className="mb-3 border-primary-200 bg-primary-50 text-primary-700">
@@ -211,7 +217,7 @@ export default function PublicNoticesPage() {
         <h1 className="text-display font-bold text-text-primary">
           Public Notices
         </h1>
-        <p className="mt-3 text-body text-text-secondary">
+        <p className="mt-3 text-body text-text-secondary md:text-subtitle">
           Announcements for parents, students and the wider community.
           No login required — these notices are public per SRS §2.7.3.
         </p>
@@ -275,7 +281,7 @@ export default function PublicNoticesPage() {
       </div>
 
       {/* Notice list */}
-      {filtered.length === 0 ? (
+      {paged.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center gap-3 p-12 text-center">
             <Megaphone className="h-10 w-10 text-text-muted" />
@@ -296,16 +302,24 @@ export default function PublicNoticesPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {filtered.map((notice) => {
+          {paged.map((notice) => {
             const tone = CATEGORY_TONE[notice.category];
             const Icon = tone.icon;
             return (
-              <Card key={notice.id} className="transition-shadow hover:shadow-elevation-2">
-                <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-start">
-                  {/* Date block */}
-                  <div className="flex shrink-0 items-center gap-3 md:w-32 md:flex-col md:items-start">
-                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-primary-50 text-primary-700">
-                      <CalendarDays className="h-4 w-4" />
+              <Card
+                key={notice.id}
+                className="group transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-500 hover:shadow-elevation-2"
+              >
+                <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-start">
+                  {/* Date badge block */}
+                  <div className="flex shrink-0 items-center gap-3 md:w-28 md:flex-col md:items-start">
+                    <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg border border-primary-200 bg-primary-50 text-primary-700">
+                      <span className="text-headline font-bold leading-none">
+                        {notice.date.getDate()}
+                      </span>
+                      <span className="text-caption uppercase">
+                        {notice.date.toLocaleDateString("en-US", { month: "short" })}
+                      </span>
                     </div>
                     <div className="md:mt-1">
                       <p className="text-caption font-medium text-text-secondary">
@@ -324,11 +338,14 @@ export default function PublicNoticesPage() {
                         <Icon className="h-3 w-3" />
                         {notice.category}
                       </Badge>
-                      <h2 className="text-subtitle font-semibold text-text-primary">
-                        {notice.title}
-                      </h2>
+                      <Badge variant="outline" className={AUDIENCE_TONE[notice.audience]}>
+                        {notice.audience}
+                      </Badge>
                     </div>
-                    <p className="mt-2 text-body text-text-secondary line-clamp-3">
+                    <h2 className="mt-2 text-subtitle font-semibold text-text-primary">
+                      {notice.title}
+                    </h2>
+                    <p className="mt-1.5 line-clamp-3 text-body text-text-secondary">
                       {notice.excerpt}
                     </p>
                     <div className="mt-3">
@@ -338,6 +355,7 @@ export default function PublicNoticesPage() {
                         onClick={() => setOpenNotice(notice)}
                       >
                         Read more
+                        <ArrowRight className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -345,6 +363,36 @@ export default function PublicNoticesPage() {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Prev
+          </Button>
+          <span className="px-3 text-body text-text-secondary">
+            Page <span className="font-medium text-text-primary">{page}</span> of{" "}
+            <span className="font-medium text-text-primary">{totalPages}</span>
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            aria-label="Next page"
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       )}
 

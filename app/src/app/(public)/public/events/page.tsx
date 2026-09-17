@@ -1,26 +1,24 @@
 "use client";
 
 /**
- * MadrashaOS — Public Events Page (Phase C5.2 · SRS §2.7.3)
+ * MadrashaOS — Public Events Page (Task 8-a redesign)
  *
- * Public event calendar — upcoming madrasha events:
- *   - Annual Sports, Quran Competition, Parent-Teacher Meeting, Graduation
- *
- * Each event:
- *   - Name, date, time, location, description
- *   - "Add to Calendar" button (mock — generates a basic ICS download)
- *
- * NO permissions required — public visitors see this freely.
+ * iom.edu.bd-style premium events page:
+ *   - Page header + breadcrumb
+ *   - Upcoming events: each as a premium card with date block (day/month),
+ *     title, time, location, description, "Add to Calendar" button
+ *   - Past events section (greyed out)
  */
 
 import * as React from "react";
+import Link from "next/link";
 import {
   CalendarDays, Clock, MapPin, Trophy, BookOpen, Users,
-  GraduationCap, CalendarPlus, Info,
+  GraduationCap, CalendarPlus, Info, Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { formatDate, formatDateLong, formatNumber } from "@/lib/i18n/format";
@@ -29,7 +27,7 @@ type Event = {
   id: string;
   name: string;
   date: Date;
-  startTime: string; // "HH:MM"
+  startTime: string;
   endTime: string;
   location: string;
   description: string;
@@ -40,25 +38,27 @@ type Event = {
 const EVENTS: Event[] = [
   {
     id: "e-1",
-    name: "Annual Sports Day 2026",
-    date: new Date(2026, 9, 15),
-    startTime: "08:30",
-    endTime: "17:00",
-    location: "Bashundhara Sports Ground, Gate-3",
-    description: "Annual inter-house sports competition featuring races, long jump, tug-of-war and a special Quran recitation contest. Prize distribution at 4:30 PM. Lunch and refreshments provided.",
-    icon: Trophy,
-    category: "Sports",
-  },
-  {
-    id: "e-2",
     name: "Inter-Class Quran Competition",
     date: new Date(2026, 9, 8),
     startTime: "09:00",
     endTime: "13:00",
     location: "Madrasha Main Hall",
-    description: "Annual Quran recitation and memorization competition. Students from Hifz and Alim programs compete across three categories: Tilawah, Hifz, and Qirat. Chief guest: Qari Yusuf Mansur.",
+    description:
+      "Annual Quran recitation and memorization competition. Students from Hifz and Alim programs compete across three categories: Tilawah, Hifz, and Qirat. Chief guest: Qari Yusuf Mansur.",
     icon: BookOpen,
     category: "Academic",
+  },
+  {
+    id: "e-2",
+    name: "Annual Sports Day 2026",
+    date: new Date(2026, 9, 15),
+    startTime: "08:30",
+    endTime: "17:00",
+    location: "Bashundhara Sports Ground, Gate-3",
+    description:
+      "Annual inter-house sports competition featuring races, long jump, tug-of-war and a special Quran recitation contest. Prize distribution at 4:30 PM. Lunch and refreshments provided.",
+    icon: Trophy,
+    category: "Sports",
   },
   {
     id: "e-3",
@@ -67,7 +67,8 @@ const EVENTS: Event[] = [
     startTime: "10:00",
     endTime: "13:00",
     location: "Madrasha Main Hall",
-    description: "Half-yearly parent-teacher meeting to discuss student progress, exam preparation guidance, and winter semester plans. Concludes with Maghrib prayer at the madrasha mosque.",
+    description:
+      "Half-yearly parent-teacher meeting to discuss student progress, exam preparation guidance, and winter semester plans. Concludes with Maghrib prayer at the madrasha mosque.",
     icon: Users,
     category: "Community",
   },
@@ -78,9 +79,36 @@ const EVENTS: Event[] = [
     startTime: "15:00",
     endTime: "18:30",
     location: "Auditorium, Block-C",
-    description: "Graduation ceremony for the Dawra-e-Hadith (Alim Course final year) class of 2026. Distinguished guests include scholars from Wifaq-ul-Madaris. Certificate distribution, Dua and dinner.",
+    description:
+      "Graduation ceremony for the Dawra-e-Hadith (Alim Course final year) class of 2026. Distinguished guests include scholars from Wifaq-ul-Madaris. Certificate distribution, Dua and dinner.",
     icon: GraduationCap,
     category: "Ceremony",
+  },
+];
+
+// Past events (dates before now's simulation anchor — Sep 2026).
+const PAST_EVENTS: Event[] = [
+  {
+    id: "p-1",
+    name: "Annual Quran Recitation Workshop",
+    date: new Date(2026, 5, 12),
+    startTime: "10:00",
+    endTime: "12:00",
+    location: "Online (Zoom)",
+    description: "Special workshop on Tajweed refinement for advanced Hifz students.",
+    icon: BookOpen,
+    category: "Academic",
+  },
+  {
+    id: "p-2",
+    name: "Eid Get-Together — Community Iftar",
+    date: new Date(2026, 2, 25),
+    startTime: "17:30",
+    endTime: "20:00",
+    location: "Madrasha Courtyard",
+    description: "Community Iftar gathering with students, parents and staff. Over 400 attendees.",
+    icon: Users,
+    category: "Community",
   },
 ];
 
@@ -91,24 +119,19 @@ const CATEGORY_TONE: Record<Event["category"], string> = {
   Ceremony: "border-primary-200 bg-primary-50 text-primary-700",
 };
 
-/**
- * Generate a minimal ICS calendar file for an event and trigger download.
- * This is the standard iCalendar format — works with Google Calendar,
- * Outlook, and Apple Calendar.
- */
 function downloadIcs(event: Event) {
   const pad = (n: number) => String(n).padStart(2, "0");
-  const toIcsDate = (d: Date) =>
-    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${event.startTime.replace(":", "")}00`;
-  const dtStart = toIcsDate(event.date);
-  const dtEnd = toIcsDate(event.date).replace(event.startTime.replace(":", ""), event.endTime.replace(":", ""));
+  const toIcsDate = (d: Date, time: string) =>
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${time.replace(":", "")}00`;
+  const dtStart = toIcsDate(event.date, event.startTime);
+  const dtEnd = toIcsDate(event.date, event.endTime);
 
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//MadrashaOS//Public Events//EN",
     "BEGIN:VEVENT",
-    `UID:${event.id}@darulirfan.edu.bd`,
+    `UID:${event.id}@madrashaos.org`,
     `DTSTAMP:${dtStart}Z`,
     `DTSTART:${dtStart}`,
     `DTEND:${dtEnd}`,
@@ -128,6 +151,22 @@ function downloadIcs(event: Event) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function DateBlock({ date }: { date: Date }) {
+  return (
+    <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-lg border border-primary-200 bg-primary-50 text-primary-700">
+      <span className="text-headline font-bold leading-none">
+        {date.getDate()}
+      </span>
+      <span className="text-caption uppercase tracking-wider">
+        {date.toLocaleDateString("en-US", { month: "short" })}
+      </span>
+      <span className="text-caption text-primary-600">
+        {date.getFullYear()}
+      </span>
+    </div>
+  );
 }
 
 export default function PublicEventsPage() {
@@ -150,11 +189,27 @@ export default function PublicEventsPage() {
     }
   };
 
-  // Sort by date ascending.
-  const sorted = [...EVENTS].sort((a, b) => a.date.getTime() - b.date.getTime());
+  // Sort upcoming ascending.
+  const upcoming = [...EVENTS].sort((a, b) => a.date.getTime() - b.date.getTime());
+  // Sort past descending (most recent first).
+  const past = [...PAST_EVENTS].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
     <div className="mx-auto max-w-[var(--grid-max-width)] px-4 py-12 md:px-6 md:py-16">
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="mb-6">
+        <ol className="flex flex-wrap items-center gap-1.5 text-caption text-text-muted">
+          <li>
+            <Link href="/public" className="inline-flex items-center gap-1 hover:text-primary-700">
+              <Home className="h-3 w-3" />
+              Home
+            </Link>
+          </li>
+          <li aria-hidden>/</li>
+          <li className="text-text-secondary" aria-current="page">Events</li>
+        </ol>
+      </nav>
+
       {/* Header */}
       <header className="mb-10 max-w-3xl">
         <Badge variant="outline" className="mb-3 border-primary-200 bg-primary-50 text-primary-700">
@@ -164,44 +219,45 @@ export default function PublicEventsPage() {
         <h1 className="text-display font-bold text-text-primary">
           Upcoming Events
         </h1>
-        <p className="mt-3 text-body text-text-secondary">
+        <p className="mt-3 text-body text-text-secondary md:text-subtitle">
           Mark your calendar — parents and community members are warmly invited
           to attend all listed events. Click <em>Add to Calendar</em> to download
           a calendar file (works with Google Calendar, Outlook and Apple Calendar).
         </p>
       </header>
 
-      {/* Event list — timeline style */}
-      <ol className="relative space-y-6 border-s-2 border-border-default ps-6">
-        {sorted.map((event) => {
+      {/* Upcoming events */}
+      <div className="space-y-4">
+        {upcoming.map((event) => {
           const Icon = event.icon;
           return (
-            <li key={event.id} className="relative">
-              {/* Timeline node */}
-              <span
-                aria-hidden
-                className="absolute -start-[1.625rem] top-4 flex h-7 w-7 items-center justify-center rounded-full border-2 border-primary-500 bg-surface-card text-primary-600 shadow-elevation-1"
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </span>
+            <Card
+              key={event.id}
+              className="group border-border-default transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-500 hover:shadow-elevation-2"
+            >
+              <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-start">
+                {/* Date block */}
+                <DateBlock date={event.date} />
 
-              <Card>
-                <CardHeader>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-subtitle">{event.name}</CardTitle>
-                      <p className="mt-1 text-caption text-text-muted">
+                {/* Content */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-subtitle font-semibold text-text-primary">
+                        {event.name}
+                      </h2>
+                      <p className="mt-0.5 text-caption text-text-muted">
                         {formatDateLong(event.date, locale)} ·{" "}
                         {event.startTime} – {event.endTime}
                       </p>
                     </div>
                     <Badge variant="outline" className={CATEGORY_TONE[event.category]}>
+                      <Icon className="h-3 w-3" />
                       {event.category}
                     </Badge>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-body text-text-secondary">
+
+                  <p className="mt-3 text-body text-text-secondary">
                     {event.description}
                   </p>
 
@@ -240,16 +296,65 @@ export default function PublicEventsPage() {
                     </Button>
                   </div>
 
-                  {/* Date string (machine-readable for crawlers) */}
+                  {/* sr-only date for crawlers */}
                   <p className="sr-only">
                     {formatDate(event.date, locale)}
                   </p>
-                </CardContent>
-              </Card>
-            </li>
+                </div>
+              </CardContent>
+            </Card>
           );
         })}
-      </ol>
+      </div>
+
+      {/* Past events */}
+      <section aria-label="Past events" className="mt-12">
+        <h2 className="mb-6 text-headline font-bold text-text-secondary">
+          Past Events
+        </h2>
+        <div className="space-y-3">
+          {past.map((event) => {
+            const Icon = event.icon;
+            return (
+              <Card
+                key={event.id}
+                className="border-border-default bg-surface-hover/40 opacity-75"
+              >
+                <CardContent className="flex flex-col gap-4 p-5 opacity-90 md:flex-row md:items-start">
+                  <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-lg border border-border-default bg-surface-card text-text-muted">
+                    <span className="text-headline font-bold leading-none">
+                      {event.date.getDate()}
+                    </span>
+                    <span className="text-caption uppercase">
+                      {event.date.toLocaleDateString("en-US", { month: "short" })}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-subtitle font-semibold text-text-secondary">
+                          {event.name}
+                        </h3>
+                        <p className="mt-0.5 text-caption text-text-muted">
+                          {formatDateLong(event.date, locale)} ·{" "}
+                          {event.startTime} – {event.endTime}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className={CATEGORY_TONE[event.category]}>
+                        <Icon className="h-3 w-3" />
+                        {event.category}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-body text-text-secondary">
+                      {event.description}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Info note */}
       <Card className="mt-10 border-info-200 bg-info-50">

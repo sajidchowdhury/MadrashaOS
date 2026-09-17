@@ -1,25 +1,20 @@
 "use client";
 
 /**
- * MadrashaOS — Public Contact Page (Phase C5.2 · SRS §2.7.3)
+ * MadrashaOS — Public Contact Page (Task 8-a redesign)
  *
- * Public contact page:
- *   - Contact form (name, email, message) — no permission required
- *   - Honeypot field for bot-trap protection
- *   - Contact info: address, phone, email, hours
- *   - Google Maps embed placeholder (styled div, no real embed)
- *   - Social media links (mock)
- *
- * On submit:
- *   - If honeypot filled → silently rejected with "Spam detected" error
- *   - Otherwise → toast "Message sent — we'll reply within 2 working days"
- *     and form resets
+ * iom.edu.bd-style premium contact page:
+ *   - 2-column layout: left = contact form, right = info + map + social
+ *   - Premium form with focus states
+ *   - Honeypot field for spam prevention
+ *   - Reads contact info from cmsStore.footer.contact
  */
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Mail, Phone, MapPin, Clock, Send, ShieldAlert,
-  Facebook, Youtube, Twitter, Instagram, AlertTriangle, CheckCircle2,
+  AlertTriangle, CheckCircle2, Home, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,42 +24,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-
-const CONTACT_INFO = [
-  {
-    icon: MapPin,
-    label: "Address",
-    value: "123 Bashundhara R/A, Dhaka 1229, Bangladesh",
-  },
-  {
-    icon: Phone,
-    label: "Phone",
-    value: "+880 2 555 0199",
-  },
-  {
-    icon: Mail,
-    label: "Email",
-    value: "info@darulirfan.edu.bd",
-  },
-  {
-    icon: Clock,
-    label: "Office Hours",
-    value: "Sat – Thu, 8:30 AM – 4:30 PM (closed Fridays)",
-  },
-];
-
-const SOCIAL_LINKS = [
-  { label: "Facebook", icon: Facebook, href: "#" },
-  { label: "YouTube", icon: Youtube, href: "#" },
-  { label: "Twitter", icon: Twitter, href: "#" },
-  { label: "Instagram", icon: Instagram, href: "#" },
-];
+import { useCmsStore } from "@/stores/cmsStore";
+import { DynamicIcon } from "@/components/public/DynamicIcon";
 
 export default function PublicContactPage() {
   const { toast } = useToast();
+  const footer = useCmsStore((s) => s.footer);
 
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
+  const [subject, setSubject] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [honeypot, setHoneypot] = React.useState("");
   const [sent, setSent] = React.useState(false);
@@ -80,28 +49,65 @@ export default function PublicContactPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSpamDetected(false);
-
     if (honeypot.trim().length > 0) {
       setSpamDetected(true);
       return;
     }
-
     if (!canSubmit) return;
-
     setSent(true);
     toast({
       title: "Message sent",
       description: "We'll reply within 2 working days. Jazak Allah khairan.",
     });
-
     setName("");
     setEmail("");
+    setSubject("");
     setMessage("");
     setHoneypot("");
   };
 
+  const CONTACT_INFO = [
+    {
+      icon: MapPin,
+      label: "Address",
+      value: footer.contact.address,
+      valueBn: footer.contact.addressBn,
+    },
+    {
+      icon: Phone,
+      label: "Phone",
+      value: footer.contact.phone,
+      href: `tel:${footer.contact.phone.replace(/[\s+-]/g, "")}`,
+    },
+    {
+      icon: Mail,
+      label: "Email",
+      value: footer.contact.email,
+      href: `mailto:${footer.contact.email}`,
+    },
+    {
+      icon: Clock,
+      label: "Office Hours",
+      value: footer.contact.hours,
+    },
+  ];
+
   return (
     <div className="mx-auto max-w-[var(--grid-max-width)] px-4 py-12 md:px-6 md:py-16">
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="mb-6">
+        <ol className="flex flex-wrap items-center gap-1.5 text-caption text-text-muted">
+          <li>
+            <Link href="/public" className="inline-flex items-center gap-1 hover:text-primary-700">
+              <Home className="h-3 w-3" />
+              Home
+            </Link>
+          </li>
+          <li aria-hidden>/</li>
+          <li className="text-text-secondary" aria-current="page">Contact</li>
+        </ol>
+      </nav>
+
       {/* Header */}
       <header className="mb-10 max-w-3xl">
         <Badge variant="outline" className="mb-3 border-primary-200 bg-primary-50 text-primary-700">
@@ -111,16 +117,16 @@ export default function PublicContactPage() {
         <h1 className="text-display font-bold text-text-primary">
           Get in Touch
         </h1>
-        <p className="mt-3 text-body text-text-secondary">
+        <p className="mt-3 text-body text-text-secondary md:text-subtitle">
           Have a question about admissions, programs or donations? We&apos;re
           here to help. Reach us by phone, email, or send a message below.
         </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Contact form — spans 2 columns */}
+        {/* Contact form */}
         <div className="lg:col-span-2">
-          <Card>
+          <Card className="border-border-default shadow-elevation-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-subtitle">
                 <Send className="h-5 w-5 text-primary-600" />
@@ -128,7 +134,6 @@ export default function PublicContactPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Spam detected */}
               {spamDetected && (
                 <Alert variant="destructive" className="mb-4">
                   <ShieldAlert className="h-4 w-4" />
@@ -140,7 +145,6 @@ export default function PublicContactPage() {
                 </Alert>
               )}
 
-              {/* Success */}
               {sent && (
                 <div className="mb-4 flex items-start gap-3 rounded-lg border border-semantic-success/30 bg-success-50 p-4">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 text-semantic-success" />
@@ -164,42 +168,52 @@ export default function PublicContactPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Name */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="name" className="mb-1.5 block text-subtitle">
+                      Your Name <span className="text-semantic-danger">*</span>
+                    </Label>
+                    <Input
+                      id="name"
+                      placeholder="Full name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email" className="mb-1.5 block text-subtitle">
+                      Email <span className="text-semantic-danger">*</span>
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      aria-invalid={!emailValid}
+                      required
+                    />
+                    {!emailValid && (
+                      <p className="mt-1 text-caption text-semantic-danger">
+                        Please enter a valid email address.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <div>
-                  <Label htmlFor="name" className="mb-1.5 block text-subtitle">
-                    Your Name <span className="text-semantic-danger">*</span>
+                  <Label htmlFor="subject" className="mb-1.5 block text-subtitle">
+                    Subject <span className="text-text-muted">(optional)</span>
                   </Label>
                   <Input
-                    id="name"
-                    placeholder="Full name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
+                    id="subject"
+                    placeholder="What is this about?"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
                   />
                 </div>
 
-                {/* Email */}
-                <div>
-                  <Label htmlFor="email" className="mb-1.5 block text-subtitle">
-                    Email <span className="text-semantic-danger">*</span>
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    aria-invalid={!emailValid}
-                    required
-                  />
-                  {!emailValid && (
-                    <p className="mt-1 text-caption text-semantic-danger">
-                      Please enter a valid email address.
-                    </p>
-                  )}
-                </div>
-
-                {/* Message */}
                 <div>
                   <Label htmlFor="message" className="mb-1.5 block text-subtitle">
                     Message <span className="text-semantic-danger">*</span>
@@ -220,7 +234,7 @@ export default function PublicContactPage() {
                   )}
                 </div>
 
-                {/* Honeypot — visually hidden */}
+                {/* Honeypot */}
                 <div aria-hidden className="absolute -z-10 h-0 w-0 overflow-hidden opacity-0">
                   <label htmlFor="website">Website (leave blank)</label>
                   <input
@@ -243,9 +257,9 @@ export default function PublicContactPage() {
           </Card>
         </div>
 
-        {/* Contact info + map + social */}
+        {/* Right rail — info + map + social */}
         <div className="space-y-4">
-          <Card>
+          <Card className="border-border-default">
             <CardHeader>
               <CardTitle className="text-subtitle">Contact Information</CardTitle>
             </CardHeader>
@@ -253,18 +267,31 @@ export default function PublicContactPage() {
               <ul className="space-y-4">
                 {CONTACT_INFO.map((info) => {
                   const Icon = info.icon;
+                  const content = (
+                    <>
+                      <p className="text-caption font-medium text-text-muted">
+                        {info.label}
+                      </p>
+                      <p className="text-body text-text-primary">{info.value}</p>
+                      {"valueBn" in info && info.valueBn && (
+                        <p className="text-caption text-text-muted" lang="bn">{info.valueBn}</p>
+                      )}
+                    </>
+                  );
                   return (
                     <li key={info.label} className="flex items-start gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
                         <Icon className="h-4 w-4" />
                       </span>
                       <div className="min-w-0">
-                        <p className="text-caption font-medium text-text-muted">
-                          {info.label}
-                        </p>
-                        <p className="text-body text-text-primary">
-                          {info.value}
-                        </p>
+                        {info.href ? (
+                          <a
+                            href={info.href}
+                            className="block transition-colors hover:text-primary-700"
+                          >
+                            {content}
+                          </a>
+                        ) : content}
                       </div>
                     </li>
                   );
@@ -274,7 +301,7 @@ export default function PublicContactPage() {
           </Card>
 
           {/* Map placeholder */}
-          <Card>
+          <Card className="border-border-default">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-subtitle">
                 <MapPin className="h-5 w-5 text-primary-600" />
@@ -306,26 +333,28 @@ export default function PublicContactPage() {
           </Card>
 
           {/* Social */}
-          <Card>
+          <Card className="border-border-default">
             <CardHeader>
-              <CardTitle className="text-subtitle">Follow Us</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-subtitle">
+                <MessageSquare className="h-5 w-5 text-primary-600" />
+                Follow Us
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-4 gap-2">
-                {SOCIAL_LINKS.map((social) => {
-                  const Icon = social.icon;
-                  return (
-                    <a
-                      key={social.label}
-                      href={social.href}
-                      aria-label={social.label}
-                      title={social.label}
-                      className="flex aspect-square items-center justify-center rounded-lg border border-border-default bg-surface-canvas text-text-secondary transition-colors hover:border-primary-500 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                    >
-                      <Icon className="h-5 w-5" />
-                    </a>
-                  );
-                })}
+              <div className="grid grid-cols-5 gap-2">
+                {footer.social.map((social) => (
+                  <a
+                    key={social.platform}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={social.platform}
+                    title={social.platform}
+                    className="flex aspect-square items-center justify-center rounded-lg border border-border-default bg-surface-canvas text-text-secondary transition-colors hover:border-primary-500 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  >
+                    <DynamicIcon name={social.icon} className="h-4 w-4" />
+                  </a>
+                ))}
               </div>
             </CardContent>
           </Card>
