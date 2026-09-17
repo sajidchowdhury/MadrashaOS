@@ -99,10 +99,12 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 | C5 | 5.1 | Branded PDF Templates | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | 6 templates (FeeReceipt/MarkSheet/ResultSheet/Certificate/LedgerStatement/OutstandingFeesReport) + `/dev/pdfs` showcase + trigger buttons on /fees, /accounting, /students |
 | C5 | 5.2 | Public Website Templates | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | 7 public pages (home/programs/admission/notices/events/contact/donate) + PublicLayout + layout restructure (root → (app) + (public) groups) |
 | C5 | 5.3 | Multi-Language Typography Validation | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | TypographyChecker component + `/dev/typography` route + `scripts/typography-audit.ts` (36 routes × 3 locales = 108 combos · 0 tofu) |
-| C6 | 6.1–6.3 | Prototype & Usability Validation | ⏳ Pending | — | — | — |
+| C6 | 6.1 | Interactive Prototype (8 Flows) | ✅ Done | [`88df329`](https://github.com/sajidchowdhury/MadrashaOS/commit/88df329) | 2026-09-16 | `flows/registry.ts` (8 flows) + `flows/walkthrough.ts` (Zustand) + `FlowOverlay` (pulsing CTA ring) + `/dev/flows` route + DevToolbar FlowsSection |
+| C6 | 6.2 | Role Walkthroughs with Seeded Data | ✅ Done | [`88df329`](https://github.com/sajidchowdhury/MadrashaOS/commit/88df329) | 2026-09-16 | `/dev/walkthroughs` (8 personas × 3 tasks = 24 audit) + `/dev/a11y` (WCAG 2.1 AA checklist, 8 pass/2 partial) + a11y fixes (2.1.1 + 4.1.3) |
+| C6 | 6.3 | Polish & Iteration | ✅ Done | [`88df329`](https://github.com/sajidchowdhury/MadrashaOS/commit/88df329) | 2026-09-16 | Fixed 6 widget dead-ends (QuickActions/AttendanceToday/TeacherClasses/GuardianChildren/ApprovalsQueue now navigate + toast); removed stray app/ dir (was causing 404s); lazy-loaded illustrations; focus rings + hover states verified |
 | C7 | 7.1–7.4 | Design QA, Docs & Handoff | ⏳ Pending | — | — | — |
 
-**Summary:** 21 / 32 sessions done · 0 in progress · 11 pending · 0 blocked
+**Summary:** 24 / 32 sessions done · 0 in progress · 8 pending · 0 blocked
 
 **Phase C0 (Foundation & Design System in Code): ✅ Complete** — 4/4 sessions done. Branded shell, trilingual i18n (bn/en/ar with RTL), next-themes, mock data layer (Zustand + 110+ permissions + 8-persona role map + fixtures), 16 TanStack Query hooks, `/dev/data` debug route.
 
@@ -116,7 +118,9 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 
 **Phase C5 (Print/PDF & Public Website): ✅ Complete** — 3/3 sessions done. 6 branded PDF templates (FeeReceipt/MarkSheet/ResultSheet/Certificate/LedgerStatement/OutstandingFeesReport) with `/dev/pdfs` showcase + trigger buttons on /fees, /accounting, /students/[id]. 7-page public website (home/programs/admission/notices/events/contact/donate) with separate PublicLayout (no AppShell/DevToolbar). Layout restructured: root → (app) + (public) route groups. Typography audit: 36 routes × 3 locales = 108 combinations · 0 tofu · 3/3 formatters passed. Risk R13 (branded PDFs), R14 (Arabic glyphs), R10 (donation honeypot), C8 (public/protected route segregation) all enforced.
 
-Next up: **Phase C6 (Prototype & Usability Validation)** — 8-flow clickable prototype + role walkthroughs + polish pass.
+**Phase C6 (Prototype & Usability Validation): ✅ Complete** — 3/3 sessions done. 8-flow interactive prototype with FlowOverlay (pulsing CTA ring) + DevToolbar FlowsSection + `/dev/flows` catalog. 24-task role walkthrough audit (8 personas × 3 tasks) at `/dev/walkthroughs`. WCAG 2.1 AA checklist at `/dev/a11y` (8 pass / 2 partial / 0 fail after fixes). Polish pass: fixed 6 widget dead-ends (QuickActions/AttendanceToday/TeacherClasses/GuardianChildren/ApprovalsQueue now navigate + toast); removed stray `app/` dir that was causing 404s on all routes; lazy-loaded illustrations; a11y fixes (WCAG 2.1.1 disabled button + 4.1.3 status messages). All 8 flows now walkable end-to-end without dead-ends.
+
+Next up: **Phase C7 (Design QA, Docs & Handoff)** — component documentation + design QA contract + asset library export + final sign-off.
 
 ---
 
@@ -575,7 +579,7 @@ Next up: **Phase C6 (Prototype & Usability Validation)** — 8-flow clickable pr
 
 ---
 
-## 10. Phase C6 — Prototype & Usability Validation (4 days)
+## 10. Phase C6 — Prototype & Usability Validation (4 days) ✅
 
 ### 6.1 — Interactive Prototype (8 Flows)
 
