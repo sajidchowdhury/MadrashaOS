@@ -175,7 +175,7 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   return (
     <div
-      className="flex min-h-[24rem] w-full flex-col gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 sm:w-72"
+      className="flex min-h-[24rem] w-full flex-col gap-2 rounded-xl border border-border-default bg-surface-canvas p-3 sm:w-72"
     >
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">

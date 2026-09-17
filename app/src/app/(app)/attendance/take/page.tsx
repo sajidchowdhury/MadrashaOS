@@ -370,7 +370,7 @@ function TakeAttendanceContent() {
       {/* Sticky action bar — also a mobile CTA anchor/target for the shell-level MobileBottomActionBar */}
       <div
         data-mobile-cta-anchor
-        className="sticky bottom-0 z-20 -mx-4 border-t border-border-default bg-surface-card/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8"
+        className="sticky bottom-0 z-20 -mx-4 border-t border-border-default bg-surface-card px-4 py-3 backdrop-blur md:-mx-8 md:px-8"
       >
         <div className="mx-auto flex max-w-[var(--grid-max-width)] items-center gap-2">
           <Button

@@ -392,7 +392,7 @@ function FlowsSection({
 
   // No active flow — show the "Start Flow" dropdown.
   return (
-    <div className="rounded-lg border border-border-default bg-surface-canvas/60 p-3">
+    <div className="rounded-lg border border-border-default bg-surface-canvas p-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-caption font-medium uppercase tracking-wider text-text-muted">

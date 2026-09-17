@@ -47,7 +47,7 @@ export default function AppGroupLayout({
        * surface). */}
       <div
         aria-hidden
-        className="pointer-events-none fixed bottom-3 end-3 z-30 hidden items-center gap-1.5 rounded-full border border-border-default bg-surface-card/95 px-3 py-1.5 text-caption font-medium text-text-secondary shadow-elevation-2 backdrop-blur md:inline-flex"
+        className="pointer-events-none fixed bottom-3 end-3 z-30 hidden items-center gap-1.5 rounded-full border border-border-default bg-surface-card px-3 py-1.5 text-caption font-medium text-text-secondary shadow-elevation-2 backdrop-blur md:inline-flex"
         title={`Authenticated as ${ROLE_LABELS[role].english}`}
       >
         <ShieldCheck className="h-3.5 w-3.5 text-semantic-success" />

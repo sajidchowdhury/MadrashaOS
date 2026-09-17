@@ -126,7 +126,7 @@ export default function DevFlowsPage() {
   return (
     <div className="min-h-screen bg-surface-canvas">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b border-border-default bg-surface-card/95 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-border-default bg-surface-card">
         <div className="mx-auto max-w-[var(--grid-max-width)] px-4 py-4 md:px-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -202,7 +202,7 @@ function FlowCard({ flow, onStart }: { flow: FlowDef; onStart: () => void }) {
 
   return (
     <Card className="flex flex-col overflow-hidden">
-      <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border-default bg-surface-canvas/40 p-4">
+      <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border-default bg-surface-canvas p-4">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-500">
             <Icon className="h-5 w-5" />

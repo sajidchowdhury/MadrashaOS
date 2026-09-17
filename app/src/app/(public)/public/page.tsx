@@ -153,7 +153,7 @@ export default function PublicHomePage() {
               return (
                 <div
                   key={stat.label}
-                  className="flex flex-col items-center gap-2 rounded-xl border border-border-default bg-surface-card/95 p-4 text-center shadow-elevation-3 backdrop-blur transition-transform hover:-translate-y-0.5 md:flex-row md:gap-4 md:text-start"
+                  className="flex flex-col items-center gap-2 rounded-xl border border-border-default bg-surface-card p-4 text-center shadow-elevation-3 transition-transform hover:-translate-y-0.5 md:flex-row md:gap-4 md:text-start"
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
                     <Icon className="h-5 w-5" />
@@ -363,7 +363,7 @@ export default function PublicHomePage() {
               </p>
             </div>
             <div className="flex flex-col items-start gap-4 md:items-end">
-              <div className="rounded-xl border border-primary-700 bg-primary-900/50 px-6 py-4 text-center">
+              <div className="rounded-xl border border-primary-700 bg-primary-900 px-6 py-4 text-center">
                 <p className="text-display font-bold text-accent-500">{alumni.stat.value}</p>
                 <p className="text-caption text-primary-200">{alumni.stat.label}</p>
               </div>

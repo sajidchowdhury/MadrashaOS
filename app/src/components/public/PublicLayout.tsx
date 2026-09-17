@@ -323,7 +323,7 @@ function MobileDrawer({
   return (
     <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
       <div
-        className="absolute inset-0 bg-neutral-950/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-neutral-950/60 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden
       />
@@ -582,9 +582,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col bg-surface-canvas">
       <TopContactBar />
 
-      {/* Sticky navbar */}
+      {/* Sticky navbar — solid bg always; shadow intensifies on scroll */}
       <header
-        className={`sticky top-0 z-40 border-b border-border-default bg-surface-card/95 backdrop-blur transition-shadow ${
+        className={`sticky top-0 z-40 border-b border-border-default bg-surface-card transition-shadow ${
           scrolled ? "shadow-elevation-2" : "shadow-elevation-1"
         }`}
       >
