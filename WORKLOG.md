@@ -136,3 +136,59 @@ Stage Summary:
   * Responsive: mobile hamburger drawer works; desktop side nav collapsible ✅
   * Trilingual: all shell labels translate across en/bn/ar ✅
 - Next session (C0.4) will build the mock-data layer + Zustand session store so the DevToolbar's role/branch switchers become functional (currently visual placeholders). The AppShell + DevToolbar foundation is ready for the C1 component library.
+
+---
+Task ID: C0.4
+Agent: Z.ai Code (main)
+Task: MadrashaOS Phase C0 Session 0.4 — Mock-Data Layer & Seeding. Build the mock API + Zustand session store so every downstream screen has realistic data on day one. Wire the DevToolbar's role/branch/network switchers to be fully functional. Create a /dev/data debug route proving the mock-data layer works end-to-end.
+
+Work Log:
+- Created src/stores/types.ts — 8 Role constants (super-admin/authority/administrator/accountant/teacher/storekeeper/guardian/student) with ROLE_LABELS; 3 Branch constants (dhaka/chittagong/sylhet) with BRANCH_LABELS; 3 NetworkMode constants (normal/slow/offline); SessionState type; initialSessionState default
+- Created src/lib/auth/permissions.ts — 110+ permission codes from SRS §6.2 organized by domain (Foundation/People/Academic/Finance/Operations/Communication/Platform); dotted convention {module}.{resource}.{action}; PERMISSION_SET for O(1) lookup; isValidPermission() validator
+- Created src/lib/auth/role-permissions.ts — Role → PermissionCode[] map for all 8 personas with strict enforcement: Teacher has NO financial perms (D3), Accountant has NO academic edit (D3), Guardian read-only on own children (*.view.own scope), Storekeeper limited to inventory+purchase. getRolePermissions() + roleHasPermission() helpers
+- Created src/stores/sessionStore.ts — Zustand store with persist middleware (localStorage key: madrasha-session); setRole() auto-derives permissions[] via getRolePermissions(); setBranch/setAcademicYear/setLocale/setNetwork setters; hasPermission() checker; reset() to defaults; getSession() non-hook accessor for use in mockApi
+- Created src/lib/mock/types.ts — domain types matching future Prisma schema (SRS Part 7): Branch, Organization, User, Guardian, Student, Class, FeePlan, FeeInstallment, FeePayment, LedgerEntry, Account (with fund: "general" | "zakat" for C6 isolation), AttendanceSession, AttendanceRecord, InventoryItem, Notice, Approval, FixtureCounts
+- Created src/lib/mock/fixtures/organization.ts — 1 organization (Darul Uloom Madrasha) + 3 branches with bn/en names + addresses + phones
+- Created src/lib/mock/fixtures/users.ts — 8 users (1 per persona) with bn/en names + emails + phones + avatar initials; getUserByRole() + getUserById() helpers
+- Created src/lib/mock/fixtures/students.ts — 4 classes (Class 1/3/5/8 with sections A/B), 8 guardians, 40 auto-generated students (bn/en names + optional Arabic name_ar for 25% per SRS §2.6.5), with codes MOS-2026-001 through 040
+- Created src/lib/mock/fixtures/index.ts — 40 fee plans (3 installments each = 120 installments with mixed paid/unpaid states), 8 fee payments (recent receipts), 8 accounts (Cash/Bank/Mobile/Fee Income/Expense/Zakat Fund isolated per C6/Donation/Salary), 12 ledger entries (1 month activity, 2 pending), 4 attendance sessions (Class 5-A across 4 days including today — Risk R6 testing ground), 10 inventory items (3 low-stock: Pen/Lentils/Detergent), 5 notices (mixed audiences), 6 approvals (3 pending, 2 approved, 1 rejected)
+- Created src/lib/mock/mockApi.ts — async functions for every resource with 300-800ms latency; NetworkError + PermissionDeniedError custom error classes; checkPermission() enforcement before returning data (server still enforces per SRS §5.1); network simulator (offline throws, slow 3x latency)
+- Created src/lib/query/client.ts — singleton QueryClient (staleTime 30s, retry 1); 16 typed hooks (useOrganization, useBranches, useCurrentUser, useClasses, useStudents, useStudent, useStudentsByClass, useGuardians, useFeePlans, useFeePayments, useAccounts, useLedgerEntries, useAttendanceSessions, useInventory, useLowStockItems, useNotices, useApprovals, usePendingApprovals); queryKeys include session state so role/branch changes auto-refetch
+- Created src/lib/query/QueryProvider.tsx — wraps children in QueryClientProvider
+- Updated src/app/layout.tsx — added QueryProvider nested in I18nProvider; updated docstring from C0.3 → C0.4
+- Rewrote src/components/dev/DevToolbar.tsx — wired role/branch/network selectors to sessionStore (was local state in C0.3); role badge in collapsed view shows current role; permissions count + preview shown in expanded view; language + theme remain on their providers
+- Created src/app/dev/data/page.tsx — debug route showing: session state (role/branch/network/permissions count/current user), fixture counts (14 metrics in a grid), live query results table (12 rows × resource/permission/status/row-count); switching role via DevToolbar instantly flips rows from ✅ success to ❌ 403 denied
+- Verified lint: passes clean (zero errors, zero warnings)
+- Verified dev server: HTTP 200 on both / and /dev/data; compile 2-3ms after warm-up
+- Verified via Agent Browser:
+  * /dev/data as Administrator: all 10 resource queries ✅ success with correct row counts (40 students, 8 guardians, 40 fee plans, 8 fee payments, 8 accounts, 12 ledger entries, 4 attendance sessions, 10 inventory items, 5 notices, 3 pending approvals) ✅
+  * Switch to Teacher: students ✅ (has students.view), guardians ✅, feePlans ❌ 403 (no fees.view per D3), feePayments ❌ 403, accounts ❌ 403, ledgerEntries ❌ 403, attendanceSessions ✅ (has attendance.view), inventory ❌ 403, notices ✅ — permission filtering works in real-time ✅
+  * Switch to Storekeeper: only inventory ✅, notices ✅, currentUser ✅, classes ✅; all student/finance/academic data ❌ 403 ✅
+  * Network simulator: click Offline → switch role → all queries that would succeed show ⚠ network error; back to Normal → all succeed ✅
+  * Home route / still renders correctly with all new providers nested (ThemeProvider → I18nProvider → QueryProvider → AppShell → DevToolbar) ✅
+
+Stage Summary:
+- Artifacts produced (10 new + 2 modified):
+  * src/stores/types.ts (Role/Branch/NetworkMode types + labels)
+  * src/stores/sessionStore.ts (Zustand store with persist)
+  * src/lib/auth/permissions.ts (110+ permission codes from SRS §6.2)
+  * src/lib/auth/role-permissions.ts (8 personas → permission codes, D3 enforced)
+  * src/lib/mock/types.ts (domain types matching future Prisma schema)
+  * src/lib/mock/fixtures/organization.ts (1 org + 3 branches)
+  * src/lib/mock/fixtures/users.ts (8 users, 1 per persona)
+  * src/lib/mock/fixtures/students.ts (4 classes, 8 guardians, 40 students)
+  * src/lib/mock/fixtures/index.ts (fees/ledger/accounts/attendance/inventory/notices/approvals)
+  * src/lib/mock/mockApi.ts (async API with latency + 403/500 simulation)
+  * src/lib/query/client.ts (QueryClient + 16 typed hooks)
+  * src/lib/query/QueryProvider.tsx (provider wrapper)
+  * src/app/dev/data/page.tsx (debug route — /dev/data)
+  * src/app/layout.tsx (modified — added QueryProvider)
+  * src/components/dev/DevToolbar.tsx (modified — wired to sessionStore)
+- Exit criteria met:
+  * /dev/data shows every fixture with row counts (14 metrics) ✅
+  * DevToolbar role-switch updates permissions[] and filters /dev/data queries in real-time ✅
+  * mockApi enforces permissions (403 denied) per SRS §5.1 ✅
+  * Network simulator (normal/slow/offline) works end-to-end ✅
+  * Mock data realistic enough to populate every screen in Phases C2–C4 ✅
+- Repository: all C0.1–C0.4 code committed and pushed to https://github.com/sajidchowdhury/MadrashaOS (main branch, commit 4696fd6 for C0.4)
+- Next: Phase C0 COMPLETE. Phase C1 (Component Library in Code — 30 components × 5 states × a11y contracts) begins next, consuming the FROZEN tokens + mock data layer.
