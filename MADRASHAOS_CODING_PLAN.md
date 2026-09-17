@@ -88,16 +88,16 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 | C2 | 2.2 | Five Role Dashboards | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | 12 widgets + 5 dashboards (authority/accountant/teacher/storekeeper/guardian) + role-redirect |
 | C2 | 2.3 | State System | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `LoadingState` (5 patterns) + `ErrorState` + `PermissionDenied` (Risk R3) + `OfflineState` |
 | C2 | 2.4 | Permission-Aware UI Rules | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `IfPermission` + `IfField` wrappers; QuickActions + Zakat KPI permission-gated |
-| C3 | 3.1 | Foundation Module Screens | 🔄 In Progress | — | — | — |
-| C3 | 3.2 | People Module Screens | ⏳ Pending | — | — | — |
-| C3 | 3.3 | Academic Module Screens (Mobile-First) | ⏳ Pending | — | — | — |
-| C3 | 3.4 | Finance Module Screens | ⏳ Pending | — | — | — |
+| C3 | 3.1 | Foundation Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/organization` + `/organization/modules` (Risk R2) + `/rbac` (D16) + `/audit` (52 events + field-diff viewer) |
+| C3 | 3.2 | People Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/students` + `/students/[id]` (7 tabs + Risk R4) + `/admission` (DnD Kanban) + `/teachers` |
+| C3 | 3.3 | Academic Module Screens (Mobile-First) | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/attendance` + `/attendance/take` (mobile, Risk R6) + `/exams` + `/exams/[id]/marks` (swipe-next) |
+| C3 | 3.4 | Finance Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/fees` (3-step Collect Payment, Risk R8) + `/accounting` (Ledger Explorer) + `/zakat` (Risk R9) + `/donations` (Risk R10) |
 | C4 | 4.1–4.4 | Operations, Communication & Mobile | ⏳ Pending | — | — | — |
 | C5 | 5.1–5.3 | Print/PDF & Public Website | ⏳ Pending | — | — | — |
 | C6 | 6.1–6.3 | Prototype & Usability Validation | ⏳ Pending | — | — | — |
 | C7 | 7.1–7.4 | Design QA, Docs & Handoff | ⏳ Pending | — | — | — |
 
-**Summary:** 10 / 32 sessions done · 1 in progress · 21 pending · 0 blocked
+**Summary:** 14 / 32 sessions done · 0 in progress · 18 pending · 0 blocked
 
 **Phase C0 (Foundation & Design System in Code): ✅ Complete** — 4/4 sessions done. Branded shell, trilingual i18n (bn/en/ar with RTL), next-themes, mock data layer (Zustand + 110+ permissions + 8-persona role map + fixtures), 16 TanStack Query hooks, `/dev/data` debug route.
 
@@ -105,7 +105,9 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 
 **Phase C2 (Information Architecture & Navigation): ✅ Complete** — 4/4 sessions done. Dynamic permission-aware nav (40+ modules filtered by role), 5 role dashboards with 12 widget types, 5-state system (empty/loading/error/permission-denied/offline), IfPermission/IfField wrappers. Verified: role switch via DevToolbar instantly updates nav + dashboard.
 
-Next up: **Phase C3 (Core Module Screens)** — 40+ module screens threaded by the nav built in C2.
+**Phase C3 (Core Module Screens): ✅ Complete** — 4/4 sessions done. 16 module routes across Foundation (Organization/Modules/RBAC/Audit Explorer), People (Students/Profile/Admission Kanban/Teachers), Academic (Attendance list + mobile Take Attendance/Exams/Marks Entry), Finance (Fees 3-step Collect Payment/Ledger Explorer/Zakat Dashboard/Donations). Risk lock-ins enforced: R2 (module dependents), R4 (promotion history), R6 (attendance mobile <60s + offline + undo), R8 (pending discounts), R9 (Zakat fund isolation), R10 (donation honeypot), D16 (no self-approve). All 16 routes HTTP 200; lint clean; VLM-verified.
+
+Next up: **Phase C4 (Operations, Communication & Mobile)** — operations modules (Inventory/Purchase/Hostel/Library/Transport) + communication + mobile hi-fi polish.
 
 ---
 
@@ -379,7 +381,7 @@ Next up: **Phase C3 (Core Module Screens)** — 40+ module screens threaded by t
 
 ---
 
-## 7. Phase C3 — Core Module Screens (8 days)
+## 7. Phase C3 — Core Module Screens (8 days) ✅
 
 > Each session produces list + detail + form screens for the module group. All screens consume the C1 component library, mock data from 0.4, and the dynamic nav from 2.1.
 
