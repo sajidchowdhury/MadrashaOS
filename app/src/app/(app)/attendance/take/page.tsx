@@ -367,8 +367,11 @@ function TakeAttendanceContent() {
         </ul>
       )}
 
-      {/* Sticky action bar */}
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-border-default bg-surface-card/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
+      {/* Sticky action bar — also a mobile CTA anchor/target for the shell-level MobileBottomActionBar */}
+      <div
+        data-mobile-cta-anchor
+        className="sticky bottom-0 z-20 -mx-4 border-t border-border-default bg-surface-card/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8"
+      >
         <div className="mx-auto flex max-w-[var(--grid-max-width)] items-center gap-2">
           <Button
             variant="outline"
@@ -381,6 +384,7 @@ function TakeAttendanceContent() {
             Present All
           </Button>
           <Button
+            data-mobile-cta-target
             onClick={handleSubmit}
             disabled={isSubmitted || queued || students.length === 0}
             className="flex-1"

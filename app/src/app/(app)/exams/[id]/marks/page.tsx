@@ -256,8 +256,11 @@ function EnterMarksContent() {
         />
       )}
 
-      {/* Navigation: Prev / Next or Save & Submit */}
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-border-default bg-surface-card/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
+      {/* Navigation: Prev / Next or Save & Submit — also a mobile CTA anchor/target for the shell-level MobileBottomActionBar */}
+      <div
+        data-mobile-cta-anchor
+        className="sticky bottom-0 z-20 -mx-4 border-t border-border-default bg-surface-card/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8"
+      >
         <div className="mx-auto flex max-w-[var(--grid-max-width)] items-center gap-2">
           <Button
             variant="outline"
@@ -272,6 +275,7 @@ function EnterMarksContent() {
 
           {isLastStudent ? (
             <Button
+              data-mobile-cta-target
               onClick={handleSaveAndSubmit}
               disabled={isNextBlocked}
               className="flex-1"
@@ -282,6 +286,7 @@ function EnterMarksContent() {
             </Button>
           ) : (
             <Button
+              data-mobile-cta-target
               onClick={handleNext}
               disabled={isNextBlocked}
               className="flex-1"

@@ -130,7 +130,7 @@ export default function FeesPage() {
             </p>
           </div>
           <IfPermission code="fees.payment.create">
-            <Button onClick={() => openCollect(undefined)}>
+            <Button data-mobile-cta-target onClick={() => openCollect(undefined)}>
               <Wallet className="h-4 w-4" />
               Collect Payment
             </Button>
