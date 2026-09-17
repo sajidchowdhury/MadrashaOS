@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96" role="img" aria-label="MadrashaOS horizontal logo lockup">
+  <!-- ============================================================
+       MadrashaOS — Horizontal Logo Lockup Mockup (C7.3 · Task 7-c)
+       ============================================================
+       Composition:
+         - Teal monogram badge (60×60 circle, primary.500 #0E5C5C)
+           with gold "م" meem glyph (accent.500 #C9A961)
+         - Vertical gold divider (1px stroke, accent.500 @ 50% opacity)
+         - Wordmark: "MadrashaOS" in Inter Bold, primary.700 #093838
+           with the "OS" suffix rendered in accent gold to signal
+           the platform/operating-system framing
+         - Bangla subtitle underneath: "দারুল উলূম মাদরাসা"
+           in Hind Siliguri 12px, neutral.500 #6E6A60
+       ============================================================ -->
+
+  <!-- ===== Monogram Badge ===== -->
+  <g transform="translate(18, 18)">
+    <circle cx="30" cy="30" r="30" fill="#0E5C5C" />
+    <circle cx="30" cy="30" r="28" fill="none" stroke="#C9A961" stroke-width="1" opacity="0.45" />
+    <text
+      x="30" y="42"
+      font-family="'Noto Naskh Arabic', 'Times New Roman', serif"
+      font-size="36"
+      font-weight="700"
+      fill="#C9A961"
+      text-anchor="middle"
+      text-rendering="geometricPrecision"
+    >م</text>
+  </g>
+
+  <!-- ===== Vertical Gold Divider ===== -->
+  <line x1="100" y1="24" x2="100" y2="72" stroke="#C9A961" stroke-width="1" opacity="0.5" />
+
+  <!-- ===== Wordmark ===== -->
+  <text
+    x="118" y="50"
+    font-family="'Inter', 'Helvetica Neue', sans-serif"
+    font-size="26"
+    font-weight="700"
+    letter-spacing="-0.5"
+    fill="#093838"
+    text-rendering="geometricPrecision"
+  >Madrasha<tspan fill="#C9A961">OS</tspan></text>
+
+  <!-- ===== Bangla Subtitle ===== -->
+  <text
+    x="118" y="70"
+    font-family="'Hind Siliguri', 'Inter', sans-serif"
+    font-size="12"
+    font-weight="400"
+    fill="#6E6A60"
+    text-rendering="geometricPrecision"
+  >দারুল উলূম মাদরাসা</text>
+</svg>

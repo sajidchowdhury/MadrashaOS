@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-label="No outstanding fees" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <g>
+    <!-- Receipt -->
+    <path d="M80 30 h80 v100 l-10 -5 -10 5 -10 -5 -10 5 -10 -5 -10 5 -10 -5 -10 5 z" />
+    <line x1="95" y1="55" x2="145" y2="55" />
+    <line x1="95" y1="70" x2="145" y2="70" />
+    <line x1="95" y1="85" x2="125" y2="85" />
+    <!-- Checkmark badge -->
+    <circle cx="165" cy="45" r="18" stroke="#C9A961" />
+    <path d="M156 45 l6 6 12 -12" stroke="#2F7D32" />
+  </g>
+</svg>

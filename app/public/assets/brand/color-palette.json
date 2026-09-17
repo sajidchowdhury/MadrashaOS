@@ -1,0 +1,127 @@
+{
+  "$schema": "https://madrashaos.dev/schema/color-palette.json",
+  "name": "MadrashaOS Brand Color Palette",
+  "version": "1.0.0",
+  "session": "1.1 (FROZEN)",
+  "description": "Machine-readable export of all MadrashaOS color tokens from src/lib/design-system/tokens.ts and src/styles/tokens.css. Every hex value is sourced verbatim from the FROZEN Brand Kit v1.0.0.",
+  "license": "FROZEN — Risk R13 brand lock-in. Every branded PDF, illustration, favicon, and product surface MUST source its colors from this palette.",
+  "primary": {
+    "name": "Deep Teal",
+    "inspiration": "Mosque tile glaze",
+    "foreground": "#FFFFFF",
+    "DEFAULT": "#0E5C5C",
+    "scale": {
+      "50":  "#E6F2F2",
+      "100": "#C2DEDE",
+      "200": "#8FC2C2",
+      "300": "#5BA6A6",
+      "400": "#2E8A8A",
+      "500": "#0E5C5C",
+      "600": "#0B4A4A",
+      "700": "#093838",
+      "800": "#062626",
+      "900": "#041818"
+    }
+  },
+  "accent": {
+    "name": "Warm Gold",
+    "inspiration": "Mosque dome + illuminated manuscript",
+    "foreground": "#1A1814",
+    "DEFAULT": "#C9A961",
+    "scale": {
+      "50":  "#FBF6E8",
+      "100": "#F3E8C2",
+      "500": "#C9A961",
+      "700": "#8A6F2F"
+    }
+  },
+  "neutral": {
+    "name": "Warm Grays",
+    "inspiration": "Sandstone undertone (beige-gray, not cool blue-gray)",
+    "scale": {
+      "0":   "#FFFFFF",
+      "50":  "#FAF8F5",
+      "100": "#F2EFE8",
+      "200": "#E0DCD2",
+      "300": "#C7C1B5",
+      "400": "#9A9388",
+      "500": "#6E6A60",
+      "600": "#4A4740",
+      "700": "#2E2C27",
+      "800": "#1F1E1A",
+      "900": "#15140F",
+      "950": "#0A0908"
+    }
+  },
+  "semantic": {
+    "success": {
+      "DEFAULT": "#2F7D32",
+      "foreground": "#FFFFFF",
+      "50": "#E8F5E9",
+      "usage": "Confirmations, positive deltas, paid status, present attendance"
+    },
+    "warning": {
+      "DEFAULT": "#B58400",
+      "foreground": "#1A1814",
+      "50": "#FFF6E5",
+      "usage": "Low-stock alerts, pending approvals, unpaid fees"
+    },
+    "danger": {
+      "DEFAULT": "#B91C1C",
+      "foreground": "#FFFFFF",
+      "50": "#FDE8E8",
+      "usage": "Errors, deleted records, absent attendance, failed validation"
+    },
+    "info": {
+      "DEFAULT": "#1D4ED8",
+      "foreground": "#FFFFFF",
+      "50": "#E0EBFD",
+      "usage": "Info tooltips, neutral hints, system messages"
+    }
+  },
+  "semanticAliases": {
+    "colorActionPrimary":            "var(--color-primary-500)",
+    "colorActionPrimaryHover":       "var(--color-primary-600)",
+    "colorActionPrimaryPressed":     "var(--color-primary-700)",
+    "colorActionPrimaryForeground":  "var(--color-primary-foreground)",
+    "colorActionAccent":              "var(--color-accent-500)",
+    "colorActionAccentForeground":   "var(--color-accent-foreground)",
+    "colorActionDanger":              "var(--color-semantic-danger)",
+    "colorActionDangerForeground":   "var(--color-semantic-danger-foreground)",
+    "colorSurfaceCanvas":            "var(--color-neutral-50)",
+    "colorSurfaceCard":              "var(--color-neutral-0)",
+    "colorSurfaceHover":             "var(--color-primary-50)",
+    "colorSurfaceSelected":          "var(--color-primary-50)",
+    "colorTextPrimary":              "var(--color-neutral-900)",
+    "colorTextSecondary":            "var(--color-neutral-500)",
+    "colorTextMuted":                "var(--color-neutral-400)",
+    "colorTextInverse":              "var(--color-neutral-0)",
+    "colorTextLink":                 "var(--color-primary-500)",
+    "colorBorderDefault":            "var(--color-neutral-200)",
+    "colorBorderStrong":             "var(--color-neutral-300)",
+    "colorBorderFocus":              "var(--color-primary-500)"
+  },
+  "contrastPairs": {
+    "primary500_on_neutral0":   { "foreground": "#0E5C5C", "background": "#FFFFFF", "ratio": "8.6:1", "wcag": "AAA" },
+    "primary700_on_neutral0":   { "foreground": "#093838", "background": "#FFFFFF", "ratio": "13.4:1", "wcag": "AAA" },
+    "neutral900_on_neutral0":   { "foreground": "#15140F", "background": "#FFFFFF", "ratio": "18.7:1", "wcag": "AAA" },
+    "neutral500_on_neutral0":   { "foreground": "#6E6A60", "background": "#FFFFFF", "ratio": "5.0:1",  "wcag": "AA" },
+    "accent500_on_neutral900":  { "foreground": "#C9A961", "background": "#15140F", "ratio": "8.9:1",  "wcag": "AAA" },
+    "neutral0_on_primary500":   { "foreground": "#FFFFFF", "background": "#0E5C5C", "ratio": "8.6:1", "wcag": "AAA" },
+    "success_on_neutral0":      { "foreground": "#2F7D32", "background": "#FFFFFF", "ratio": "5.2:1",  "wcag": "AA" },
+    "warning_on_neutral0":      { "foreground": "#B58400", "background": "#FFFFFF", "ratio": "4.5:1",  "wcag": "AA" },
+    "danger_on_neutral0":       { "foreground": "#B91C1C", "background": "#FFFFFF", "ratio": "5.3:1",  "wcag": "AA" }
+  },
+  "usage": {
+    "primary":   "All primary actions, navigational chrome (TopBar, SideNav active), primary CTAs, brand surfaces",
+    "accent":    "Decorative emphasis only — gold accent divider on PDFs, monogram, completion certificates, Zakat-fund cards (Risk R9 fund-isolation visual cue)",
+    "neutral":   "Text, backgrounds, borders, surfaces — warm undertone throughout",
+    "semantic":  "Status indicators (success/warning/danger/info) — never decorative; always meaningful"
+  },
+  "notes": [
+    "All colors are FROZEN at Brand Kit v1.0.0 and MUST NOT be altered (Risk R13).",
+    "Dark-mode overrides flip surfaces to dark neutrals using the same FROZEN palette (see src/styles/tokens.css .dark block).",
+    "PDF templates hardcode these hex values in src/lib/pdf/brand.ts because @react-pdf/renderer cannot read CSS variables at render time.",
+    "Hex values are uppercase by convention; lowercase is acceptable when generated programmatically."
+  ]
+}

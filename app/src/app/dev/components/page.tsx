@@ -13,9 +13,14 @@
  *
  * Each section shows variants + 5 states (default/hover/active/focus/disabled).
  * Uses the FROZEN token system — zero raw hex/px values in component code.
+ *
+ * Phase C7.1 — each component now links to a Storybook-style detail page at
+ * /dev/components/[name] (variants + states + props + a11y + tokens + snippet).
+ * The "Documentation Summary" banner at the top tracks documented coverage.
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   ChevronRight,
   Plus,
@@ -30,7 +35,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Check,
+  FileText,
 } from "lucide-react";
+import {
+  componentRegistry,
+  CATEGORY_ORDER,
+  type ComponentCategory,
+} from "@/lib/dev/component-registry";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -86,6 +98,97 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 /* ------------------------------------------------------------------ */
+/*  Documentation summary (Phase C7.1)                                */
+/* ------------------------------------------------------------------ */
+
+const CATEGORY_BADGE: Record<ComponentCategory, string> = {
+  Action: "bg-primary-50 text-primary-700",
+  Form: "bg-accent-50 text-accent-700",
+  Navigation: "bg-info-50 text-info-foreground",
+  Data: "bg-neutral-100 text-text-primary",
+  Feedback: "bg-warning-50 text-semantic-warning",
+  Layout: "bg-success-50 text-semantic-success",
+};
+
+function DocumentationSummary() {
+  const total = componentRegistry.length;
+  const documented = componentRegistry.length; // All entries in the registry are documented
+  const pending = total - documented;
+
+  return (
+    <section className="rounded-2xl border border-border-default bg-surface-card p-6 shadow-elevation-1 md:p-8">
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-headline font-bold text-text-primary">Documentation Summary</h2>
+          <p className="mt-1 text-body text-text-secondary">
+            Storybook-style per-component detail pages — variants, states, props, a11y, tokens, and code snippets.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-3 py-1 text-caption font-semibold text-semantic-success">
+            <Check className="h-3.5 w-3.5" /> {documented} documented
+          </span>
+          {pending > 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-50 px-3 py-1 text-caption font-semibold text-semantic-warning">
+              <AlertTriangle className="h-3.5 w-3.5" /> {pending} pending
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border-default bg-neutral-50 px-3 py-1 text-caption font-semibold text-text-secondary">
+              0 pending
+            </span>
+          )}
+        </div>
+      </header>
+
+      <p className="mb-4 text-subtitle font-semibold text-text-primary">
+        {total} components · {documented} documented · {pending} pending
+      </p>
+
+      <div className="space-y-6">
+        {CATEGORY_ORDER.map((category) => {
+          const items = componentRegistry.filter((c) => c.category === category);
+          if (items.length === 0) return null;
+          return (
+            <div key={category}>
+              <h3 className="mb-2 flex items-center gap-2 text-caption font-medium uppercase tracking-wider text-text-muted">
+                <span className={`inline-block h-2 w-2 rounded-full ${CATEGORY_BADGE[category]?.split(" ")[0] ?? "bg-neutral-200"}`} />
+                {category} ({items.length})
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {items.map((comp) => (
+                  <Link
+                    key={comp.name}
+                    href={`/dev/components/${comp.name}`}
+                    className="group flex items-center justify-between gap-2 rounded-lg border border-border-default bg-surface-card px-3 py-2 transition-colors hover:border-primary-500 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate text-body font-medium text-text-primary group-hover:text-primary-700">
+                        {comp.displayName}
+                      </span>
+                      <span className="truncate text-caption text-text-muted">
+                        {comp.variants.length} variants · {comp.props.length} props
+                      </span>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success-50 px-1.5 py-0.5 text-caption font-semibold text-semantic-success" title="Documented">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-text-secondary">
+        <FileText className="h-3.5 w-3.5" />
+        Click any component above to open its detail page.
+      </p>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -111,6 +214,9 @@ export default function ComponentsShowcasePage() {
             Every value sourced from the FROZEN token system (v1.0.0).
           </p>
         </header>
+
+        {/* Documentation Summary (Phase C7.1) */}
+        <DocumentationSummary />
 
         {/* 1. Action Components */}
         <Section title="1. Action Components" subtitle="Button, ButtonGroup, IconButton — 3 variants × 3 sizes × 5 states.">

@@ -1,0 +1,1113 @@
+{
+  "generatedAt": "2026-09-17T10:17:19.680Z",
+  "source": "MadrashaOS · src/ (lucide-react v0.525.0)",
+  "count": 158,
+  "icons": [
+    {
+      "name": "accessibility",
+      "pascalName": "Accessibility",
+      "filename": "accessibility.svg",
+      "sizeBytes": 390,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "alert-circle",
+      "pascalName": "AlertCircle",
+      "filename": "alert-circle.svg",
+      "sizeBytes": 320,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "alert-triangle",
+      "pascalName": "AlertTriangle",
+      "filename": "alert-triangle.svg",
+      "sizeBytes": 331,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-down-left",
+      "pascalName": "ArrowDownLeft",
+      "filename": "arrow-down-left.svg",
+      "sizeBytes": 244,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-down-to-line",
+      "pascalName": "ArrowDownToLine",
+      "filename": "arrow-down-to-line.svg",
+      "sizeBytes": 271,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-left",
+      "pascalName": "ArrowLeft",
+      "filename": "arrow-left.svg",
+      "sizeBytes": 246,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-left-right",
+      "pascalName": "ArrowLeftRight",
+      "filename": "arrow-left-right.svg",
+      "sizeBytes": 301,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-right",
+      "pascalName": "ArrowRight",
+      "filename": "arrow-right.svg",
+      "sizeBytes": 245,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-up-circle",
+      "pascalName": "ArrowUpCircle",
+      "filename": "arrow-up-circle.svg",
+      "sizeBytes": 286,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-up-from-line",
+      "pascalName": "ArrowUpFromLine",
+      "filename": "arrow-up-from-line.svg",
+      "sizeBytes": 271,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "arrow-up-right",
+      "pascalName": "ArrowUpRight",
+      "filename": "arrow-up-right.svg",
+      "sizeBytes": 244,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "award",
+      "pascalName": "Award",
+      "filename": "award.svg",
+      "sizeBytes": 362,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "ban",
+      "pascalName": "Ban",
+      "filename": "ban.svg",
+      "sizeBytes": 264,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "bar-chart-3",
+      "pascalName": "BarChart3",
+      "filename": "bar-chart-3.svg",
+      "sizeBytes": 308,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "bed-double",
+      "pascalName": "BedDouble",
+      "filename": "bed-double.svg",
+      "sizeBytes": 356,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "bell",
+      "pascalName": "Bell",
+      "filename": "bell.svg",
+      "sizeBytes": 377,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "bell-off",
+      "pascalName": "BellOff",
+      "filename": "bell-off.svg",
+      "sizeBytes": 426,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "book-open",
+      "pascalName": "BookOpen",
+      "filename": "book-open.svg",
+      "sizeBytes": 362,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "briefcase",
+      "pascalName": "Briefcase",
+      "filename": "briefcase.svg",
+      "sizeBytes": 303,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "bug",
+      "pascalName": "Bug",
+      "filename": "bug.svg",
+      "sizeBytes": 655,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "building-2",
+      "pascalName": "Building2",
+      "filename": "building-2.svg",
+      "sizeBytes": 465,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "bus",
+      "pascalName": "Bus",
+      "filename": "bus.svg",
+      "sizeBytes": 490,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "calculator",
+      "pascalName": "Calculator",
+      "filename": "calculator.svg",
+      "sizeBytes": 523,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "calendar-days",
+      "pascalName": "CalendarDays",
+      "filename": "calendar-days.svg",
+      "sizeBytes": 484,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "calendar-off",
+      "pascalName": "CalendarOff",
+      "filename": "calendar-off.svg",
+      "sizeBytes": 421,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "calendar-plus",
+      "pascalName": "CalendarPlus",
+      "filename": "calendar-plus.svg",
+      "sizeBytes": 396,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "check",
+      "pascalName": "Check",
+      "filename": "check.svg",
+      "sizeBytes": 221,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "check-check",
+      "pascalName": "CheckCheck",
+      "filename": "check-check.svg",
+      "sizeBytes": 259,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "check-circle-2",
+      "pascalName": "CheckCircle2",
+      "filename": "check-circle-2.svg",
+      "sizeBytes": 259,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "check-icon",
+      "pascalName": "CheckIcon",
+      "filename": "check-icon.svg",
+      "sizeBytes": 221,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-down",
+      "pascalName": "ChevronDown",
+      "filename": "chevron-down.svg",
+      "sizeBytes": 218,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-down-icon",
+      "pascalName": "ChevronDownIcon",
+      "filename": "chevron-down-icon.svg",
+      "sizeBytes": 218,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-left",
+      "pascalName": "ChevronLeft",
+      "filename": "chevron-left.svg",
+      "sizeBytes": 220,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-left-icon",
+      "pascalName": "ChevronLeftIcon",
+      "filename": "chevron-left-icon.svg",
+      "sizeBytes": 220,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-right",
+      "pascalName": "ChevronRight",
+      "filename": "chevron-right.svg",
+      "sizeBytes": 219,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-right-icon",
+      "pascalName": "ChevronRightIcon",
+      "filename": "chevron-right-icon.svg",
+      "sizeBytes": 219,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-up",
+      "pascalName": "ChevronUp",
+      "filename": "chevron-up.svg",
+      "sizeBytes": 220,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "chevron-up-icon",
+      "pascalName": "ChevronUpIcon",
+      "filename": "chevron-up-icon.svg",
+      "sizeBytes": 220,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "circle-dot",
+      "pascalName": "CircleDot",
+      "filename": "circle-dot.svg",
+      "sizeBytes": 267,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "circle-icon",
+      "pascalName": "CircleIcon",
+      "filename": "circle-icon.svg",
+      "sizeBytes": 228,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "clipboard-check",
+      "pascalName": "ClipboardCheck",
+      "filename": "clipboard-check.svg",
+      "sizeBytes": 369,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "clipboard-list",
+      "pascalName": "ClipboardList",
+      "filename": "clipboard-list.svg",
+      "sizeBytes": 444,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "clock",
+      "pascalName": "Clock",
+      "filename": "clock.svg",
+      "sizeBytes": 257,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "cloud-upload",
+      "pascalName": "CloudUpload",
+      "filename": "cloud-upload.svg",
+      "sizeBytes": 319,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "credit-card",
+      "pascalName": "CreditCard",
+      "filename": "credit-card.svg",
+      "sizeBytes": 287,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "database-backup",
+      "pascalName": "DatabaseBackup",
+      "filename": "database-backup.svg",
+      "sizeBytes": 468,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "download",
+      "pascalName": "Download",
+      "filename": "download.svg",
+      "sizeBytes": 304,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "external-link",
+      "pascalName": "ExternalLink",
+      "filename": "external-link.svg",
+      "sizeBytes": 318,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "eye",
+      "pascalName": "Eye",
+      "filename": "eye.svg",
+      "sizeBytes": 346,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "facebook",
+      "pascalName": "Facebook",
+      "filename": "facebook.svg",
+      "sizeBytes": 271,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "file-archive",
+      "pascalName": "FileArchive",
+      "filename": "file-archive.svg",
+      "sizeBytes": 436,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "file-check-2",
+      "pascalName": "FileCheck2",
+      "filename": "file-check-2.svg",
+      "sizeBytes": 325,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "file-edit",
+      "pascalName": "FileEdit",
+      "filename": "file-edit.svg",
+      "sizeBytes": 444,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "file-image",
+      "pascalName": "FileImage",
+      "filename": "file-image.svg",
+      "sizeBytes": 409,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "file-spreadsheet",
+      "pascalName": "FileSpreadsheet",
+      "filename": "file-spreadsheet.svg",
+      "sizeBytes": 407,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "file-text",
+      "pascalName": "FileText",
+      "filename": "file-text.svg",
+      "sizeBytes": 382,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "file-type",
+      "pascalName": "FileType",
+      "filename": "file-type.svg",
+      "sizeBytes": 387,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "filter",
+      "pascalName": "Filter",
+      "filename": "filter.svg",
+      "sizeBytes": 352,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "fuel",
+      "pascalName": "Fuel",
+      "filename": "fuel.svg",
+      "sizeBytes": 432,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "gauge",
+      "pascalName": "Gauge",
+      "filename": "gauge.svg",
+      "sizeBytes": 262,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "gift",
+      "pascalName": "Gift",
+      "filename": "gift.svg",
+      "sizeBytes": 422,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "globe",
+      "pascalName": "Globe",
+      "filename": "globe.svg",
+      "sizeBytes": 319,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "graduation-cap",
+      "pascalName": "GraduationCap",
+      "filename": "graduation-cap.svg",
+      "sizeBytes": 398,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "grip-vertical",
+      "pascalName": "GripVertical",
+      "filename": "grip-vertical.svg",
+      "sizeBytes": 417,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "grip-vertical-icon",
+      "pascalName": "GripVerticalIcon",
+      "filename": "grip-vertical-icon.svg",
+      "sizeBytes": 417,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "hand",
+      "pascalName": "Hand",
+      "filename": "hand.svg",
+      "sizeBytes": 471,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "hand-coins",
+      "pascalName": "HandCoins",
+      "filename": "hand-coins.svg",
+      "sizeBytes": 467,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "hash",
+      "pascalName": "Hash",
+      "filename": "hash.svg",
+      "sizeBytes": 361,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "heart",
+      "pascalName": "Heart",
+      "filename": "heart.svg",
+      "sizeBytes": 342,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "history",
+      "pascalName": "History",
+      "filename": "history.svg",
+      "sizeBytes": 310,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "home",
+      "pascalName": "Home",
+      "filename": "home.svg",
+      "sizeBytes": 375,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "info",
+      "pascalName": "Info",
+      "filename": "info.svg",
+      "sizeBytes": 282,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "instagram",
+      "pascalName": "Instagram",
+      "filename": "instagram.svg",
+      "sizeBytes": 367,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "key",
+      "pascalName": "Key",
+      "filename": "key.svg",
+      "sizeBytes": 343,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "keyboard",
+      "pascalName": "Keyboard",
+      "filename": "keyboard.svg",
+      "sizeBytes": 459,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "landmark",
+      "pascalName": "Landmark",
+      "filename": "landmark.svg",
+      "sizeBytes": 439,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "languages",
+      "pascalName": "Languages",
+      "filename": "languages.svg",
+      "sizeBytes": 354,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "laptop",
+      "pascalName": "Laptop",
+      "filename": "laptop.svg",
+      "sizeBytes": 389,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "layout-dashboard",
+      "pascalName": "LayoutDashboard",
+      "filename": "layout-dashboard.svg",
+      "sizeBytes": 404,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "layout-grid",
+      "pascalName": "LayoutGrid",
+      "filename": "layout-grid.svg",
+      "sizeBytes": 404,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "list-checks",
+      "pascalName": "ListChecks",
+      "filename": "list-checks.svg",
+      "sizeBytes": 326,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "loader-2",
+      "pascalName": "Loader2",
+      "filename": "loader-2.svg",
+      "sizeBytes": 233,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "lock",
+      "pascalName": "Lock",
+      "filename": "lock.svg",
+      "sizeBytes": 293,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "log-out",
+      "pascalName": "LogOut",
+      "filename": "log-out.svg",
+      "sizeBytes": 303,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "mail",
+      "pascalName": "Mail",
+      "filename": "mail.svg",
+      "sizeBytes": 300,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "map-pin",
+      "pascalName": "MapPin",
+      "filename": "map-pin.svg",
+      "sizeBytes": 345,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "megaphone",
+      "pascalName": "Megaphone",
+      "filename": "megaphone.svg",
+      "sizeBytes": 417,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "menu",
+      "pascalName": "Menu",
+      "filename": "menu.svg",
+      "sizeBytes": 265,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "mic",
+      "pascalName": "Mic",
+      "filename": "mic.svg",
+      "sizeBytes": 312,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "minus",
+      "pascalName": "Minus",
+      "filename": "minus.svg",
+      "sizeBytes": 214,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "minus-icon",
+      "pascalName": "MinusIcon",
+      "filename": "minus-icon.svg",
+      "sizeBytes": 214,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "monitor",
+      "pascalName": "Monitor",
+      "filename": "monitor.svg",
+      "sizeBytes": 332,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "moon",
+      "pascalName": "Moon",
+      "filename": "moon.svg",
+      "sizeBytes": 240,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "more-horizontal",
+      "pascalName": "MoreHorizontal",
+      "filename": "more-horizontal.svg",
+      "sizeBytes": 304,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "more-horizontal-icon",
+      "pascalName": "MoreHorizontalIcon",
+      "filename": "more-horizontal-icon.svg",
+      "sizeBytes": 304,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "mouse-pointer-click",
+      "pascalName": "MousePointerClick",
+      "filename": "mouse-pointer-click.svg",
+      "sizeBytes": 453,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "package",
+      "pascalName": "Package",
+      "filename": "package.svg",
+      "sizeBytes": 438,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "package-check",
+      "pascalName": "PackageCheck",
+      "filename": "package-check.svg",
+      "sizeBytes": 475,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "palette",
+      "pascalName": "Palette",
+      "filename": "palette.svg",
+      "sizeBytes": 569,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "panel-left-close",
+      "pascalName": "PanelLeftClose",
+      "filename": "panel-left-close.svg",
+      "sizeBytes": 300,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "panel-left-icon",
+      "pascalName": "PanelLeftIcon",
+      "filename": "panel-left-icon.svg",
+      "sizeBytes": 268,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "panel-left-open",
+      "pascalName": "PanelLeftOpen",
+      "filename": "panel-left-open.svg",
+      "sizeBytes": 299,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "party-popper",
+      "pascalName": "PartyPopper",
+      "filename": "party-popper.svg",
+      "sizeBytes": 732,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "pencil",
+      "pascalName": "Pencil",
+      "filename": "pencil.svg",
+      "sizeBytes": 361,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "phone",
+      "pascalName": "Phone",
+      "filename": "phone.svg",
+      "sizeBytes": 419,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "play",
+      "pascalName": "Play",
+      "filename": "play.svg",
+      "sizeBytes": 235,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "play-circle",
+      "pascalName": "PlayCircle",
+      "filename": "play-circle.svg",
+      "sizeBytes": 278,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "plus",
+      "pascalName": "Plus",
+      "filename": "plus.svg",
+      "sizeBytes": 240,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "receipt",
+      "pascalName": "Receipt",
+      "filename": "receipt.svg",
+      "sizeBytes": 365,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "redo-2",
+      "pascalName": "Redo2",
+      "filename": "redo-2.svg",
+      "sizeBytes": 292,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "refresh-cw",
+      "pascalName": "RefreshCw",
+      "filename": "refresh-cw.svg",
+      "sizeBytes": 380,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "reply",
+      "pascalName": "Reply",
+      "filename": "reply.svg",
+      "sizeBytes": 262,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "rotate-ccw",
+      "pascalName": "RotateCcw",
+      "filename": "rotate-ccw.svg",
+      "sizeBytes": 281,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "save",
+      "pascalName": "Save",
+      "filename": "save.svg",
+      "sizeBytes": 403,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "scale",
+      "pascalName": "Scale",
+      "filename": "scale.svg",
+      "sizeBytes": 421,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "scan-line",
+      "pascalName": "ScanLine",
+      "filename": "scan-line.svg",
+      "sizeBytes": 380,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "scroll",
+      "pascalName": "Scroll",
+      "filename": "scroll.svg",
+      "sizeBytes": 354,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "search",
+      "pascalName": "Search",
+      "filename": "search.svg",
+      "sizeBytes": 261,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "search-icon",
+      "pascalName": "SearchIcon",
+      "filename": "search-icon.svg",
+      "sizeBytes": 261,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "send",
+      "pascalName": "Send",
+      "filename": "send.svg",
+      "sizeBytes": 377,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "settings",
+      "pascalName": "Settings",
+      "filename": "settings.svg",
+      "sizeBytes": 810,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "settings-2",
+      "pascalName": "Settings2",
+      "filename": "settings-2.svg",
+      "sizeBytes": 316,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "share",
+      "pascalName": "Share",
+      "filename": "share.svg",
+      "sizeBytes": 304,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "shield-alert",
+      "pascalName": "ShieldAlert",
+      "filename": "shield-alert.svg",
+      "sizeBytes": 421,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "shield-check",
+      "pascalName": "ShieldCheck",
+      "filename": "shield-check.svg",
+      "sizeBytes": 399,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "shopping-cart",
+      "pascalName": "ShoppingCart",
+      "filename": "shopping-cart.svg",
+      "sizeBytes": 363,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "smartphone",
+      "pascalName": "Smartphone",
+      "filename": "smartphone.svg",
+      "sizeBytes": 278,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "sofa",
+      "pascalName": "Sofa",
+      "filename": "sofa.svg",
+      "sizeBytes": 451,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "sparkles",
+      "pascalName": "Sparkles",
+      "filename": "sparkles.svg",
+      "sizeBytes": 558,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "star",
+      "pascalName": "Star",
+      "filename": "star.svg",
+      "sizeBytes": 570,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "sun",
+      "pascalName": "Sun",
+      "filename": "sun.svg",
+      "sizeBytes": 485,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "tablet",
+      "pascalName": "Tablet",
+      "filename": "tablet.svg",
+      "sizeBytes": 298,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "trash-2",
+      "pascalName": "Trash2",
+      "filename": "trash-2.svg",
+      "sizeBytes": 410,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "trending-down",
+      "pascalName": "TrendingDown",
+      "filename": "trending-down.svg",
+      "sizeBytes": 257,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "trending-up",
+      "pascalName": "TrendingUp",
+      "filename": "trending-up.svg",
+      "sizeBytes": 255,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "trophy",
+      "pascalName": "Trophy",
+      "filename": "trophy.svg",
+      "sizeBytes": 517,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "truck",
+      "pascalName": "Truck",
+      "filename": "truck.svg",
+      "sizeBytes": 463,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "twitter",
+      "pascalName": "Twitter",
+      "filename": "twitter.svg",
+      "sizeBytes": 341,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "type",
+      "pascalName": "Type",
+      "filename": "type.svg",
+      "sizeBytes": 296,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "undo-2",
+      "pascalName": "Undo2",
+      "filename": "undo-2.svg",
+      "sizeBytes": 293,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "upload",
+      "pascalName": "Upload",
+      "filename": "upload.svg",
+      "sizeBytes": 304,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "user",
+      "pascalName": "User",
+      "filename": "user.svg",
+      "sizeBytes": 285,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "user-check",
+      "pascalName": "UserCheck",
+      "filename": "user-check.svg",
+      "sizeBytes": 316,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "user-circle",
+      "pascalName": "UserCircle",
+      "filename": "user-circle.svg",
+      "sizeBytes": 333,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "user-minus",
+      "pascalName": "UserMinus",
+      "filename": "user-minus.svg",
+      "sizeBytes": 329,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "user-plus",
+      "pascalName": "UserPlus",
+      "filename": "user-plus.svg",
+      "sizeBytes": 373,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "user-search",
+      "pascalName": "UserSearch",
+      "filename": "user-search.svg",
+      "sizeBytes": 341,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "users",
+      "pascalName": "Users",
+      "filename": "users.svg",
+      "sizeBytes": 373,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "utensils-crossed",
+      "pascalName": "UtensilsCrossed",
+      "filename": "utensils-crossed.svg",
+      "sizeBytes": 415,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "volume-2",
+      "pascalName": "Volume2",
+      "filename": "volume-2.svg",
+      "sizeBytes": 462,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "wallet",
+      "pascalName": "Wallet",
+      "filename": "wallet.svg",
+      "sizeBytes": 371,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "wifi-off",
+      "pascalName": "WifiOff",
+      "filename": "wifi-off.svg",
+      "sizeBytes": 488,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "wrench",
+      "pascalName": "Wrench",
+      "filename": "wrench.svg",
+      "sizeBytes": 358,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "x",
+      "pascalName": "X",
+      "filename": "x.svg",
+      "sizeBytes": 244,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "x-circle",
+      "pascalName": "XCircle",
+      "filename": "x-circle.svg",
+      "sizeBytes": 281,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "x-icon",
+      "pascalName": "XIcon",
+      "filename": "x-icon.svg",
+      "sizeBytes": 244,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "youtube",
+      "pascalName": "Youtube",
+      "filename": "youtube.svg",
+      "sizeBytes": 412,
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "name": "zap",
+      "pascalName": "Zap",
+      "filename": "zap.svg",
+      "sizeBytes": 361,
+      "viewBox": "0 0 24 24"
+    }
+  ]
+}

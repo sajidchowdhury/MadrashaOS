@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="MadrashaOS favicon">
+  <!-- Deep-teal background circle (primary.500 #0E5C5C, Risk R13 brand lock-in) -->
+  <circle cx="32" cy="32" r="30" fill="#0E5C5C" />
+  <!-- Subtle gold ring (accent.500 #C9A961) -->
+  <circle cx="32" cy="32" r="28" fill="none" stroke="#C9A961" stroke-width="1.5" opacity="0.5" />
+  <!-- Arabic meem monogram (م) — rendered in warm gold (accent.500) -->
+  <text
+    x="32" y="44"
+    font-family="'Noto Naskh Arabic', 'Times New Roman', serif"
+    font-size="38"
+    font-weight="700"
+    fill="#C9A961"
+    text-anchor="middle"
+    text-rendering="geometricPrecision"
+  >م</text>
+</svg>
