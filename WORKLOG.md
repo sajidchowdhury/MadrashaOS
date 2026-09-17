@@ -732,3 +732,199 @@ Stage Summary:
 - Used ONLY FROZEN token utilities (bg-primary-500, text-text-primary, shadow-elevation-1, bg-warning-50, text-semantic-danger, border-border-default, bg-surface-card, etc.) — zero raw hex/px values.
 - No existing files modified (no i18n messages, no moduleTree, no widgets/states/fixtures).
 - All additional mock data (suppliers, assets, beds, meals, books, vehicles, purchase orders) defined inline within page components — no new fixture files created.
+
+---
+Task ID: 5-c
+Agent: full-stack-developer
+Task: C5.3 — Multi-Language Typography Validation. Built a comprehensive typography audit route (/dev/typography), a zero-tofu verification component (TypographyChecker), and a Bun-compatible typography audit script that scans every public+app+dev route × 3 locales (en/bn/ar) for tofu characters and validates the i18n formatters.
+
+Work Log:
+- Read /home/z/my-project/worklog.md (18 prior sessions complete — C0.1 through C4.4) and key i18n files: src/lib/i18n/config.ts (3 locales, localeConfig with fontVar/dir/bcp47), src/lib/i18n/format.ts (convertDigits/formatDate/formatNumber/formatCurrency with manual BN/AR digit conversion), src/lib/i18n/messages.ts (en/bn/ar message catalogs), src/styles/tokens.css (--font-en/--font-bn/--font-ar CSS vars + 6-step type scale + Inter/Hind_Siliguri/Noto_Naskh_Arabic stacks), src/app/layout.tsx (next/font loads 4 font families exposing --font-inter/--font-hind-siliguri/--font-noto-naskh-arabic/--font-jetbrains-mono). Read existing dev routes (/dev/data, /dev/components, /dev/shell) and the existing dev components folder to match conventions. Read package.json (no audit script existed), tsconfig.json (@/* alias), eslint.config.mjs (relaxed rules), and tokens.ts (typed constants mirror). Confirmed there are 36 page.tsx routes across src/app (33 (app) routes + / + 3 /dev routes).
+- Built Part 3 first: src/components/dev/TypographyChecker.tsx — a client component that (a) waits for document.fonts.ready, (b) scans each per-locale test string's characters against the known tofu set (U+25A1, U+FFFD, U+0000), (c) uses document.fonts.check(fontSpec, char) to verify the assigned webfont can actually render each glyph (catching the "missing glyph" case even when the source has no tofu codepoint), (d) scans the mixed-script string "Ahmad আহমদ أحمد · 2026-০৯-١٦ · ৳5,000 / ৳৫,০০০ / ৳٥٬٠٠٠", and (e) hooks a MutationObserver on the rendered test spans so the check re-runs if React re-renders. Renders a green ✅ "No tofu detected" badge or a red ❌ "Tofu found in [locale] [context]" badge with per-hit table. Uses a hidden sr-only div with explicit lang/dir/style for each locale's font so the browser actually exercises the font-rendering path.
+- Built Part 1 + Part 4: src/app/dev/typography/page.tsx — comprehensive typography audit route with 7 sections: (1) TypographyChecker live tofu check, (2) Type Scale × 3 Scripts table — 6 type-scale steps (caption/body/subtitle/title/headline/display) × 3 scripts side-by-side using per-cell lang/dir/font-class attributes (Inter for en, Hind Siliguri for bn, Noto Naskh Arabic for ar with dir=rtl), (3) Numerals / Currency / Dates cards showing Western 0-9 / Bangla ০-৯ / Arabic-Indic ٠-٩, ৳5,000 / ৳৫,০০০ / ৳٥٬٠٠٠, and 16-09-2026 / ১৬-০৯-২০২৬ / ١٦-٠٩-٢٠٢٦ — all rendered via formatCurrency()/formatDate()/convertDigits() to verify the formatters end-to-end, (4) Mixed-Script Strings card showing "Ahmad আহমদ أحمد · 2026-০৯-١٦ · ৳5,000 / ৳৫,০০০ / ৳٥٬٠٠٠" rendered with the var(--font-default) chained stack + a <pre> showing the raw source, (5) Long-Text Wrapping card with a paragraph per locale, (6) Font-Family CSS Stacks table mirroring tokens.css (var(--font-en/bn/ar) → var(--font-inter/hind-siliguri/noto-naskh-arabic)), and (7) Summary table: Script | Font | Sample | Tofu Check (all 3 locales ✅ No tofu). Plus a "Run Full Audit" button that fetches every route × locale client-side, scans the returned HTML for U+25A1/U+FFFD/U+0000, and shows a streaming-progress table with green/red/amber status per cell. After completion, shows a summary banner: "21 routes × 3 locales = 63 combinations · 0 tofu found · ✅ clean" or "❌ review required".
+- Built Part 2: scripts/typography-audit.ts — Bun-compatible audit script that imports formatDate/formatCurrency/convertDigits from src/lib/i18n/format.ts directly. Phase 1 validates the 3 formatters: formatDate(new Date(2026, 8, 16), "bn") === "১৬-০৯-২০২৬", formatCurrency(5000, "bn") === "৳৫,০০০", convertDigits("123", "ar") === "١٢٣". Phase 2 fetches 36 routes × 3 locales = 108 combinations (each URL is `${BASE_URL}${route}?lang=${locale}` with a Cookie: madrasha-locale=${locale} header), scans the returned HTML for U+25A1/U+FFFD/U+0000, and reports tofu hits with route + locale + char + codepoint + 80-char context snippet. Phase 3 prints a summary: "36 routes checked × 3 locales = 108 combinations · 0 tofu found". Exit code 0 if zero tofu AND formatters pass AND zero HTTP errors, exit code 1 otherwise.
+- Updated Part 5: package.json — added "audit:typography": "bun run scripts/typography-audit.ts" script.
+- Lint pass 1 found 1 warning + 2 errors. Fixed the warning (removed the unnecessary /* eslint-disable no-console */ comment). The 2 errors are pre-existing in src/lib/pdf/brand.ts:226 and src/lib/pdf/templates/Certificate.tsx:329 (PDF template files from a parallel Phase C5.2 agent — not my work, untouched per the task rule). My 3 files (TypographyChecker.tsx, dev/typography/page.tsx, typography-audit.ts) pass lint cleanly: `npx eslint <my-files>` returns exit 0 with no errors/warnings.
+- Verified /dev/typography route: curl returns HTTP 200, 79,859 bytes, 85ms render. Initial HTML scan found 2 tofu chars but they were in MY OWN descriptive text "(□ U+25A1, � U+FFFD, U+0000)" — replaced those literals with codepoint descriptions ("U+25A1 WHITE SQUARE, U+FFFD REPLACEMENT CHARACTER, U+0000 NULL") in both page.tsx and TypographyChecker.tsx so the page's own HTML no longer contains tofu chars. Re-scanned: 0 tofu chars in the rendered HTML.
+- Verified the audit script: `bun run scripts/typography-audit.ts` → Phase 1: 3/3 formatter checks passed (Bangla date "১৬-০৯-২০২৬", Bangla currency "৳৫,০০০", Arabic digits "١٢٣"). Phase 2: 108/108 cells OK, 0 cells with errors, 0 cells with tofu. Phase 3: "36 routes checked × 3 locales = 108 combinations · 0 tofu found · ✅ Typography audit PASSED". Exit code 0. Also verified `bun run audit:typography` works (uses the package.json script).
+- Used ONLY FROZEN tokens throughout — every color/spacing/radius/elevation references Tailwind theme keys backed by CSS variables (bg-primary-500, text-semantic-success, border-border-default, bg-surface-card, shadow-elevation-2, text-caption/body/subtitle/title/headline/display, font-en/bn/ar). No raw hex/px values introduced. Did NOT modify i18n messages, moduleTree, stores, fixtures, tokens.css, or tokens.ts.
+- Did NOT modify any other agent's files (PDF templates, RBAC pages, accounting pages, etc.). The 2 pre-existing lint errors in src/lib/pdf/* are from a sibling agent's WIP and remain untouched.
+
+Stage Summary:
+- **Files created (3)**:
+  - `src/components/dev/TypographyChecker.tsx` (300 lines) — client-side zero-tofu verification component using document.fonts.check() + MutationObserver. Embeddable in any page; renders a green ✅ or red ❌ badge.
+  - `src/app/dev/typography/page.tsx` (882 lines) — comprehensive typography audit route with 7 sections (TypographyChecker + Type Scale × 3 Scripts + Numerals/Currency/Dates + Mixed-Script + Long-Text Wrapping + Font Stacks + Summary + Run Full Audit grid).
+  - `scripts/typography-audit.ts` (270 lines) — Bun-compatible audit script that validates the 3 formatters + scans 36 routes × 3 locales = 108 HTML combinations for tofu. Exit code 0 on success, 1 on tofu found.
+- **Files modified (1)**:
+  - `package.json` — added `"audit:typography": "bun run scripts/typography-audit.ts"` script.
+- **Lint result**: My 3 files pass lint cleanly (exit 0, 0 errors, 0 warnings). The 2 remaining project-wide errors are pre-existing in `src/lib/pdf/brand.ts:226` and `src/lib/pdf/templates/Certificate.tsx:329` (sibling agent's WIP — untouched per task rule).
+- **HTTP status /dev/typography**: 200 OK · 79,859 bytes · 85ms render · 0 tofu chars in rendered HTML.
+- **Audit script output**: 36 routes × 3 locales = 108 combinations · 0 tofu found · 3/3 formatters passed · exit code 0 · ✅ PASSED.
+- **Exit criteria met**:
+  - Part 1: All 3 scripts side-by-side for every text style ✅; 6 type scale steps × 3 scripts ✅; all numerals (Western/Bangla/Arabic-Indic) ✅; currency (৳5000/৳৫,০০০/৳٥٬٠٠٠) ✅; dates (16-09-2026/১৬-০৯-২০২৬/١٦-٠٩-٢٠٢٦) ✅; mixed-script strings ✅; long-text wrapping in all 3 scripts ✅; font-family CSS stacks shown ✅.
+  - Part 2: All routes defined ✅; all 3 locales ✅; URL constructed as `?lang=XX` ✅; HTML fetched ✅; tofu scanned (U+25A1, U+FFFD, U+0000) ✅; formatter validations (Bangla date, Bangla currency, Arabic digits) ✅; summary report "X routes × 3 locales = Y combinations · Z tofu found" ✅; exit code 0/1 logic ✅; runnable via `bun run scripts/typography-audit.ts` ✅.
+  - Part 3: Comprehensive test strings in all 3 locales ✅; MutationObserver-based re-check ✅; green ✅ / red ❌ badge ✅; embeddable in any page ✅.
+  - Part 4: TypographyChecker embedded ✅; summary table (Script | Font | Sample | Tofu Check) ✅; "Run Full Audit" button ✅; results table with green/red status per route × locale ✅.
+  - Part 5: `audit:typography` script added to package.json ✅.
+
+---
+Task ID: 5-a
+Agent: full-stack-developer
+Task: MadrashaOS Phase C5.1 — Branded PDF Templates (6 templates + preview routes + trigger buttons)
+
+Work Log:
+- Read worklog + 7 key context files (tokens.ts, i18n config/format, mock fixtures, fees page, accounting page, student profile page) to align with the FROZEN brand palette and existing code patterns
+- Confirmed `@react-pdf/renderer` v4.9.0 + `fontkit` are installed; verified jsdelivr WOFF URLs for HindSiliguri + NotoNaskhArabic + Inter return HTTP 200 (fontkit supports WOFF/WOFF2/TTF/OTF per its README)
+- Created `/home/z/my-project/src/lib/pdf/brand.ts` — FROZEN brand hex constants (primary.500=#0E5C5C, accent.DEFAULT=#C9A961, neutral.0=#FFFFFF + full neutral/accent/semantic scales), Font.register() for 3 font families with 3 weights each, amountInWords() helper (handles 0–999,999,999 BDT with crore/lakh/thousand grouping), marksToGrade() + marksToGpa() helpers (Bangladeshi madrasha board A+/A/A-/B/C/F scale on 5.0 GPA), ensurePdfReady() guard called at the top of every Document component
+- Created `/home/z/my-project/src/lib/pdf/mockData.ts` — pure-function builders: getBranchInfo(), getStudentInfo(), getExamInfo(), getSubjectMarks() (deterministic per student code), getFeePayment(), getLedgerRows() (with running balance + opening/closing), getOutstandingInstallments() (scan feePlans for unpaid), getResultRows() (top-N by class+section with computed marks/grade/gpa), TEMPLATE_REGISTRY (6 entries with id+title+description+fields)
+- Created 6 branded PDF template components under `/home/z/my-project/src/lib/pdf/templates/`:
+  * `FeeReceipt.tsx` — primary.500 header bar + accent gold divider + monogram, meta grid (Receipt No/Date/Student bilingual/Class), payment details table, total row, amount-in-words gold callout, signature lines, computer-gen footer
+  * `MarkSheet.tsx` — exam banner, student info card with avatar + bilingual names (bn via HindSiliguri, ar via NotoNaskhArabic with `direction: rtl`), 6-subject table (Quran, Hadith, Fiqh, Arabic, Bangla, English) with alternating rows + grades, summary row with Total/GPA/Position (position badge conditional on `rankingEnabled` per Risk R7), teacher + principal signatures
+  * `ResultSheet.tsx` — exam banner, student ranking table (10 rows from Class 5-A fixtures), top-3 students highlighted with gold accent background + rank badge, summary row (Highest/Average/Pass Rate/Total Students), Prepared By + Approved By signatures
+  * `Certificate.tsx` — landscape A4, gold double-border frame, monogram + bilingual org name, large "CERTIFICATE OF COMPLETION" title, student name in 3 scripts, decorative seal (mock circle with gold border + accent fill), diagonal "PHASE 3 PLACEHOLDER" watermark per task spec
+  * `LedgerStatement.tsx` — primary.500 header, date range banner, opening balance row (neutral.100 background), 6-column running-balance table (Date/Voucher/Narration/Dr/Cr/Balance), closing balance highlighted in accent gold, generated-on footer
+  * `OutstandingFeesReport.tsx` — "Outstanding as of [date]" warning-color banner (Risk R12), 6-column table (Student bilingual/Code/Class/Installment/Amount/Due Date), overdue rows highlighted in danger background, total outstanding in warning color, "X students · Y installments outstanding" summary
+  * `index.ts` — barrel export + TEMPLATE_REGISTRY re-export
+- Created `/home/z/my-project/src/components/pdf/PdfPreview.tsx` — client-side wrapper component exposing 3 exports:
+  * `PdfPreview` — full-size iframe preview (used by /dev/pdfs/[template]); uses `next/dynamic` with `ssr: false` to lazily load @react-pdf/renderer's PDFViewer
+  * `PdfDownloadButton` — shadcn-styled Button that triggers PDFDownloadLink; accepts templateId, locale, label, variant, size, fileName, icon (download/print/file), and per-template props (studentId/paymentId/from/to/accountFilter/classId/section/etc.); shows a disabled placeholder button pre-mount so layout doesn't jump
+  * `PdfThumbnailPreview` — small inline PDFViewer (`show={false}` to hide toolbar) for the /dev/pdfs grid showcase; aspect ratio 1:1.414 (A4 portrait)
+  * `renderDocument()` factory switch dispatches on TemplateId and returns the correct React element with mock data wired in
+- Created `/home/z/my-project/src/app/dev/pdfs/page.tsx` — showcase route with:
+  * Header + Risk callout grid (3 chips: R13 brand lock-in, R14 Arabic/Bangla glyphs, R7 conditional position)
+  * Grid of 6 TemplateCard components, each rendering: title + ID, description, thumbnail preview (PdfThumbnailPreview), fields chips, "Preview PDF" link button + "Download" PdfDownloadButton
+  * Implementation notes card explaining the brand-hex exception, font loading strategy, and trigger button locations
+- Created `/home/z/my-project/src/app/dev/pdfs/[template]/page.tsx` — single-PDF preview route:
+  * useParams reads template param, validates against VALID_IDS set, falls back to fee-receipt for invalid IDs with a warning card
+  * Header with "Back to PDF showcase" link + Download PDF button + Print button (window.print())
+  * Full-height (80vh) PDF iframe via PdfPreview
+- Modified `/home/z/my-project/src/app/(app)/fees/page.tsx` — added "Receipt" button on each fee row:
+  * Added `useFeePayments()` hook + `latestPaymentId` lookup in the rows useMemo (finds the most recent payment per student)
+  * In the Action cell, added a `PdfDownloadButton` next to the existing "Collect" button; only renders when the student has at least one payment; passes paymentId so the FeeReceipt template renders the correct payment
+- Modified `/home/z/my-project/src/app/(app)/accounting/page.tsx` — added "Download Statement" button in the header:
+  * Imported `PdfDownloadButton` and `Download` icon
+  * Wrapped existing "New Entry" button in a flex container alongside a `PdfDownloadButton` that passes fromDate/toDate filters to the LedgerStatement template
+- Modified `/home/z/my-project/src/app/(app)/students/[id]/page.tsx` — added "Download Mark Sheet" button in the Academic tab:
+  * Imported `PdfDownloadButton` and `Download` icon
+  * Wrapped the CardHeader's CardTitle in a flex container alongside a `PdfDownloadButton` that passes the current studentId to the MarkSheet template
+- Fixed 2 ESLint/parse errors found during initial lint pass:
+  * `brand.ts` line 226: template-literal closing backtick had been written as a double quote (`Crore"` instead of ``Crore` ``) — fixed all 3 occurrences (Crore/Lakh/Thousand)
+  * `Certificate.tsx` line 329: JSX attribute `style={styles.sealMono">` had a stray `"` instead of `}>` — fixed to `style={styles.sealMono}>`
+- Fixed a runtime module-resolution error: `mockData.ts` imported `students` + `branches` from `@/lib/mock/fixtures` (the index) but those symbols are only imported (not re-exported) by that index — switched to direct imports from `@/lib/mock/fixtures/students` and `@/lib/mock/fixtures/organization`
+- Verified lint: `bun run lint` passes with zero errors, zero warnings
+- Verified dev server: started fresh dev server, all 10 routes return HTTP 200:
+  * `/dev/pdfs` → 200 (compile 3.6s)
+  * `/dev/pdfs/fee-receipt` → 200 (compile 1.1s)
+  * `/dev/pdfs/mark-sheet` → 200
+  * `/dev/pdfs/result-sheet` → 200
+  * `/dev/pdfs/certificate` → 200
+  * `/dev/pdfs/ledger-statement` → 200
+  * `/dev/pdfs/outstanding-fees` → 200
+  * `/fees` → 200 (compile 1.1s)
+  * `/accounting` → 200 (compile 0.4s)
+  * `/students/stu-001` → 200 (compile 1.1s)
+
+Stage Summary:
+- Artifacts produced (8 new files + 3 modified):
+  * src/lib/pdf/brand.ts (FROZEN hex constants + Font.register + amountInWords + grade helpers) — 263 LOC
+  * src/lib/pdf/mockData.ts (pure-function builders + TEMPLATE_REGISTRY) — 282 LOC
+  * src/lib/pdf/templates/FeeReceipt.tsx (branded fee receipt) — 282 LOC
+  * src/lib/pdf/templates/MarkSheet.tsx (student mark sheet with conditional position) — 311 LOC
+  * src/lib/pdf/templates/ResultSheet.tsx (class-wide result ranking) — 290 LOC
+  * src/lib/pdf/templates/Certificate.tsx (landscape A4 certificate with watermark + seal) — 348 LOC
+  * src/lib/pdf/templates/LedgerStatement.tsx (running-balance ledger statement) — 268 LOC
+  * src/lib/pdf/templates/OutstandingFeesReport.tsx (outstanding fees with overdue highlighting) — 268 LOC
+  * src/lib/pdf/templates/index.ts (barrel exports) — 36 LOC
+  * src/components/pdf/PdfPreview.tsx (3 client wrappers: PdfPreview, PdfDownloadButton, PdfThumbnailPreview with next/dynamic ssr:false) — 235 LOC
+  * src/app/dev/pdfs/page.tsx (6-card showcase grid) — 207 LOC
+  * src/app/dev/pdfs/[template]/page.tsx (single-PDF preview with validation + fallback) — 109 LOC
+  * src/app/(app)/fees/page.tsx (modified: added Print Receipt button per row via PdfDownloadButton)
+  * src/app/(app)/accounting/page.tsx (modified: added Download Statement button in header)
+  * src/app/(app)/students/[id]/page.tsx (modified: added Download Mark Sheet button in Academic tab header)
+- Exit criteria met:
+  * 6 branded PDF templates created (FeeReceipt, MarkSheet, ResultSheet, Certificate, LedgerStatement, OutstandingFeesReport) ✅
+  * Every PDF uses primary.500 (#0E5C5C) + accent.DEFAULT (#C9A961) + neutral.0 (#FFFFFF) per Risk R13 — FROZEN hex values hardcoded in brand.ts as the documented exception to the no-raw-hex rule ✅
+  * Arabic + Bangla glyphs supported via registered NotoNaskhArabic + HindSiliguri fonts (Risk R14 mitigation — falls back to Helvetica if CDN unreachable, with a console.warn) ✅
+  * MarkSheet hides position when `rankingEnabled=false` per Risk R7 ✅
+  * OutstandingFeesReport shows "as of [date]" banner per Risk R12 ✅
+  * Certificate has diagonal "PHASE 3 PLACEHOLDER" watermark per task spec ✅
+  * /dev/pdfs showcase lists all 6 templates with thumbnail previews + Preview/Download buttons ✅
+  * /dev/pdfs/[template] renders the full PDF inline via PDFViewer ✅
+  * Trigger buttons added to /fees (Print Receipt), /accounting (Download Statement), /students/[id] Academic tab (Download Mark Sheet) ✅
+  * `bun run lint` passes with zero errors, zero warnings ✅
+  * All 10 routes (showcase + 6 templates + 3 trigger pages) verified via curl returning HTTP 200 ✅
+- Notes for the next session:
+  * The branded PDF templates are production-ready for Phase 3 — when the real Prisma backend ships, only the `mockData.ts` builders need to be swapped for live API calls (the template components themselves are pure presentation).
+  * Font registration uses @fontsource WOFF files from the jsdelivr CDN — for offline/air-gapped deployments, the fonts should be vendored into `public/fonts/` and the URLs in `brand.ts` updated to local paths.
+  * The Certificate template has the "PHASE 3 PLACEHOLDER" watermark per the task spec — when Phase 3 ships, remove the watermark Text element from Certificate.tsx.
+  * The dev server was manually started via `setsid bun run dev &` for verification; the system auto-restart of the dev server may or may not pick up depending on sandbox state.
+
+---
+Task ID: 5-b
+Agent: Z.ai Code (subagent 5-b)
+Task: MadrashaOS Phase C5.2 — Public Website (7 pages) + Layout Restructure per SRS §2.7.3.
+
+Work Log:
+- Read /home/z/my-project/worklog.md (C0–C4 complete, C5.1 PDFs complete, C5.3 typography complete).
+- Read /home/z/my-project/src/app/layout.tsx — confirmed root layout already restructured (only ThemeProvider + I18nProvider + QueryProvider + 4 fonts + Toaster; no AppShell, no DevToolbar).
+- Read /home/z/my-project/src/app/(app)/layout.tsx — confirmed wraps children in <AppShell> + <DevToolbar> + fixed "Authenticated as [role]" route-guard badge.
+- Read /home/z/my-project/src/app/(public)/layout.tsx — confirmed wraps children in <PublicLayout> (no AppShell, no DevToolbar).
+- Read /home/z/my-project/src/components/public/PublicLayout.tsx (325 lines) — sticky white navbar (logo + 7 nav links: Home, Programs, Admission, Notices, Events, Contact, Donate + LanguageSwitcher + ThemeToggle + "Public Visitor" route-guard badge) + mobile hamburger drawer + footer (brand info, quick links, contact, copyright with token version + locale).
+- Read all 7 public pages — verified each matches the task spec:
+  * /public/page.tsx (424 lines) — Hero (teal bg, name + tagline + Apply Now + Donate CTAs) + Stats (40 students / 8 teachers / 3 branches / 25 years, all with formatNumber()) + About + Programs preview (3 cards: Hifz, Alim, Qirat) + Recent Notices (3 items) + Contact preview with map placeholder.
+  * /public/programs/page.tsx (325 lines) — 6 programs (Hifz-ul-Quran, Alim Course, Qirat Saba&Ashara, Tajweed Foundation, Arabic Language, Islamic Studies Weekend) each with name, subtitle, description, duration, eligibility, seats, highlights, and "Apply for {name}" CTA → /public/admission; category filter (All/Hifz/Alim/Tajweed/Language/Studies).
+  * /public/admission/page.tsx (452 lines) — 4-step admission timeline (Apply → Interview → Document Verification → Confirmation) + Online Application Form (applicant name, parent name, phone, email, desired program Select, previous madrasha, notes) + honeypot "website" field; on submit → toast "Application received" + success state with reference APP-2026-XXXX + Required Documents sidebar (8 items) + admission fee note.
+  * /public/notices/page.tsx (390 lines) — 5 mock notices (Holiday, Exam, Event, Event, General) with title, date, excerpt, full body; category filter tabs + free-text search + "Read more" opens Dialog with full body.
+  * /public/events/page.tsx (272 lines) — 4 upcoming events (Annual Sports Day, Inter-Class Quran Competition, Parent-Teacher Meeting, Graduation Ceremony) on a vertical timeline; each with date, time, location, description, "Add to Calendar" button that generates and downloads a real .ics file; events sorted ascending by date.
+  * /public/contact/page.tsx (337 lines) — Contact form (name, email, message) + honeypot → toast "Message sent — Jazak Allah khairan"; Contact info card (address, phone, email, office hours); Google Maps embed placeholder; social media grid (Facebook, YouTube, Twitter, Instagram).
+  * /public/donate/page.tsx (529 lines) — Donation form with Risk R10 + R16 mitigations: amount presets (৳500/৳1000/৳5000 + custom ৳ input), donation type radio (General/Zakat/Sadaqah — Zakat highlighted in accent tone with "This donation will be posted to the Zakat fund (SRS §3.7)" note), donor name (optional, disabled when anonymous), email OR mobile (MANDATORY — both with format validation), anonymous checkbox, honeypot "website" field (silent reject with "Spam detected" Alert if filled), reCAPTCHA v3 placeholder checkbox; on submit → success screen with receipt number DON-2026-XXXX + "Download Receipt" button (mock) + "Donate Again" reset; sidebar with Recent Donations (5 anonymous mock) + Zakat distribution note + Other Ways to Give (bank/mobile/in person).
+- Ran `bun run lint` — zero errors, zero warnings.
+- Curl-tested all 11 routes — all return HTTP 200:
+  * GET / → 200 (50ms render, root showcase — NO AppShell, NO DevToolbar, NO PublicLayout)
+  * GET /dashboard → 200 (96ms render — AppShell + DevToolbar present, includes Main navigation + Branch switcher + Dev Toolbar aria-labels)
+  * GET /students → 200 (74ms render — AppShell + DevToolbar)
+  * GET /dev/components → 200 (136ms render — standalone dev route)
+  * GET /public → 200 (97ms render — PublicLayout only, no AppShell/DevToolbar, has "Public Visitor" badge + Primary navbar)
+  * GET /public/programs → 200 (76ms render)
+  * GET /public/admission → 200 (80ms render)
+  * GET /public/notices → 200 (103ms render)
+  * GET /public/events → 200 (54ms render)
+  * GET /public/contact → 200 (62ms render)
+  * GET /public/donate → 200 (83ms render)
+- Layout-segregation verified by SSR HTML grep:
+  * /dashboard SSR: contains aria-label="Dev Toolbar" + "Main navigation" + "Branch" + "Academic Year" + "Notifications" + "Language switcher" markers (AppShell + DevToolbar present) ✅
+  * /public SSR: ZERO DevToolbar markers, ZERO "Branch" switcher, ZERO "Main navigation" — instead has "Public Visitor" badge + aria-label="Primary" public navbar ✅
+  * / SSR (root showcase): ZERO AppShell markers, ZERO DevToolbar, ZERO PublicLayout — pure showcase page (intentional) ✅
+- FROZEN tokens only: every color/spacing/radius/elevation uses Tailwind utilities backed by FROZEN token CSS variables (`bg-primary-700`, `text-primary-foreground`, `border-border-default`, `bg-surface-card`, `shadow-elevation-2`, `text-semantic-success`, `bg-accent-50`, `text-accent-700`, `bg-success-50`, `border-warning-200`, `text-semantic-warning`, etc.). No raw hex/px values introduced.
+- Dev log: clean, no errors. All 11 routes compile in ≤500ms and render in ≤136ms. No hydration warnings.
+
+Stage Summary:
+- Artifacts (5 new + 1 modified prior to this verification cycle — all already present from the C5.2 build effort, verified end-to-end here):
+  * src/app/layout.tsx (restructured: only ThemeProvider + I18nProvider + QueryProvider + 4 fonts + Toaster)
+  * src/app/(app)/layout.tsx (wraps children in <AppShell> + <DevToolbar> + Authenticated-as badge)
+  * src/app/(public)/layout.tsx (wraps children in <PublicLayout> + metadata)
+  * src/components/public/PublicLayout.tsx (325 LOC — public navbar + mobile drawer + footer)
+  * src/app/(public)/public/page.tsx (424 LOC — home: hero, stats, about, programs preview, recent notices, contact preview)
+  * src/app/(public)/public/programs/page.tsx (325 LOC — 6 programs with category filter + Apply CTAs)
+  * src/app/(public)/public/admission/page.tsx (452 LOC — 4-step timeline + application form + honeypot + required docs sidebar)
+  * src/app/(public)/public/notices/page.tsx (390 LOC — 5 notices with category filter + search + detail Dialog)
+  * src/app/(public)/public/events/page.tsx (272 LOC — 4 events on timeline + real .ics download)
+  * src/app/(public)/public/contact/page.tsx (337 LOC — contact form + honeypot + contact info + map placeholder + social)
+  * src/app/(public)/public/donate/page.tsx (529 LOC — donation form with honeypot + reCAPTCHA placeholder + Zakat note + success state with Download Receipt)
+- Exit criteria met:
+  * Root layout restructured — no AppShell, no DevToolbar ✅
+  * (app)/layout.tsx wraps all back-office routes in AppShell + DevToolbar ✅
+  * (public)/layout.tsx wraps all public routes in PublicLayout (no AppShell, no DevToolbar) ✅
+  * PublicLayout: sticky white navbar + 7 nav links + LanguageSwitcher + ThemeToggle + mobile hamburger drawer + footer ✅
+  * 7 public pages created (Home, Programs, Admission, Notices, Events, Contact, Donate) ✅
+  * Home page has Hero + Stats + Programs preview + Recent notices ✅
+  * Programs page has 6 programs with name, description, duration, Apply button ✅
+  * Admission page has form (name, parent, phone, email, desired class) + toast "Application received" ✅
+  * Notices page has 5 mock notices with title, date, body ✅
+  * Events page has 4 upcoming events with date, time, location ✅
+  * Contact page has form + contact info ✅
+  * Donate page has presets (৳500/৳1000/৳5000/custom) + type (General/Zakat/Sadaqah) + Zakat note "posted to Zakat fund (SRS §3.7)" + honeypot + reCAPTCHA placeholder + success screen with Download Receipt button ✅
+  * Honeypot fields on Admission, Contact, Donate — silent spam-detected reject ✅
+  * `bun run lint` passes with zero errors, zero warnings ✅
+  * All 11 routes verified via curl returning HTTP 200 ✅
+  * Existing routes (/, /dashboard, /students, /dev/components) still work after layout restructure ✅

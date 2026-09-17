@@ -34,9 +34,10 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { formatCurrency, formatDate } from "@/lib/i18n/format";
 import {
-  useStudents, useFeePlans, usePendingApprovals,
+  useStudents, useFeePlans, usePendingApprovals, useFeePayments,
 } from "@/lib/query/client";
 import { CollectPaymentDialog } from "@/components/finance/CollectPaymentDialog";
+import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
 
 type Row = {
   studentId: string;
@@ -48,6 +49,7 @@ type Row = {
   pendingInstallments: number;
   hasPendingDiscount: boolean;
   discountTitle?: string;
+  latestPaymentId?: string;
 };
 
 export default function FeesPage() {
@@ -58,6 +60,7 @@ export default function FeesPage() {
   const { data: students, isLoading: studentsLoading, isError: studentsError, refetch: refetchStudents } = useStudents();
   const { data: feePlans, isLoading: feesLoading, isError: feesError, refetch: refetchFees } = useFeePlans();
   const { data: approvals } = usePendingApprovals();
+  const { data: feePayments } = useFeePayments();
 
   const [collectOpen, setCollectOpen] = React.useState(false);
   const [preselectedStudentId, setPreselectedStudentId] = React.useState<string | undefined>();
@@ -78,6 +81,12 @@ export default function FeesPage() {
       const pendingApproval = approvals?.find(
         (a) => a.type === "discount" && a.status === "pending" && a.title.includes(s.code),
       );
+      // Find the most recent payment by this student (for the "Print Receipt" button).
+      // C5.1 — Task 5-a: trigger button for the FeeReceipt PDF template.
+      const studentPayments = (feePayments ?? [])
+        .filter((p) => p.studentId === s.id)
+        .sort((a, b) => (a.collectedAt < b.collectedAt ? 1 : -1));
+      const latestPaymentId = studentPayments.length > 0 ? studentPayments[0].id : undefined;
       return {
         studentId: s.id,
         studentName: s.name,
@@ -88,9 +97,10 @@ export default function FeesPage() {
         pendingInstallments: unpaid.length,
         hasPendingDiscount: !!pendingApproval,
         discountTitle: pendingApproval?.title,
+        latestPaymentId,
       };
     });
-  }, [students, feePlans, approvals]);
+  }, [students, feePlans, approvals, feePayments]);
 
   const filteredRows = React.useMemo(() => {
     if (!search.trim()) return rows;
@@ -246,33 +256,50 @@ export default function FeesPage() {
                         {r.pendingInstallments}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-end">
-                        <IfPermission
-                          code="fees.payment.create"
-                          fallback={
-                            <span className="text-caption text-text-muted">View only</span>
-                          }
-                        >
-                          <Button
-                            size="sm"
-                            variant={r.outstanding === 0 ? "outline" : "default"}
-                            disabled={r.outstanding === 0 || isDiscountPending}
-                            onClick={() => openCollect(r.studentId)}
+                        <div className="flex items-center justify-end gap-2">
+                          <IfPermission
+                            code="fees.payment.create"
+                            fallback={
+                              <span className="text-caption text-text-muted">View only</span>
+                            }
                           >
-                            {isDiscountPending ? (
-                              <>
-                                <AlertTriangle className="h-4 w-4" />
-                                On Hold
-                              </>
-                            ) : r.outstanding === 0 ? (
-                              "No Dues"
-                            ) : (
-                              <>
-                                <Wallet className="h-4 w-4" />
-                                Collect
-                              </>
-                            )}
-                          </Button>
-                        </IfPermission>
+                            <Button
+                              size="sm"
+                              variant={r.outstanding === 0 ? "outline" : "default"}
+                              disabled={r.outstanding === 0 || isDiscountPending}
+                              onClick={() => openCollect(r.studentId)}
+                            >
+                              {isDiscountPending ? (
+                                <>
+                                  <AlertTriangle className="h-4 w-4" />
+                                  On Hold
+                                </>
+                              ) : r.outstanding === 0 ? (
+                                "No Dues"
+                              ) : (
+                                <>
+                                  <Wallet className="h-4 w-4" />
+                                  Collect
+                                </>
+                              )}
+                            </Button>
+                          </IfPermission>
+
+                          {/* C5.1 / Task 5-a — Print Receipt (FeeReceipt PDF template) */}
+                          {r.latestPaymentId && (
+                            <PdfDownloadButton
+                              templateId="fee-receipt"
+                              paymentId={r.latestPaymentId}
+                              locale={locale}
+                              label="Receipt"
+                              variant="outline"
+                              size="sm"
+                              icon="download"
+                              fileName={`receipt-${r.studentCode}.pdf`}
+                              buttonClassName="whitespace-nowrap"
+                            />
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

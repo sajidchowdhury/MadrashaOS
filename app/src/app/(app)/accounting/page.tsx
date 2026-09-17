@@ -18,7 +18,7 @@
  */
 
 import * as React from "react";
-import { Calculator, Plus, Search } from "lucide-react";
+import { Calculator, Plus, Search, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ import { formatCurrency, formatDate } from "@/lib/i18n/format";
 import { useLedgerEntries, useAccounts } from "@/lib/query/client";
 import { users } from "@/lib/mock/fixtures/users";
 import { LedgerEntryForm } from "@/components/finance/LedgerEntryForm";
+import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
 
 type StatusFilter = "all" | "posted" | "pending" | "rejected";
 
@@ -119,12 +120,27 @@ export default function AccountingPage() {
               Double-entry journal vouchers with running balance.
             </p>
           </div>
-          <IfPermission code="accounting.ledger.post">
-            <Button onClick={() => setEntryOpen(true)}>
-              <Plus className="h-4 w-4" />
-              New Entry
-            </Button>
-          </IfPermission>
+          <div className="flex items-center gap-2">
+            {/* C5.1 / Task 5-a — Download Statement (LedgerStatement PDF template) */}
+            <PdfDownloadButton
+              templateId="ledger-statement"
+              locale={locale}
+              from={fromDate || undefined}
+              to={toDate || undefined}
+              accountName="All Accounts"
+              label="Download Statement"
+              variant="outline"
+              size="default"
+              icon="download"
+              fileName={`ledger-statement-${fromDate || "all"}-to-${toDate || "now"}.pdf`}
+            />
+            <IfPermission code="accounting.ledger.post">
+              <Button onClick={() => setEntryOpen(true)}>
+                <Plus className="h-4 w-4" />
+                New Entry
+              </Button>
+            </IfPermission>
+          </div>
         </header>
 
         {/* KPI strip */}

@@ -28,7 +28,7 @@ import {
   ArrowLeft, CalendarDays, GraduationCap, FileText, Wallet, Users,
   ClipboardCheck, History as HistoryIcon, Upload, ArrowUpCircle,
   CheckCircle2, Clock, XCircle, FileArchive, Phone, Mail, Briefcase,
-  AlertCircle, BookOpen, Hash,
+  AlertCircle, BookOpen, Hash, Download,
 } from "lucide-react";
 import { useStudent, useFeePlans, useAttendanceSessions, useGuardians, useClasses } from "@/lib/query/client";
 import { useI18n } from "@/lib/i18n/I18nProvider";
@@ -55,6 +55,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   StudentAvatar, StudentStatusBadge, InfoRow, PastClassChip, buildNameSubtitle,
 } from "@/components/people";
+import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
 
 /* ---------------------------------------------------------------
  * Inline mock data — Risk R4 history + Academic subjects + Documents
@@ -340,7 +341,22 @@ export default function StudentProfilePage() {
           <TabsContent value="academic">
             <Card>
               <CardHeader>
-                <CardTitle className="text-subtitle">Academic Details</CardTitle>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-subtitle">Academic Details</CardTitle>
+                  {/* C5.1 / Task 5-a — Download Mark Sheet (MarkSheet PDF template) */}
+                  <PdfDownloadButton
+                    templateId="mark-sheet"
+                    studentId={studentId}
+                    locale={locale}
+                    rankingEnabled
+                    position={1}
+                    label="Download Mark Sheet"
+                    variant="outline"
+                    size="sm"
+                    icon="download"
+                    fileName={`marksheet-${student.code}.pdf`}
+                  />
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <dl className="divide-y divide-border-default">

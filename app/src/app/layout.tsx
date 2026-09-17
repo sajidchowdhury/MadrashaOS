@@ -5,19 +5,25 @@ import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { QueryProvider } from "@/lib/query/QueryProvider";
-import { AppShell } from "@/components/shell/AppShell";
-import { DevToolbar } from "@/components/dev/DevToolbar";
 
 /**
- * MadrashaOS — Root Layout (Session C0.4)
+ * MadrashaOS — Root Layout (Phase C5.2 restructure)
  *
- * Wraps the entire app in:
+ * The root layout now provides ONLY shared global providers + fonts:
  *   1. next/font: 4 trilingual fonts (Inter / Hind Siliguri / Noto Naskh Arabic / JetBrains Mono)
  *   2. ThemeProvider (next-themes): light/dark/system with class attribute
  *   3. I18nProvider: locale state + t() + dir + cookie persistence
  *   4. QueryProvider: TanStack Query client + cache
- *   5. AppShell: TopBar + SideNav + main + sticky Footer
- *   6. DevToolbar: floating dev controls (role / branch / language / theme / network)
+ *   5. Toaster (mounted once globally)
+ *
+ * Route-group layouts add their own chrome:
+ *   - `(app)/layout.tsx`  → AppShell + DevToolbar (authenticated back-office)
+ *   - `(public)/layout.tsx` → PublicLayout (public website, no shell)
+ *
+ * The legacy `/` showcase page + the `/dev/*` routes live OUTSIDE both route
+ * groups, so they get no chrome from a group layout (intentional — the
+ * showcase already renders its own page-level chrome and the /dev routes
+ * are tooling pages that don't need the AppShell).
  *
  * The <html suppressHydrationWarning> suppresses the theme class mismatch
  * that next-themes injects on the client (SSR renders without a class to
@@ -82,10 +88,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <I18nProvider>
-            <QueryProvider>
-              <AppShell>{children}</AppShell>
-              <DevToolbar />
-            </QueryProvider>
+            <QueryProvider>{children}</QueryProvider>
           </I18nProvider>
         </ThemeProvider>
         <Toaster />
