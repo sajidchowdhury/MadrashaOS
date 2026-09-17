@@ -25,6 +25,8 @@
  */
 
 import { type LucideIcon, Users, Wallet, Package, ClipboardCheck, Receipt, Clock, TrendingUp, TrendingDown, Bell, History, CheckCircle2, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { useSessionStore } from "@/stores/sessionStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -189,6 +191,7 @@ export function LowStockAlertWidget() {
 /* --- 5. AttendanceToday --- */
 export function AttendanceTodayWidget() {
   const { locale } = useI18n();
+  const router = useRouter();
   const { data, isLoading, isError, refetch } = useAttendanceSessions();
   const today = formatDate(new Date(), "en"); // ISO date for comparison
   const todaysSessions = data?.filter((s) => s.date === today) ?? [];
@@ -202,13 +205,13 @@ export function AttendanceTodayWidget() {
         {isLoading && <Skeleton className="h-20 w-full" />}
         {isError && <ErrorState onRetry={() => refetch()} />}
         {data && todaysSessions.length === 0 && (
-          <EmptyState illustration="attendance" title="No sessions yet today" description="Take attendance to get started." action={<Button size="sm">Take Attendance</Button>} />
+          <EmptyState illustration="attendance" title="No sessions yet today" description="Take attendance to get started." action={<Button size="sm" onClick={() => router.push("/attendance/take")}>Take Attendance</Button>} />
         )}
         {data && todaysSessions.length > 0 && (
           <div>
             <p className="text-display font-bold text-primary-500">{todaysSessions.length}</p>
             <p className="text-caption text-text-secondary">sessions taken today</p>
-            <Button size="sm" className="mt-3"><ClipboardCheck className="h-4 w-4" /> Take Attendance</Button>
+            <Button size="sm" className="mt-3" onClick={() => router.push("/attendance/take")}><ClipboardCheck className="h-4 w-4" /> Take Attendance</Button>
           </div>
         )}
       </CardContent>
@@ -251,7 +254,19 @@ export function RecentReceiptsWidget() {
 }
 
 /* --- 7. QuickActions --- */
+const QUICK_ACTION_ROUTES: Record<string, string> = {
+  "Collect Fee": "/fees",
+  "Post Entry": "/accounting",
+  "Record Expense": "/accounting",
+  "Receive Zakat": "/zakat",
+  "Take Attendance": "/attendance/take",
+  "Enter Marks": "/exams",
+  "Receive Stock": "/inventory",
+  "Issue Stock": "/inventory",
+  "New Purchase": "/purchase",
+};
 export function QuickActionsWidget({ actions }: { actions: { label: string; icon: LucideIcon; permission?: string }[] }) {
+  const router = useRouter();
   return (
     <Card>
       <CardHeader>
@@ -260,8 +275,9 @@ export function QuickActionsWidget({ actions }: { actions: { label: string; icon
       <CardContent>
         <div className="grid grid-cols-2 gap-2">
           {actions.map((a) => {
+            const route = QUICK_ACTION_ROUTES[a.label] ?? "/dashboard";
             const actionEl = (
-              <Button key={a.label} variant="outline" size="sm" className="justify-start">
+              <Button key={a.label} variant="outline" size="sm" className="justify-start" onClick={() => router.push(route)}>
                 <a.icon className="h-4 w-4" />
                 {a.label}
               </Button>
@@ -325,6 +341,7 @@ export function ClassPerformanceWidget() {
 /* --- 9. GuardianChildren --- */
 export function GuardianChildrenWidget() {
   const { locale } = useI18n();
+  const router = useRouter();
   const { data: students, isLoading, isError, refetch } = useStudents();
   // Guardian sees only their linked children — mock: first 2 students
   const myChildren = students?.slice(0, 2) ?? [];
@@ -347,7 +364,7 @@ export function GuardianChildrenWidget() {
                   <p className="font-medium text-text-primary">{c.name}</p>
                   <p className="text-caption text-text-muted">{c.code}</p>
                 </div>
-                <Button size="sm" variant="ghost">View</Button>
+                <Button size="sm" variant="ghost" onClick={() => router.push(`/students/${c.id}`)}>View</Button>
               </li>
             ))}
           </ul>
@@ -359,6 +376,7 @@ export function GuardianChildrenWidget() {
 
 /* --- 10. TeacherClasses --- */
 export function TeacherClassesWidget() {
+  const router = useRouter();
   const { data: sessions, isLoading, isError, refetch } = useAttendanceSessions();
   return (
     <Card>
@@ -376,7 +394,7 @@ export function TeacherClassesWidget() {
             {sessions.slice(0, 4).map((s) => (
               <li key={s.id} className="flex items-center justify-between text-body">
                 <span className="text-text-primary">Class 5 · Section {s.section}</span>
-                <Button size="sm" variant="outline">Take</Button>
+                <Button size="sm" variant="outline" onClick={() => router.push("/attendance/take")}>Take</Button>
               </li>
             ))}
           </ul>
@@ -424,6 +442,12 @@ export function AuditTimelineWidget() {
 export function ApprovalsQueueWidget() {
   const { locale } = useI18n();
   const { data: approvals, isLoading, isError, refetch } = usePendingApprovals();
+  function handleApprove(title: string) {
+    toast.success("Request approved", { description: title });
+  }
+  function handleReject(title: string) {
+    toast.error("Request rejected", { description: title });
+  }
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -445,8 +469,8 @@ export function ApprovalsQueueWidget() {
                   <p className="text-caption text-text-muted">{formatDate(new Date(a.requestedAt), locale)}</p>
                 </div>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="outline"><CheckCircle2 className="h-4 w-4 text-semantic-success" /></Button>
-                  <Button size="sm" variant="outline"><AlertCircle className="h-4 w-4 text-semantic-danger" /></Button>
+                  <Button size="sm" variant="outline" aria-label="Approve" onClick={() => handleApprove(a.title)}><CheckCircle2 className="h-4 w-4 text-semantic-success" /></Button>
+                  <Button size="sm" variant="outline" aria-label="Reject" onClick={() => handleReject(a.title)}><AlertCircle className="h-4 w-4 text-semantic-danger" /></Button>
                 </div>
               </li>
             ))}

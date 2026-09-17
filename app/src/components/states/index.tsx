@@ -27,9 +27,17 @@ export function LoadingState({
   pattern?: "list" | "detail" | "form" | "dashboard" | "table";
   rows?: number;
 }) {
+  // role=status + aria-live=polite so screen readers announce content
+  // arrival once the loading skeleton is replaced by real data
+  // (WCAG 4.1.3 — Status messages).
   if (pattern === "table") {
     return (
-      <div className="overflow-hidden rounded-lg border border-border-default">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-label="Loading data"
+        className="overflow-hidden rounded-lg border border-border-default"
+      >
         <div className="border-b border-border-default bg-neutral-50 p-3">
           <Skeleton className="h-4 w-1/3" />
         </div>
@@ -48,7 +56,12 @@ export function LoadingState({
   }
   if (pattern === "detail") {
     return (
-      <div className="space-y-4">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-label="Loading detail"
+        className="space-y-4"
+      >
         <Skeleton className="h-8 w-1/2" />
         <Skeleton className="h-4 w-1/3" />
         <div className="grid gap-4 md:grid-cols-2">
@@ -61,7 +74,12 @@ export function LoadingState({
   }
   if (pattern === "form") {
     return (
-      <div className="space-y-4">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-label="Loading form"
+        className="space-y-4"
+      >
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-10 w-full rounded-md" />
         <Skeleton className="h-4 w-32" />
@@ -74,7 +92,12 @@ export function LoadingState({
   }
   if (pattern === "dashboard") {
     return (
-      <div className="grid gap-4 md:grid-cols-3">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-label="Loading dashboard"
+        className="grid gap-4 md:grid-cols-3"
+      >
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-28 w-full rounded-lg" />
         ))}
@@ -83,7 +106,12 @@ export function LoadingState({
   }
   // list
   return (
-    <div className="space-y-2">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Loading list"
+      className="space-y-2"
+    >
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className="h-12 w-full rounded-md" />
       ))}
