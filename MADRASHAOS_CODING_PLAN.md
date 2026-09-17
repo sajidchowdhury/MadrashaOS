@@ -73,7 +73,43 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 
 ---
 
-## 4. Phase C0 — Foundation & Design System in Code (3 days)
+## 3.5 Progress Tracker
+
+> Auto-updated after each coding session. Status legend: ✅ Done · 🔄 In Progress · ⏳ Pending · ⛔ Blocked
+
+| Phase | Session | Title | Status | Commit | Date | Deliverable |
+|-------|---------|-------|--------|--------|------|-------------|
+| C0 | 0.1 | Token Ingestion | ✅ Done | [`5141435`](https://github.com/sajidchowdhury/MadrashaOS/commit/5141435) | 2026-09-16 | `tokens.css` + `tokens.ts` + `globals.css` bridge + showcase `/` |
+| C0 | 0.2 | Multi-Language Font Stack & RTL Pipeline | ✅ Done | [`5141435`](https://github.com/sajidchowdhury/MadrashaOS/commit/5141435) | 2026-09-16 | `i18n/` module + `DirectionalIcon` + Bangla/Arabic numeral formatters |
+| C0 | 0.3 | Theme Provider & Global Shell Skeleton | ✅ Done | [`5141435`](https://github.com/sajidchowdhury/MadrashaOS/commit/5141435) | 2026-09-16 | `AppShell` + `TopBar` + `SideNav` + `Footer` + `DevToolbar` + next-themes |
+| C0 | 0.4 | Mock-Data Layer & Seeding | ✅ Done | [`4696fd6`](https://github.com/sajidchowdhury/MadrashaOS/commit/4696fd6) | 2026-09-16 | Zustand store + 110+ permission codes + 8-persona role map + fixtures (40 students, 12 ledger entries, 4 attendance sessions) + mockApi + 16 TanStack Query hooks + `/dev/data` route |
+| C1 | 1.1–1.5 | Component Library (30 components × 5 states) | ✅ Done | [`7ebf999`](https://github.com/sajidchowdhury/MadrashaOS/commit/7ebf999) | 2026-09-16 | 8 custom components (IconButton, ButtonGroup, NumberInput, DateInput, Chip, EmptyState, FilterBar, FieldRow) + 5 SVG illustrations + `/dev/components` showcase with all 30 components |
+| C2 | 2.1 | Dynamic Nav Model (Permission-Aware) | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `moduleTree.ts` (40+ modules, 8 groups) + SideNav rewired to `getVisibleModules()` |
+| C2 | 2.2 | Five Role Dashboards | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | 12 widgets + 5 dashboards (authority/accountant/teacher/storekeeper/guardian) + role-redirect |
+| C2 | 2.3 | State System | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `LoadingState` (5 patterns) + `ErrorState` + `PermissionDenied` (Risk R3) + `OfflineState` |
+| C2 | 2.4 | Permission-Aware UI Rules | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `IfPermission` + `IfField` wrappers; QuickActions + Zakat KPI permission-gated |
+| C3 | 3.1 | Foundation Module Screens | 🔄 In Progress | — | — | — |
+| C3 | 3.2 | People Module Screens | ⏳ Pending | — | — | — |
+| C3 | 3.3 | Academic Module Screens (Mobile-First) | ⏳ Pending | — | — | — |
+| C3 | 3.4 | Finance Module Screens | ⏳ Pending | — | — | — |
+| C4 | 4.1–4.4 | Operations, Communication & Mobile | ⏳ Pending | — | — | — |
+| C5 | 5.1–5.3 | Print/PDF & Public Website | ⏳ Pending | — | — | — |
+| C6 | 6.1–6.3 | Prototype & Usability Validation | ⏳ Pending | — | — | — |
+| C7 | 7.1–7.4 | Design QA, Docs & Handoff | ⏳ Pending | — | — | — |
+
+**Summary:** 10 / 32 sessions done · 1 in progress · 21 pending · 0 blocked
+
+**Phase C0 (Foundation & Design System in Code): ✅ Complete** — 4/4 sessions done. Branded shell, trilingual i18n (bn/en/ar with RTL), next-themes, mock data layer (Zustand + 110+ permissions + 8-persona role map + fixtures), 16 TanStack Query hooks, `/dev/data` debug route.
+
+**Phase C1 (Component Library in Code): ✅ Complete** — 30 components (8 custom + 22 shadcn inherited) × 5 states × a11y contracts. 5 empty-state illustrations. `/dev/components` showcase gallery live.
+
+**Phase C2 (Information Architecture & Navigation): ✅ Complete** — 4/4 sessions done. Dynamic permission-aware nav (40+ modules filtered by role), 5 role dashboards with 12 widget types, 5-state system (empty/loading/error/permission-denied/offline), IfPermission/IfField wrappers. Verified: role switch via DevToolbar instantly updates nav + dashboard.
+
+Next up: **Phase C3 (Core Module Screens)** — 40+ module screens threaded by the nav built in C2.
+
+---
+
+## 4. Phase C0 — Foundation & Design System in Code (3 days) ✅
 
 ### 0.1 — Token Ingestion
 
@@ -160,7 +196,7 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 
 ---
 
-## 5. Phase C1 — Component Library in Code (6 days)
+## 5. Phase C1 — Component Library in Code (6 days) ✅
 
 **Goal:** Build all 30 components from Session 1.3 spec sheet, each with 5 states, a11y contracts, and a live demo in `/dev/components`.
 
@@ -249,7 +285,7 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 
 ---
 
-## 6. Phase C2 — Information Architecture & Navigation (5 days)
+## 6. Phase C2 — Information Architecture & Navigation (5 days) ✅
 
 ### 2.1 — Dynamic Nav Model (Permission-Aware)
 
