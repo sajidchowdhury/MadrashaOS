@@ -96,11 +96,13 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 | C4 | 4.2 | Operations Modules | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | 8 routes: inventory/purchase/suppliers/assets/hostel/food/library/transport + KpiStat component |
 | C4 | 4.3 | Communication & Documents & Reporting | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | `/notices` (Risk R11) + `/documents` (60MB validation) + `/reports` (finance-gated) + 7 components |
 | C4 | 4.4 | Mobile Screens Hi-Fi | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | Guardian Portal mobile polish + MobileBottomActionBar + attendance/marks/fees CTA anchors |
-| C5 | 5.1–5.3 | Print/PDF & Public Website | ⏳ Pending | — | — | — |
+| C5 | 5.1 | Branded PDF Templates | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | 6 templates (FeeReceipt/MarkSheet/ResultSheet/Certificate/LedgerStatement/OutstandingFeesReport) + `/dev/pdfs` showcase + trigger buttons on /fees, /accounting, /students |
+| C5 | 5.2 | Public Website Templates | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | 7 public pages (home/programs/admission/notices/events/contact/donate) + PublicLayout + layout restructure (root → (app) + (public) groups) |
+| C5 | 5.3 | Multi-Language Typography Validation | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | TypographyChecker component + `/dev/typography` route + `scripts/typography-audit.ts` (36 routes × 3 locales = 108 combos · 0 tofu) |
 | C6 | 6.1–6.3 | Prototype & Usability Validation | ⏳ Pending | — | — | — |
 | C7 | 7.1–7.4 | Design QA, Docs & Handoff | ⏳ Pending | — | — | — |
 
-**Summary:** 18 / 32 sessions done · 0 in progress · 14 pending · 0 blocked
+**Summary:** 21 / 32 sessions done · 0 in progress · 11 pending · 0 blocked
 
 **Phase C0 (Foundation & Design System in Code): ✅ Complete** — 4/4 sessions done. Branded shell, trilingual i18n (bn/en/ar with RTL), next-themes, mock data layer (Zustand + 110+ permissions + 8-persona role map + fixtures), 16 TanStack Query hooks, `/dev/data` debug route.
 
@@ -112,7 +114,9 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 
 **Phase C4 (Operations, Communication & Mobile): ✅ Complete** — 4/4 sessions done. 12 new routes: 8 operations (inventory/purchase Kanban/suppliers/assets/hostel floor plan/food/library/transport) + 3 communication (notices composer with Risk R11/documents/reports with finance gating) + `/dev/shell` responsive breakpoint spec. Shell polished: TopBar notification flyout + user menu flyout + MobileBottomActionBar on 3 key mobile routes. Guardian Portal mobile-polished (segmented child-switcher, sticky Pay Now, scrollable notices). All 12 routes HTTP 200; lint clean; VLM-verified.
 
-Next up: **Phase C5 (Print/PDF & Public Website)** — branded PDF templates (receipts/mark sheets/certificates) + 7-page public website + multi-language typography validation.
+**Phase C5 (Print/PDF & Public Website): ✅ Complete** — 3/3 sessions done. 6 branded PDF templates (FeeReceipt/MarkSheet/ResultSheet/Certificate/LedgerStatement/OutstandingFeesReport) with `/dev/pdfs` showcase + trigger buttons on /fees, /accounting, /students/[id]. 7-page public website (home/programs/admission/notices/events/contact/donate) with separate PublicLayout (no AppShell/DevToolbar). Layout restructured: root → (app) + (public) route groups. Typography audit: 36 routes × 3 locales = 108 combinations · 0 tofu · 3/3 formatters passed. Risk R13 (branded PDFs), R14 (Arabic glyphs), R10 (donation honeypot), C8 (public/protected route segregation) all enforced.
+
+Next up: **Phase C6 (Prototype & Usability Validation)** — 8-flow clickable prototype + role walkthroughs + polish pass.
 
 ---
 
@@ -514,7 +518,7 @@ Next up: **Phase C5 (Print/PDF & Public Website)** — branded PDF templates (re
 
 ---
 
-## 9. Phase C5 — Print/PDF & Public Website (4 days)
+## 9. Phase C5 — Print/PDF & Public Website (4 days) ✅
 
 ### 5.1 — Branded PDF Templates
 
