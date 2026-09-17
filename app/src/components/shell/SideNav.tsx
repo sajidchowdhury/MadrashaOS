@@ -1,123 +1,26 @@
 "use client";
 
 /**
- * MadrashaOS — SideNav
+ * MadrashaOS — SideNav (C2.1 upgrade)
  *
- * Session C0.3 — Theme Provider & Global Shell Skeleton
+ * Now permission-aware: uses getVisibleModules() to filter the nav tree
+ * by the current session's permissions (SRS §5.1 — hide, don't disable).
+ * Groups with zero visible items are also hidden (Risk R3).
  *
- * Collapsible left navigation showing module groups from the Session 0.1
- * module taxonomy. Items are PLACEHOLDERS for now — they render the full
- * nav structure but don't navigate. In C2.1, this will be wired to:
- *   - the dynamic module tree (enabled-modules + permissions per SRS §5.1)
- *   - permission-aware filtering (hide, don't disable per Risk R3 / D1)
- *   - branch switcher fresh-tab behavior (Risk R1)
- *
- * Collapse: click the collapse button at the bottom to toggle between
- * expanded (256px) and icon-only (64px) modes on desktop.
+ * Active item detection uses usePathname() so nav highlights follow route.
+ * Collapse toggle still available on desktop.
  */
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
-  Building2,
-  ShieldCheck,
-  History,
-  GraduationCap,
-  UserPlus,
-  Users,
-  UserCheck,
-  ClipboardCheck,
-  FileText,
-  Award,
-  Wallet,
-  Calculator,
-  HandCoins,
-  Package,
-  Home,
-  BookOpen,
-  Bell,
-  BarChart3,
-  Settings,
   PanelLeftClose,
   PanelLeftOpen,
-  type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/I18nProvider";
-import type { MessageKey } from "@/lib/i18n/messages";
-
-type NavItem = {
-  id: string;
-  labelKey: MessageKey;
-  icon: LucideIcon;
-};
-
-type NavGroup = {
-  id: string;
-  labelKey: MessageKey;
-  items: NavItem[];
-};
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    id: "main",
-    labelKey: "shell.nav.dashboard",
-    items: [
-      { id: "dashboard", labelKey: "shell.nav.dashboard", icon: LayoutDashboard },
-    ],
-  },
-  {
-    id: "foundation",
-    labelKey: "shell.nav.group.foundation",
-    items: [
-      { id: "organization", labelKey: "shell.nav.organization", icon: Building2 },
-      { id: "rbac", labelKey: "shell.nav.rbac", icon: ShieldCheck },
-      { id: "audit", labelKey: "shell.nav.audit", icon: History },
-    ],
-  },
-  {
-    id: "people",
-    labelKey: "shell.nav.group.people",
-    items: [
-      { id: "students", labelKey: "shell.nav.students", icon: GraduationCap },
-      { id: "admission", labelKey: "shell.nav.admission", icon: UserPlus },
-      { id: "guardians", labelKey: "shell.nav.guardians", icon: Users },
-      { id: "teachers", labelKey: "shell.nav.teachers", icon: UserCheck },
-    ],
-  },
-  {
-    id: "academic",
-    labelKey: "shell.nav.group.academic",
-    items: [
-      { id: "attendance", labelKey: "shell.nav.attendance", icon: ClipboardCheck },
-      { id: "exams", labelKey: "shell.nav.exams", icon: FileText },
-      { id: "results", labelKey: "shell.nav.results", icon: Award },
-    ],
-  },
-  {
-    id: "finance",
-    labelKey: "shell.nav.group.finance",
-    items: [
-      { id: "fees", labelKey: "shell.nav.fees", icon: Wallet },
-      { id: "accounting", labelKey: "shell.nav.accounting", icon: Calculator },
-      { id: "zakat", labelKey: "shell.nav.zakat", icon: HandCoins },
-    ],
-  },
-  {
-    id: "operations",
-    labelKey: "shell.nav.group.operations",
-    items: [
-      { id: "inventory", labelKey: "shell.nav.inventory", icon: Package },
-      { id: "hostel", labelKey: "shell.nav.hostel", icon: Home },
-      { id: "library", labelKey: "shell.nav.library", icon: BookOpen },
-    ],
-  },
-];
-
-const PLATFORM_ITEMS: NavItem[] = [
-  { id: "notices", labelKey: "shell.nav.notices", icon: Bell },
-  { id: "reports", labelKey: "shell.nav.reports", icon: BarChart3 },
-  { id: "settings", labelKey: "shell.nav.settings", icon: Settings },
-];
+import { useSessionStore } from "@/stores/sessionStore";
+import { getVisibleModules, type ModuleDef } from "@/lib/nav/moduleTree";
 
 export function SideNav({
   className = "",
@@ -127,13 +30,41 @@ export function SideNav({
   onNavigate?: () => void;
 }) {
   const { t } = useI18n();
+  const router = useRouter();
+  const pathname = usePathname();
+  const permissions = useSessionStore((s) => s.permissions);
+  const setRole = useSessionStore((s) => s.setRole);
   const [collapsed, setCollapsed] = useState(false);
-  const [activeId, setActiveId] = useState("dashboard");
 
-  function handleItemClick(id: string) {
-    setActiveId(id);
+  // Filter modules by permissions
+  const visibleGroups = getVisibleModules(permissions);
+
+  function handleItemClick(mod: ModuleDef) {
     onNavigate?.();
-    // Navigation wired in C2.1 — for now, items are visual placeholders
+    // Map known module IDs to dashboard routes for now (full routes in C3)
+    if (mod.id === "dashboard") {
+      // Redirect to role-appropriate dashboard
+      const role = useSessionStore.getState().role;
+      const route =
+        role === "authority" || role === "super-admin" || role === "administrator" ? "/dashboard/authority"
+        : role === "accountant" ? "/dashboard/accountant"
+        : role === "teacher" ? "/dashboard/teacher"
+        : role === "storekeeper" ? "/dashboard/storekeeper"
+        : role === "guardian" || role === "student" ? "/dashboard/guardian"
+        : "/dashboard/authority";
+      router.push(route);
+    } else {
+      // Other routes wired in C3 — for now, stay on current page
+      // (nav items are visual placeholders for non-dashboard modules)
+    }
+  }
+
+  // Determine active item by checking if current path starts with the module route
+  function isActive(mod: ModuleDef): boolean {
+    if (mod.id === "dashboard") {
+      return pathname.startsWith("/dashboard");
+    }
+    return pathname.startsWith(mod.route);
   }
 
   const widthClass = collapsed ? "w-16" : "w-64";
@@ -142,92 +73,46 @@ export function SideNav({
     <aside
       className={`flex flex-col border-e border-border-default bg-surface-card transition-all duration-normal ease-standard ${widthClass} ${className}`}
     >
-      {/* Nav scroll area */}
-      <nav
-        className="flex-1 overflow-y-auto py-4"
-        aria-label="Main navigation"
-      >
-        {NAV_GROUPS.map((group) => (
-          <div key={group.id} className="mb-4">
-            {/* Group label (hidden when collapsed) */}
-            {!collapsed && (
-              <p className="px-4 pb-1 text-caption font-medium uppercase tracking-wider text-text-muted">
-                {group.id === "main" ? "" : t(group.labelKey)}
-              </p>
-            )}
-            {collapsed && group.id !== "main" && (
-              <div className="mx-3 my-2 border-t border-border-default" />
-            )}
-
-            {/* Items */}
-            <ul className="space-y-0.5 px-2">
-              {group.items.map((item) => {
-                const isActive = activeId === item.id;
-                const Icon = item.icon;
-                return (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => handleItemClick(item.id)}
-                      className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-subtitle transition-colors ${
-                        isActive
-                          ? "bg-primary-50 font-medium text-primary-700"
-                          : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                      } ${collapsed ? "justify-center" : ""}`}
-                      title={collapsed ? t(item.labelKey) : undefined}
-                      aria-current={isActive ? "page" : undefined}
-                    >
-                      <Icon
-                        className={`h-5 w-5 shrink-0 ${
-                          isActive ? "text-primary-500" : ""
-                        }`}
-                      />
-                      {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-
-        {/* Platform group */}
-        <div className="mb-4">
-          {!collapsed && (
-            <p className="px-4 pb-1 text-caption font-medium uppercase tracking-wider text-text-muted">
-              Platform
-            </p>
-          )}
-          {collapsed && <div className="mx-3 my-2 border-t border-border-default" />}
-          <ul className="space-y-0.5 px-2">
-            {PLATFORM_ITEMS.map((item) => {
-              const isActive = activeId === item.id;
-              const Icon = item.icon;
-              return (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => handleItemClick(item.id)}
-                    className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-subtitle transition-colors ${
-                      isActive
-                        ? "bg-primary-50 font-medium text-primary-700"
-                        : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                    } ${collapsed ? "justify-center" : ""}`}
-                    title={collapsed ? t(item.labelKey) : undefined}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <Icon
-                      className={`h-5 w-5 shrink-0 ${
-                        isActive ? "text-primary-500" : ""
-                      }`}
-                    />
-                    {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+      <nav className="flex-1 overflow-y-auto py-4" aria-label="Main navigation">
+        {visibleGroups.map((group) => {
+          const isMain = group.id === "main";
+          return (
+            <div key={group.id} className="mb-4">
+              {!collapsed && !isMain && (
+                <p className="px-4 pb-1 text-caption font-medium uppercase tracking-wider text-text-muted">
+                  {t(group.labelKey)}
+                </p>
+              )}
+              {collapsed && !isMain && (
+                <div className="mx-3 my-2 border-t border-border-default" />
+              )}
+              <ul className="space-y-0.5 px-2">
+                {group.items.map((item) => {
+                  const active = isActive(item);
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleItemClick(item)}
+                        className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-subtitle transition-colors ${
+                          active
+                            ? "bg-primary-50 font-medium text-primary-700"
+                            : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                        } ${collapsed ? "justify-center" : ""}`}
+                        title={collapsed ? t(item.labelKey) : undefined}
+                        aria-current={active ? "page" : undefined}
+                      >
+                        <Icon className={`h-5 w-5 shrink-0 ${active ? "text-primary-500" : ""}`} />
+                        {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Collapse toggle (desktop only) */}

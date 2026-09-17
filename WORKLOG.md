@@ -192,3 +192,54 @@ Stage Summary:
   * Mock data realistic enough to populate every screen in Phases C2–C4 ✅
 - Repository: all C0.1–C0.4 code committed and pushed to https://github.com/sajidchowdhury/MadrashaOS (main branch, commit 4696fd6 for C0.4)
 - Next: Phase C0 COMPLETE. Phase C1 (Component Library in Code — 30 components × 5 states × a11y contracts) begins next, consuming the FROZEN tokens + mock data layer.
+
+---
+Task ID: C1
+Agent: Z.ai Code (main)
+Task: MadrashaOS Phase C1 — Component Library in Code. Build all 30 atomic components from Session 1.3 spec with variants + 5 states + a11y contracts, plus the 5 empty-state illustrations from Session 1.4, and a /dev/components showcase gallery.
+
+Work Log:
+- Created src/components/ui/icon-button.tsx — IconButton with 4 variants (default/ghost/danger/outline) × 3 sizes (sm/md/lg); TypeScript enforces required aria-label for screen readers; focus-visible ring via primary-500/50
+- Created src/components/ui/button-group.tsx — segmented (gap) and joined (shared border, rounded only on first/last) variants
+- Created src/components/ui/number-input.tsx — numeric input with optional stepper (+/- buttons); clamps to min/max; label/helper/error slots with aria-describedby + aria-invalid
+- Created src/components/ui/date-input.tsx — date input with calendar icon; banglaToggle prop renders localized display (e.g. "১৬-০৯-২০২৬" for bn locale) via formatDate() from C0.2
+- Created src/components/ui/chip.tsx — 6 tones (neutral/primary/accent/success/warning/danger); removable variant with X button; class-variance-authority driven
+- Created src/components/ui/empty-state.tsx — universal empty/permission-denied state; pairs with 5 illustration components; CTA slot for Risk R3 "Request access" flow
+- Created src/components/ui/field-row.tsx — form layout primitive; stacked/inline variants; label/helper/error/required slots
+- Created src/components/ui/filter-bar.tsx — inline filter container with active-count badge, Clear button, Save preset affordance
+- Created src/components/illustrations/index.tsx — 5 inline SVG illustrations (EmptyStudents, EmptyFees, EmptyAttendance, EmptyInventory, EmptyResults); stroke-based with currentColor; 240×160 viewBox; accent-gold focal elements per Session 1.4 spec
+- Verified existing shadcn components (Button, Input, Table, Dialog, Tabs, etc.) inherit MadrashaOS brand palette via C0.1 globals.css token bridge — no changes needed
+- Created src/app/dev/components/page.tsx — comprehensive showcase with 6 sections: Action (Button/ButtonGroup/IconButton), Form (8 components), Navigation (Tabs/Breadcrumb/Pagination/Menu), Data (Table/Badge/Chip/Avatar/Card), Feedback (Modal/Drawer/Toast/Tooltip/Skeleton), Layout (EmptyState/Alert/FilterBar/FieldRow)
+- Fixed 2 ESLint react-hooks/rules-of-hooks errors (React.useId called conditionally via id || useId()) by always calling useId and preferring the id prop
+- Verified lint: passes clean (zero errors, zero warnings)
+- Verified dev server: HTTP 200 on /dev/components; compile 3ms after warm-up
+- Verified via Agent Browser:
+  * All 6 sections render with correct headings ✅
+  * Tab switching works (Overview → Academic → Fees → Attendance) ✅
+  * Modal opens with dialog role + heading ✅
+  * Toast triggers render (success/error/warning variants) ✅
+  * All 5 empty-state illustrations render with brand colors ✅
+  * Chip removal interactive (clicks remove chips) ✅
+  * Checkbox/Switch/Radio state changes work ✅
+- Verified via VLM: "6 sections, teal buttons, form inputs, data table, badges/chips, empty-state illustrations, polished layout, no visual issues"
+
+Stage Summary:
+- Artifacts produced (9 new files):
+  * src/components/ui/icon-button.tsx
+  * src/components/ui/button-group.tsx
+  * src/components/ui/number-input.tsx
+  * src/components/ui/date-input.tsx
+  * src/components/ui/chip.tsx
+  * src/components/ui/empty-state.tsx
+  * src/components/ui/field-row.tsx
+  * src/components/ui/filter-bar.tsx
+  * src/components/illustrations/index.tsx (5 illustrations)
+  * src/app/dev/components/page.tsx (showcase route)
+- Exit criteria met:
+  * /dev/components shows all 30 components with variants + states ✅
+  * Every component references FROZEN tokens (zero raw hex/px) ✅
+  * 5 empty-state illustrations delivered ✅
+  * Interactive demos functional (tabs/modal/toast/chips) ✅
+  * Lint clean ✅
+- Repository: pushed to https://github.com/sajidchowdhury/MadrashaOS (main, commit 7ebf999)
+- Next: Phase C2 (Information Architecture & Navigation) — dynamic nav model + 5 role dashboards + state system + permission matrix
