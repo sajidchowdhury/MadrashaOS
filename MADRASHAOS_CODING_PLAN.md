@@ -92,12 +92,15 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 | C3 | 3.2 | People Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/students` + `/students/[id]` (7 tabs + Risk R4) + `/admission` (DnD Kanban) + `/teachers` |
 | C3 | 3.3 | Academic Module Screens (Mobile-First) | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/attendance` + `/attendance/take` (mobile, Risk R6) + `/exams` + `/exams/[id]/marks` (swipe-next) |
 | C3 | 3.4 | Finance Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/fees` (3-step Collect Payment, Risk R8) + `/accounting` (Ledger Explorer) + `/zakat` (Risk R9) + `/donations` (Risk R10) |
-| C4 | 4.1–4.4 | Operations, Communication & Mobile | ⏳ Pending | — | — | — |
+| C4 | 4.1 | Global Shell Hi-Fi Polish + Mobile Shell | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | TopBar flyouts (notifications + user menu) + MobileBottomActionBar + `/dev/shell` breakpoint spec |
+| C4 | 4.2 | Operations Modules | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | 8 routes: inventory/purchase/suppliers/assets/hostel/food/library/transport + KpiStat component |
+| C4 | 4.3 | Communication & Documents & Reporting | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | `/notices` (Risk R11) + `/documents` (60MB validation) + `/reports` (finance-gated) + 7 components |
+| C4 | 4.4 | Mobile Screens Hi-Fi | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | Guardian Portal mobile polish + MobileBottomActionBar + attendance/marks/fees CTA anchors |
 | C5 | 5.1–5.3 | Print/PDF & Public Website | ⏳ Pending | — | — | — |
 | C6 | 6.1–6.3 | Prototype & Usability Validation | ⏳ Pending | — | — | — |
 | C7 | 7.1–7.4 | Design QA, Docs & Handoff | ⏳ Pending | — | — | — |
 
-**Summary:** 14 / 32 sessions done · 0 in progress · 18 pending · 0 blocked
+**Summary:** 18 / 32 sessions done · 0 in progress · 14 pending · 0 blocked
 
 **Phase C0 (Foundation & Design System in Code): ✅ Complete** — 4/4 sessions done. Branded shell, trilingual i18n (bn/en/ar with RTL), next-themes, mock data layer (Zustand + 110+ permissions + 8-persona role map + fixtures), 16 TanStack Query hooks, `/dev/data` debug route.
 
@@ -107,7 +110,9 @@ Per the Handover Sequence document, the recommended order is **Designer → Back
 
 **Phase C3 (Core Module Screens): ✅ Complete** — 4/4 sessions done. 16 module routes across Foundation (Organization/Modules/RBAC/Audit Explorer), People (Students/Profile/Admission Kanban/Teachers), Academic (Attendance list + mobile Take Attendance/Exams/Marks Entry), Finance (Fees 3-step Collect Payment/Ledger Explorer/Zakat Dashboard/Donations). Risk lock-ins enforced: R2 (module dependents), R4 (promotion history), R6 (attendance mobile <60s + offline + undo), R8 (pending discounts), R9 (Zakat fund isolation), R10 (donation honeypot), D16 (no self-approve). All 16 routes HTTP 200; lint clean; VLM-verified.
 
-Next up: **Phase C4 (Operations, Communication & Mobile)** — operations modules (Inventory/Purchase/Hostel/Library/Transport) + communication + mobile hi-fi polish.
+**Phase C4 (Operations, Communication & Mobile): ✅ Complete** — 4/4 sessions done. 12 new routes: 8 operations (inventory/purchase Kanban/suppliers/assets/hostel floor plan/food/library/transport) + 3 communication (notices composer with Risk R11/documents/reports with finance gating) + `/dev/shell` responsive breakpoint spec. Shell polished: TopBar notification flyout + user menu flyout + MobileBottomActionBar on 3 key mobile routes. Guardian Portal mobile-polished (segmented child-switcher, sticky Pay Now, scrollable notices). All 12 routes HTTP 200; lint clean; VLM-verified.
+
+Next up: **Phase C5 (Print/PDF & Public Website)** — branded PDF templates (receipts/mark sheets/certificates) + 7-page public website + multi-language typography validation.
 
 ---
 
@@ -448,7 +453,7 @@ Next up: **Phase C4 (Operations, Communication & Mobile)** — operations module
 
 ---
 
-## 8. Phase C4 — Operations, Communication & Mobile (7 days)
+## 8. Phase C4 — Operations, Communication & Mobile (7 days) ✅
 
 ### 4.1 — Global Shell Hi-Fi Polish + Mobile Shell
 
