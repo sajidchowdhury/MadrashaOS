@@ -71,6 +71,15 @@ const IDS = {
   class3: "00000000-0000-0000-0003-000000000002",
   class5: "00000000-0000-0000-0003-000000000003",
   class8: "00000000-0000-0000-0003-000000000004",
+
+// Sections
+section1A: "00000000-0000-0000-0005-000000000001",
+section1B: "00000000-0000-0000-0005-000000000002",
+section3A: "00000000-0000-0000-0005-000000000003",
+section5A: "00000000-0000-0000-0005-000000000004",
+section5B: "00000000-0000-0000-0005-000000000005",
+section8A: "00000000-0000-0000-0005-000000000006",
+
   // Accounts
   accCash: "00000000-0000-0000-0004-000000000001",
   accBank: "00000000-0000-0000-0004-000000000002",
@@ -460,16 +469,35 @@ async function main() {
         name: c.name, name_bn: c.name_bn, level: c.level,
       } as any,
     });
-    for (const secName of c.sections) {
-      await prisma.section.upsert({
-        where: { id: `${c.id}-sec-${secName}` },
-        update: {},
-        create: {
-          id: `${c.id}-sec-${secName}`, organization_id: org.id,
-          class_id: c.id, name: secName,
-        } as any,
-      });
-    }
+
+
+const sectionIds: Record<string, string> = {
+  [`${IDS.class1}-A`]: IDS.section1A,
+  [`${IDS.class1}-B`]: IDS.section1B,
+  [`${IDS.class3}-A`]: IDS.section3A,
+  [`${IDS.class5}-A`]: IDS.section5A,
+  [`${IDS.class5}-B`]: IDS.section5B,
+  [`${IDS.class8}-A`]: IDS.section8A,
+};
+
+for (const secName of c.sections) {
+  const sectionId = sectionIds[`${c.id}-${secName}`];
+
+  if (!sectionId) {
+    throw new Error(`Missing section ID for ${c.name} / ${secName}`);
+  }
+
+  await prisma.section.upsert({
+    where: { id: sectionId },
+    update: {},
+    create: {
+      id: sectionId,
+      organization_id: org.id,
+      class_id: c.id,
+      name: secName,
+    } as any,
+  });
+}
   }
   console.log(`  ✅ ${classData.length} classes + ${classData.reduce((s, c) => s + c.sections.length, 0)} sections created`);
 
@@ -504,28 +532,88 @@ async function main() {
 
   // --- 9. Students (40) ---
   console.log("\n[9/14] Creating 40 students...");
-  const studentData = generateStudents();
-  const studentIds: string[] = [];
-  for (let i = 0; i < studentData.length; i++) {
-    const s = studentData[i];
-    if (!s) continue;
-    const sid = `00000000-0000-0000-0006-${(i + 1).toString().padStart(12, "0")}`;
-    studentIds.push(sid);
-    const guardianIdx = i < 8 ? 0 : i < 18 ? 1 : i < 30 ? 2 : 3;
-    await prisma.student.upsert({
-      where: { id: sid },
-      update: {},
-      create: {
-        id: sid, organization_id: org.id, branch_id: IDS.branchDhaka,
-        code: s.code, name: s.name, name_bn: s.name_bn, name_ar: s.name_ar,
-        class_id: s.classId, section_id: `${s.classId}-sec-${s.section}`,
-        guardian_id: guardianIds[guardianIdx],
-        roll: s.roll, gender: s.gender,
-        dob: new Date(s.dob), admitted_at: new Date(s.admittedAt),
-        status: StudentStatus.active,
-      } as any,
-    });
+
+const studentData = generateStudents();
+const studentIds: string[] = [];
+
+const sectionIds: Record<string, string> = {
+  [`${IDS.class1}-A`]: IDS.section1A,
+  [`${IDS.class1}-B`]: IDS.section1B,
+  [`${IDS.class3}-A`]: IDS.section3A,
+  [`${IDS.class5}-A`]: IDS.section5A,
+  [`${IDS.class5}-B`]: IDS.section5B,
+  [`${IDS.class8}-A`]: IDS.section8A,
+};
+
+for (let i = 0; i < studentData.length; i++) {
+  const s = studentData[i];
+  if (!s) continue;
+
+  const sid = `00000000-0000-0000-0006-${(i + 1)
+    .toString()
+    .padStart(12, "0")}`;
+
+  studentIds.push(sid);
+
+  const guardianIdx = i < 8 ? 0 : i < 18 ? 1 : i < 30 ? 2 : 3;
+  const guardianId = guardianIds[guardianIdx];
+
+  const sectionId = sectionIds[`${s.classId}-${s.section}`];
+
+  if (!sectionId) {
+    throw new Error(`Missing section ID for ${s.classId} / ${s.section}`);
   }
+
+  if (!guardianId) {
+    throw new Error(`Missing guardian ID for student ${s.code}`);
+  }
+
+  await prisma.student.upsert({
+    where: { id: sid },
+    update: {},
+    create: {
+      id: sid,
+      organization_id: org.id,
+      branch_id: IDS.branchDhaka,
+      code: s.code,
+      name: s.name,
+      name_bn: s.name_bn,
+      name_ar: s.name_ar,
+      class_id: s.classId,
+      section_id: sectionId,
+      roll: s.roll,
+      gender: s.gender,
+      dob: new Date(s.dob),
+      admitted_at: new Date(s.admittedAt),
+      status: StudentStatus.active,
+    } as any,
+  });
+
+  await prisma.studentGuardian.upsert({
+    where: {
+      student_id_guardian_id: {
+        student_id: sid,
+        guardian_id: guardianId,
+      },
+    },
+    update: {},
+    create: {
+      id: `00000000-0000-0000-0008-${(i + 1)
+        .toString()
+        .padStart(12, "0")}`,
+      organization_id: org.id,
+      branch_id: IDS.branchDhaka,
+      student_id: sid,
+      guardian_id: guardianId,
+      relation: "father",
+      is_primary: true,
+      can_pickup: true,
+      receive_sms: true,
+      receive_email: false,
+    } as any,
+  });
+}
+
   console.log(`  ✅ ${studentData.length} students created`);
 
   // --- 10. Accounts ---
@@ -562,10 +650,15 @@ async function main() {
     await prisma.feePlan.upsert({
       where: { id: fpId },
       update: {},
-      create: {
-        id: fpId, organization_id: org.id, branch_id: IDS.branchDhaka,
-        student_id: sid, academic_year: 2026,
-      } as any,
+create: {
+  id: fpId,
+  organization_id: org.id,
+  branch_id: IDS.branchDhaka,
+student_id: sid,
+academic_year: 2026,
+total_amount: 4500,
+net_payable: 4500,
+} as any,
     });
     // 3 installments per plan
     const installments = [
@@ -576,23 +669,44 @@ async function main() {
     for (let j = 0; j < installments.length; j++) {
       const inst = installments[j];
       if (!inst) continue;
-      await prisma.feeInstallment.upsert({
-        where: { id: `${fpId}-inst-${j + 1}` },
-        update: {},
-        create: {
-          id: `${fpId}-inst-${j + 1}`, organization_id: org.id, branch_id: IDS.branchDhaka,
-          fee_plan_id: fpId, label: inst.label, amount: inst.amount,
-          due_date: new Date(inst.dueDate), is_paid: inst.paid,
-          paid_date: inst.paidDate ? new Date(inst.paidDate) : null,
-          receipt_no: inst.receiptNo,
-        } as any,
-      });
+await prisma.feeInstallment.upsert({
+  where: {
+    id: `00000000-0000-0000-0009-${(i * 3 + j + 1)
+      .toString()
+      .padStart(12, "0")}`,
+  },
+  update: {},
+  create: {
+    id: `00000000-0000-0000-0009-${(i * 3 + j + 1)
+      .toString()
+      .padStart(12, "0")}`,
+    organization: {
+      connect: { id: org.id },
+    },
+    branch: {
+      connect: { id: IDS.branchDhaka },
+    },
+    fee_plan: {
+      connect: { id: fpId },
+    },
+    student: {
+      connect: { id: sid },
+    },
+    label: inst.label,
+    amount: inst.amount,
+    due_date: new Date(inst.dueDate),
+    is_paid: inst.paid,
+    paid_date: inst.paidDate ? new Date(inst.paidDate) : null,
+    receipt_no: inst.receiptNo,
+  } as any,
+});
     }
   }
   console.log(`  ✅ 40 fee plans + 120 installments created`);
 
   // --- 12. Fee Payments (8 recent receipts) ---
   console.log("\n[12/14] Creating fee payments (8 receipts)...");
+
   const paymentsData = [
     { studentIdx: 0, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1001", collectedAt: "2026-09-16", amount: 1500 },
     { studentIdx: 1, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1002", collectedAt: "2026-09-15", amount: 1500 },
@@ -603,24 +717,48 @@ async function main() {
     { studentIdx: 6, method: FeeMethod.bank, accountId: IDS.accBank, receiptNo: "RCP-2026-1007", collectedAt: "2026-09-10", amount: 1500 },
     { studentIdx: 7, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1008", collectedAt: "2026-09-09", amount: 1500 },
   ];
+
   for (let i = 0; i < paymentsData.length; i++) {
     const p = paymentsData[i];
     if (!p) continue;
+
     const sid = studentIds[p.studentIdx];
     if (!sid) continue;
+
+    // Step 11 creates 3 installments per student.
+    // Installment #2 for student i has deterministic UUID:
+    // 00000000-0000-0000-0009-(studentIndex * 3 + 2)
+    const installmentId =
+      `00000000-0000-0000-0009-${(p.studentIdx * 3 + 2)
+        .toString()
+        .padStart(12, "0")}`;
+
+    const paymentId =
+      `00000000-0000-0000-0008-${(i + 1)
+        .toString()
+        .padStart(12, "0")}`;
+
     await prisma.feePayment.upsert({
-      where: { id: `00000000-0000-0000-0008-${(i + 1).toString().padStart(12, "0")}` },
+      where: {
+        id: paymentId,
+      },
       update: {},
       create: {
-        id: `00000000-0000-0000-0008-${(i + 1).toString().padStart(12, "0")}`,
-        organization_id: org.id, branch_id: IDS.branchDhaka,
-        student_id: sid, installment_id: `00000000-0000-0000-0007-${(p.studentIdx + 1).toString().padStart(12, "0")}-inst-2`,
-        amount: p.amount, method: p.method, account_id: p.accountId,
-        receipt_no: p.receiptNo, collected_by: IDS.userAccountant,
+        id: paymentId,
+        organization_id: org.id,
+        branch_id: IDS.branchDhaka,
+        student_id: sid,
+        installment_id: installmentId,
+        amount: p.amount,
+        method: p.method,
+        account_id: p.accountId,
+        receipt_no: p.receiptNo,
+        collected_by: IDS.userAccountant,
         collected_at: new Date(p.collectedAt),
       } as any,
     });
   }
+
   console.log(`  ✅ ${paymentsData.length} fee payments created`);
 
   // --- 13. Ledger Entries (12 entries) ---
@@ -657,45 +795,99 @@ async function main() {
   }
   console.log(`  ✅ ${ledgerData.length} ledger entries created (2 pending)`);
 
+  
   // --- 14. Attendance Sessions (4 sessions for Class 5-A) ---
   console.log("\n[14/14] Creating attendance sessions (Class 5-A × 4 days)...");
-  const class5AStudents = studentIds.slice(18, 30); // Class 5 Section A
-  const attendanceDates = ["2026-09-13", "2026-09-14", "2026-09-15", "2026-09-16"];
+
+  const class5AStudents = studentIds.slice(18, 30);
+  const attendanceDates = [
+    "2026-09-13",
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-16",
+  ];
+
   for (let d = 0; d < attendanceDates.length; d++) {
-    const sessionId = `00000000-0000-0000-0010-${(d + 1).toString().padStart(12, "0")}`;
+    const sessionId =
+      `00000000-0000-0000-0010-${(d + 1)
+        .toString()
+        .padStart(12, "0")}`;
+
     await prisma.attendanceSession.upsert({
-      where: { id: sessionId },
+      where: {
+        id: sessionId,
+      },
       update: {},
       create: {
-        id: sessionId, organization_id: org.id, branch_id: IDS.branchDhaka,
-        class_id: IDS.class5, section: "A", date: new Date(attendanceDates[d]!),
-        taken_by: IDS.userTeacher, is_submitted: true,
+        id: sessionId,
+        organization_id: org.id,
+        branch_id: IDS.branchDhaka,
+class_id: IDS.class5,
+section_id: IDS.section5A,
+date: new Date(attendanceDates[d]!),
+        taken_by: IDS.userTeacher,
+submitted_at: new Date(attendanceDates[d]!),
+academic_year: 2026,
       } as any,
     });
-    // Records for each student
+
+    // Attendance records for each Class 5-A student
     for (let i = 0; i < class5AStudents.length; i++) {
       const sid = class5AStudents[i];
       if (!sid) continue;
+
       let status: AttendanceStatus = AttendanceStatus.present;
-      if (d === 0 && i % 7 === 0) status = AttendanceStatus.absent;
-      else if (d === 0 && i % 11 === 0) status = AttendanceStatus.late;
-      else if (d === 1 && i % 5 === 0) status = AttendanceStatus.absent;
-      else if (d === 1 && i % 9 === 0) status = AttendanceStatus.leave;
-      else if (d === 2 && i % 11 === 0) status = AttendanceStatus.absent;
-      else if (d === 2 && i % 13 === 0) status = AttendanceStatus.late;
-      else if (d === 3 && i % 13 === 0) status = AttendanceStatus.absent;
+
+      if (d === 0 && i % 7 === 0) {
+        status = AttendanceStatus.absent;
+      } else if (d === 0 && i % 11 === 0) {
+        status = AttendanceStatus.late;
+      } else if (d === 1 && i % 5 === 0) {
+        status = AttendanceStatus.absent;
+      } else if (d === 1 && i % 9 === 0) {
+        status = AttendanceStatus.leave;
+      } else if (d === 2 && i % 11 === 0) {
+        status = AttendanceStatus.absent;
+      } else if (d === 2 && i % 13 === 0) {
+        status = AttendanceStatus.late;
+      } else if (d === 3 && i % 13 === 0) {
+        status = AttendanceStatus.absent;
+      }
+
+      // Deterministic valid UUID for each attendance record.
+      // 4 sessions × 12 students = 48 unique records.
+      const recordNumber = d * class5AStudents.length + i + 1;
+
+      const recordId =
+        `00000000-0000-0000-0014-${recordNumber
+          .toString()
+          .padStart(12, "0")}`;
 
       await prisma.attendanceRecord.upsert({
-        where: { id: `${sessionId}-rec-${i}` },
+        where: {
+          id: recordId,
+        },
         update: {},
         create: {
-          id: `${sessionId}-rec-${i}`, organization_id: org.id, branch_id: IDS.branchDhaka,
-          session_id: sessionId, student_id: sid, status,
+          id: recordId,
+          organization_id: org.id,
+          branch_id: IDS.branchDhaka,
+          session_id: sessionId,
+          student_id: sid,
+          status,
         } as any,
       });
     }
   }
-  console.log(`  ✅ 4 attendance sessions + ${class5AStudents.length * 4} records created`);
+
+  console.log(
+    `  ✅ 4 attendance sessions + ${class5AStudents.length * 4} records created`
+  );
+
+
+
+
+
 
   // --- 15. Inventory Items (10 items, 3 low-stock) ---
   console.log("\n[15/15] Creating inventory items...");
@@ -792,7 +984,7 @@ async function main() {
   console.log("  3 branches (Dhaka, Chittagong, Sylhet)");
   console.log("  8 roles + 110+ permissions + role-permission assignments");
   console.log("  8 users (password: 'password123' for all)");
-  console.log("  4 classes + 5 sections");
+  console.log("  4 classes + 6 sections");
   console.log("  8 guardians");
   console.log("  40 students (with bn/en/ar names)");
   console.log("  8 accounts (incl. Zakat fund with fund='zakat')");
