@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "audit:typography": "bun run scripts/typography-audit.ts",
     "qa:design": "bun run scripts/design-qa.ts",
+    "e2e:verify": "bun run scripts/e2e-verify.ts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f db",
