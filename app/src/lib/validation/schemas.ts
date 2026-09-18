@@ -46,3 +46,49 @@ export const updateBranchSchema = createBranchSchema.partial().extend({
 export const switchBranchSchema = z.object({
   branch_id: z.string().uuid(),
 });
+
+/* --- RBAC (Phase B3.3) ---
+ *
+ * Schemas for the role + permission matrix API.
+ * Role codes follow the same convention as branch codes
+ * (lowercase alphanumeric with dashes) to stay consistent with the
+ * 8 system role codes already seeded (super-admin, authority, …).
+ */
+
+export const createRoleSchema = z.object({
+  code: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(
+      /^[a-z0-9-]+$/,
+      "Code must be lowercase alphanumeric with dashes",
+    ),
+  name: z.string().min(1).max(255),
+  description: z.string().max(1000).optional(),
+});
+
+export const updateRoleSchema = z
+  .object({
+    name: z.string().min(1).max(255).optional(),
+    description: z.string().max(1000).optional(),
+  })
+  .partial();
+
+export const assignPermissionsSchema = z.object({
+  permission_codes: z.array(z.string().min(1).max(64)),
+});
+
+/* --- Module Toggle (B3.2 / Risk R2) --- */
+
+/**
+ * PATCH /api/v1/modules/:id body — toggle a module on/off.
+ *
+ * Per Risk R2: when toggling OFF a module that has active dependents
+ * (e.g. Hostel/Food/Library/Transport/Purchase depend on Inventory),
+ * the server returns 409 with `{ error, dependents: string[] }` and the
+ * frontend blocks Save until the user disables the dependents first.
+ */
+export const toggleModuleSchema = z.object({
+  enabled: z.boolean(),
+});
