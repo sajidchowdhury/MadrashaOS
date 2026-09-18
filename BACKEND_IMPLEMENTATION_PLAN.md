@@ -90,7 +90,7 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 
 | Phase | Session | Title | Status | Commit | Date | Deliverable |
 |-------|---------|-------|--------|--------|------|-------------|
-| B0 | 0.1 | PostgreSQL Setup + Connection | ⏳ Pending | — | — | — |
+| B0 | 0.1 | PostgreSQL Setup + Connection | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-16 | `docker-compose.yml` (PostgreSQL 16 Alpine) + `.env` + `.env.example` + Prisma schema switched to PostgreSQL + `db.ts` client updated + `scripts/setup-db.sh` + `scripts/verify-db.ts` + 7 `db:*` npm scripts |
 | B0 | 0.2 | ERD Document Generation | ⏳ Pending | — | — | — |
 | B0 | 0.3 | Prisma Schema Draft (all 40+ models) | ⏳ Pending | — | — | — |
 | B1 | 1.1 | Foundation Models Migration | ⏳ Pending | — | — | — |
@@ -131,7 +131,7 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B9 | 9.2 | Frontend Client Swap (mockApi → real) | ⏳ Pending | — | — | — |
 | B9 | 9.3 | End-to-End Verification (8 flows) | ⏳ Pending | — | — | — |
 
-**Summary:** 0 / 36 sessions done · 0 in progress · 36 pending · 0 blocked
+**Summary:** 1 / 36 sessions done · 0 in progress · 35 pending · 0 blocked
 
 ---
 

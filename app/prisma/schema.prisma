@@ -1,0 +1,27 @@
+// ============================================================
+// MadrashaOS — Prisma Schema
+// ============================================================
+// Session B0.1 — PostgreSQL Setup + Connection
+//
+// Provider: PostgreSQL 16 (via Docker — see docker-compose.yml)
+// Connection: env("DATABASE_URL") from .env
+//
+// NOTE: This schema currently contains NO models. Session B0.3
+// will add all 40+ models. Session B1.1-B1.3 will create the
+// migrations. For now, this file just establishes the PostgreSQL
+// connection so `prisma db pull` + `prisma validate` work.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  // Generate into src/generated/prisma so it's co-located with code
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Models will be added in Session B0.3 (Prisma Schema Draft)
+// and migrated in Sessions B1.1–B1.3.
