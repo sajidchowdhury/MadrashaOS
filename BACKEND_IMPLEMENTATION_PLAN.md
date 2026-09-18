@@ -96,7 +96,7 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B1 | 1.1 | Foundation Models Migration | ✅ Done | [`b409eca`](https://github.com/sajidchowdhury/MadrashaOS/commit/b409eca) | 2026-09-18 | `prisma/migrations/20260918000000_init/migration.sql` (2,853 lines — ALL 52 tables + 15 enums + 260 indexes + 238 FKs in one init migration) + `migration_lock.toml` + `prisma/migrations/README.md` with local setup instructions |
 | B1 | 1.2 | People Models Migration | ✅ Done | [`b409eca`](https://github.com/sajidchowdhury/MadrashaOS/commit/b409eca) | 2026-09-18 | Covered by init migration (B1.1) — People tables created in same migration |
 | B1 | 1.3 | Academic + Finance Models Migration | ✅ Done | [`b409eca`](https://github.com/sajidchowdhury/MadrashaOS/commit/b409eca) | 2026-09-18 | Covered by init migration (B1.1) — Academic + Finance + Operations + Communication tables all created in same migration |
-| B1 | 1.4 | Seed Data (40 students, 8 users, 12 ledger entries) | ⏳ Pending | — | — | — |
+| B1 | 1.4 | Seed Data (40 students, 8 users, 12 ledger entries) | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-18 | `prisma/seed.ts` (818 lines — 1 org, 3 branches, 8 roles, 110+ permissions, 8 users with hashed passwords, 4 classes, 8 guardians, 40 students, 8 accounts incl Zakat fund, 40 fee plans × 3 installments, 8 payments, 12 ledger entries, 4 attendance sessions, 10 inventory items, 5 notices, 6 approvals) + bcryptjs installed |
 | B2 | 2.1 | NextAuth.js Setup (JWT + refresh) | ⏳ Pending | — | — | — |
 | B2 | 2.2 | Permission Middleware | ⏳ Pending | — | — | — |
 | B2 | 2.3 | MFA (TOTP) | ⏳ Pending | — | — | — |
@@ -131,11 +131,11 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B9 | 9.2 | Frontend Client Swap (mockApi → real) | ⏳ Pending | — | — | — |
 | B9 | 9.3 | End-to-End Verification (8 flows) | ⏳ Pending | — | — | — |
 
-**Summary:** 6 / 36 sessions done · 0 in progress · 30 pending · 0 blocked
+**Summary:** 7 / 36 sessions done · 0 in progress · 29 pending · 0 blocked
 
 **Phase B0 (Database Foundation): ✅ Complete** — 3/3 sessions done. PostgreSQL 16 configured via Docker + ERD with 52 tables/98 relations/15 enums + complete Prisma schema (2,271 lines, validated, client generated).
 
-**Phase B1 (Schema & Migrations): 🔄 In Progress** — 3/4 sessions done. Init migration created (2,853 lines of SQL covering all 52 tables + 15 enums + 260 indexes + 238 FKs). Only B1.4 (seed data) remains before the database is fully populated.
+**Phase B1 (Schema & Migrations): ✅ Complete** — 4/4 sessions done. Init migration (2,853 lines of SQL covering all 52 tables) + seed script (818 lines with 40 students, 8 users, 12 ledger entries, etc.). Database is ready to be populated. Run locally: `bun run db:setup` → `bunx prisma migrate deploy` → `bunx prisma db seed`.
 
 ---
 
