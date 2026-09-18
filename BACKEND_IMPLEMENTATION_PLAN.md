@@ -101,7 +101,7 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B2 | 2.2 | Permission Middleware | ✅ Done | [`2883dd2`](https://github.com/sajidchowdhury/MadrashaOS/commit/2883dd2) | 2026-09-18 | `with-permission.ts` (withPermission/withPermissions/withAnyPermission) + `with-tenant.ts` (getTenantContext + tenantWhere Prisma scope) + `with-idempotency.ts` (Idempotency-Key 24h cache) + `with-audit.ts` (audit_logs write) |
 | B2 | 2.3 | MFA (TOTP) | ✅ Done | [`2883dd2`](https://github.com/sajidchowdhury/MadrashaOS/commit/2883dd2) | 2026-09-18 | `mfa.ts` (otplib + qrcode) + 3 endpoints: `/api/v1/auth/mfa/setup` + `/verify` (enable + login-gated) + `/disable` |
 | B2 | 2.4 | 8 Roles + Permissions Seeded | ✅ Done | [`2883dd2`](https://github.com/sajidchowdhury/MadrashaOS/commit/2883dd2) | 2026-09-18 | `/api/v1/auth/verify-roles` (per-role permission count) + `/login` page (2-step: credentials → MFA OTP) |
-| B3 | 3.1 | Organization & Multi-Branch API | ⏳ Pending | — | — | — |
+| B3 | 3.1 | Organization & Multi-Branch API | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-18 | `GET/PATCH /api/v1/organizations` + `GET/POST /api/v1/branches` + `GET/PATCH/DELETE /api/v1/branches/[id]` + `POST /api/v1/branches/switch` (Risk R1 audit) + `src/lib/validation/schemas.ts` (Zod) + `src/lib/api/helpers.ts` (jsonResponse/errorResponse/paginatedResponse) |
 | B3 | 3.2 | Module Configuration API | ⏳ Pending | — | — | — |
 | B3 | 3.3 | RBAC API + Permission Matrix | ⏳ Pending | — | — | — |
 | B3 | 3.4 | Audit Trail API + Field-Diff | ⏳ Pending | — | — | — |
@@ -131,7 +131,7 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B9 | 9.2 | Frontend Client Swap (mockApi → real) | ⏳ Pending | — | — | — |
 | B9 | 9.3 | End-to-End Verification (8 flows) | ⏳ Pending | — | — | — |
 
-**Summary:** 11 / 36 sessions done · 0 in progress · 25 pending · 0 blocked
+**Summary:** 12 / 36 sessions done · 0 in progress · 24 pending · 0 blocked
 
 **Phase B0 (Database Foundation): ✅ Complete** — 3/3 sessions done. PostgreSQL 16 configured via Docker + ERD with 52 tables/98 relations/15 enums + complete Prisma schema (2,271 lines, validated, client generated).
 
