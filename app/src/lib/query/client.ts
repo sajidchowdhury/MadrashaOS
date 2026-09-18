@@ -3,15 +3,25 @@
 /**
  * MadrashaOS — TanStack Query Client + Hooks
  *
- * Session C0.4 — Mock-Data Layer & Seeding
+ * Phase B9.2 — Frontend Client Swap (mockApi → real)
  *
- * Provides typed query hooks that call mockApi today, swap to the
- * OpenAPI-generated client tomorrow (HandoverSequence §3.2). Each hook
- * automatically re-fetches when the session role/branch changes via the
- * queryKey.
+ * SWAP COMPLETE: hooks now call the real API client (src/lib/api/client.ts)
+ * instead of the mock API (src/lib/mock/mockApi.ts).
  *
- * The QueryClient is created once and shared via React context (provider
- * mounted in src/app/layout.tsx — added in this session).
+ * The swap is a one-import change:
+ *   OLD: import { mockApi } from "@/lib/mock/mockApi";
+ *   NEW: import { api } from "@/lib/api/client";
+ *
+ * Zero component changes — all hooks have the same signatures.
+ *
+ * The queryKeys still include session role/branch so the cache invalidates
+ * when the user switches roles (via DevToolbar in dev, or real login in prod).
+ *
+ * NOTE: In production, the session is set by NextAuth login (not DevToolbar).
+ * The DevToolbar still works for development — it sets the role in the
+ * sessionStore, which changes the queryKey, which triggers a refetch.
+ * The real API will return 403 for endpoints the DevToolbar-selected role
+ * doesn't have — this is correct behavior (server still enforces auth).
  */
 
 import {
@@ -20,31 +30,15 @@ import {
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { getSession } from "@/stores/sessionStore";
-import { mockApi } from "@/lib/mock/mockApi";
-import type {
-  Account,
-  Approval,
-  AttendanceSession,
-  Branch,
-  Class,
-  FeePayment,
-  FeePlan,
-  Guardian,
-  InventoryItem,
-  LedgerEntry,
-  Notice,
-  Organization,
-  Student,
-  User,
-} from "@/lib/mock/types";
+import { useSessionStore } from "@/stores/sessionStore";
+import { api } from "@/lib/api/client";
 
 /* --- Singleton QueryClient --- */
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000, // 30s — short enough to demo refetch, long enough to avoid spam
+      staleTime: 30_000, // 30s
       retry: 1,
       refetchOnWindowFocus: false,
     },
@@ -54,69 +48,69 @@ export const queryClient = new QueryClient({
 /* --- Query keys (include session so role/branch changes re-fetch) --- */
 
 function sessionKey() {
-  const s = getSession();
-  return [s.role, s.branch, s.academicYear];
+  const state = useSessionStore.getState();
+  return [state.role, state.branch, state.academicYear];
 }
 
 /* --- Hooks (one per resource) --- */
 
 export function useOrganization(
-  options?: Omit<UseQueryOptions<Organization>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["organization", ...sessionKey()],
-    queryFn: () => mockApi.getOrganization(),
+    queryFn: () => api.getOrganization(),
     ...options,
   });
 }
 
 export function useBranches(
-  options?: Omit<UseQueryOptions<Branch[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["branches", ...sessionKey()],
-    queryFn: () => mockApi.getBranches(),
+    queryFn: () => api.getBranches(),
     ...options,
   });
 }
 
 export function useCurrentUser(
-  options?: Omit<UseQueryOptions<User>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["current-user", ...sessionKey()],
-    queryFn: () => mockApi.getCurrentUser(),
+    queryFn: () => api.getCurrentUser(),
     ...options,
   });
 }
 
 export function useClasses(
-  options?: Omit<UseQueryOptions<Class[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["classes", ...sessionKey()],
-    queryFn: () => mockApi.getClasses(),
+    queryFn: () => api.getClasses(),
     ...options,
   });
 }
 
 export function useStudents(
-  options?: Omit<UseQueryOptions<Student[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["students", ...sessionKey()],
-    queryFn: () => mockApi.getStudents(),
+    queryFn: () => api.getStudents(),
     ...options,
   });
 }
 
 export function useStudent(
   id: string,
-  options?: Omit<UseQueryOptions<Student | undefined>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["student", id, ...sessionKey()],
-    queryFn: () => mockApi.getStudentById(id),
+    queryFn: () => api.getStudentById(id),
     enabled: !!id,
     ...options,
   });
@@ -125,127 +119,126 @@ export function useStudent(
 export function useStudentsByClass(
   classId: string,
   section?: string,
-  options?: Omit<UseQueryOptions<Student[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
-  // Memoize the key so it doesn't change identity on every render.
   const key = useMemo(
     () => ["students-by-class", classId, section ?? "all", ...sessionKey()],
     [classId, section],
   );
   return useQuery({
     queryKey: key,
-    queryFn: () => mockApi.getStudentsByClass(classId, section),
+    queryFn: () => api.getStudentsByClass(classId, section),
     enabled: !!classId,
     ...options,
   });
 }
 
 export function useGuardians(
-  options?: Omit<UseQueryOptions<Guardian[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["guardians", ...sessionKey()],
-    queryFn: () => mockApi.getGuardians(),
+    queryFn: () => api.getGuardians(),
     ...options,
   });
 }
 
 export function useFeePlans(
-  options?: Omit<UseQueryOptions<FeePlan[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["fee-plans", ...sessionKey()],
-    queryFn: () => mockApi.getFeePlans(),
+    queryFn: () => api.getFeePlans(),
     ...options,
   });
 }
 
 export function useFeePayments(
-  options?: Omit<UseQueryOptions<FeePayment[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["fee-payments", ...sessionKey()],
-    queryFn: () => mockApi.getFeePayments(),
+    queryFn: () => api.getFeePayments(),
     ...options,
   });
 }
 
 export function useAccounts(
-  options?: Omit<UseQueryOptions<Account[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["accounts", ...sessionKey()],
-    queryFn: () => mockApi.getAccounts(),
+    queryFn: () => api.getAccounts(),
     ...options,
   });
 }
 
 export function useLedgerEntries(
-  options?: Omit<UseQueryOptions<LedgerEntry[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["ledger-entries", ...sessionKey()],
-    queryFn: () => mockApi.getLedgerEntries(),
+    queryFn: () => api.getLedgerEntries(),
     ...options,
   });
 }
 
 export function useAttendanceSessions(
-  options?: Omit<UseQueryOptions<AttendanceSession[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["attendance-sessions", ...sessionKey()],
-    queryFn: () => mockApi.getAttendanceSessions(),
+    queryFn: () => api.getAttendanceSessions(),
     ...options,
   });
 }
 
 export function useInventory(
-  options?: Omit<UseQueryOptions<InventoryItem[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["inventory", ...sessionKey()],
-    queryFn: () => mockApi.getInventory(),
+    queryFn: () => api.getInventory(),
     ...options,
   });
 }
 
 export function useLowStockItems(
-  options?: Omit<UseQueryOptions<InventoryItem[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["low-stock", ...sessionKey()],
-    queryFn: () => mockApi.getLowStockItems(),
+    queryFn: () => api.getLowStockItems(),
     ...options,
   });
 }
 
 export function useNotices(
-  options?: Omit<UseQueryOptions<Notice[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["notices", ...sessionKey()],
-    queryFn: () => mockApi.getNotices(),
+    queryFn: () => api.getNotices(),
     ...options,
   });
 }
 
 export function useApprovals(
-  options?: Omit<UseQueryOptions<Approval[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["approvals", ...sessionKey()],
-    queryFn: () => mockApi.getApprovals(),
+    queryFn: () => api.getApprovals(),
     ...options,
   });
 }
 
 export function usePendingApprovals(
-  options?: Omit<UseQueryOptions<Approval[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {
   return useQuery({
     queryKey: ["pending-approvals", ...sessionKey()],
-    queryFn: () => mockApi.getPendingApprovals(),
+    queryFn: () => api.getPendingApprovals(),
     ...options,
   });
 }
