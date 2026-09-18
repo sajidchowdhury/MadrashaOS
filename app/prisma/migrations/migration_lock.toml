@@ -1,0 +1,4 @@
+# Prisma migration lock file
+# DO NOT REMOVE — Prisma uses this to track the database provider
+
+provider = "postgresql"

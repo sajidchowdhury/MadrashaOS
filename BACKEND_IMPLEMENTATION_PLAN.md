@@ -93,9 +93,9 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B0 | 0.1 | PostgreSQL Setup + Connection | ✅ Done | [`f53687e`](https://github.com/sajidchowdhury/MadrashaOS/commit/f53687e) | 2026-09-16 | `docker-compose.yml` (PostgreSQL 16 Alpine) + `.env` + `.env.example` + Prisma schema switched to PostgreSQL + `db.ts` client updated + `scripts/setup-db.sh` + `scripts/verify-db.ts` + 7 `db:*` npm scripts |
 | B0 | 0.2 | ERD Document Generation | ✅ Done | [`748936c`](https://github.com/sajidchowdhury/MadrashaOS/commit/748936c) | 2026-09-18 | `docs/ERD.md` (1388 lines — 52 tables, 98 relations, 6 Mermaid diagrams, 14 enums, multi-tenant strategy, index strategy) + `docs/DATA_DICTIONARY.md` (1797 lines — per-table field definitions for all 52 tables with 8-column base mixin, relations, constraints) |
 | B0 | 0.3 | Prisma Schema Draft (all 40+ models) | ✅ Done | [`9290c77`](https://github.com/sajidchowdhury/MadrashaOS/commit/9290c77) | 2026-09-18 | `prisma/schema.prisma` (2,271 lines — 52 models, 15 enums, 260 indexes, 40 unique constraints, 238 relations, all `@@map` to snake_case) + `prisma validate` ✅ + `prisma generate` ✅ |
-| B1 | 1.1 | Foundation Models Migration | ⏳ Pending | — | — | — |
-| B1 | 1.2 | People Models Migration | ⏳ Pending | — | — | — |
-| B1 | 1.3 | Academic + Finance Models Migration | ⏳ Pending | — | — | — |
+| B1 | 1.1 | Foundation Models Migration | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-18 | `prisma/migrations/20260918000000_init/migration.sql` (2,853 lines — ALL 52 tables + 15 enums + 260 indexes + 238 FKs in one init migration) + `migration_lock.toml` + `prisma/migrations/README.md` with local setup instructions |
+| B1 | 1.2 | People Models Migration | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-18 | Covered by init migration (B1.1) — People tables created in same migration |
+| B1 | 1.3 | Academic + Finance Models Migration | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-18 | Covered by init migration (B1.1) — Academic + Finance + Operations + Communication tables all created in same migration |
 | B1 | 1.4 | Seed Data (40 students, 8 users, 12 ledger entries) | ⏳ Pending | — | — | — |
 | B2 | 2.1 | NextAuth.js Setup (JWT + refresh) | ⏳ Pending | — | — | — |
 | B2 | 2.2 | Permission Middleware | ⏳ Pending | — | — | — |
@@ -131,9 +131,11 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B9 | 9.2 | Frontend Client Swap (mockApi → real) | ⏳ Pending | — | — | — |
 | B9 | 9.3 | End-to-End Verification (8 flows) | ⏳ Pending | — | — | — |
 
-**Summary:** 3 / 36 sessions done · 0 in progress · 33 pending · 0 blocked
+**Summary:** 6 / 36 sessions done · 0 in progress · 30 pending · 0 blocked
 
-**Phase B0 (Database Foundation): ✅ Complete** — 3/3 sessions done. PostgreSQL 16 configured via Docker + ERD with 52 tables/98 relations/15 enums + complete Prisma schema (2,271 lines, validated, client generated). Ready for Phase B1 (migrations + seed data).
+**Phase B0 (Database Foundation): ✅ Complete** — 3/3 sessions done. PostgreSQL 16 configured via Docker + ERD with 52 tables/98 relations/15 enums + complete Prisma schema (2,271 lines, validated, client generated).
+
+**Phase B1 (Schema & Migrations): 🔄 In Progress** — 3/4 sessions done. Init migration created (2,853 lines of SQL covering all 52 tables + 15 enums + 260 indexes + 238 FKs). Only B1.4 (seed data) remains before the database is fully populated.
 
 ---
 
