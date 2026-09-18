@@ -1,15 +1,42 @@
 // ============================================================
-// MadrashaOS — Prisma Schema
+// MadrashaOS — Prisma Schema (Phase B0.3)
 // ============================================================
-// Session B0.1 — PostgreSQL Setup + Connection
+// Implements the 52-table PostgreSQL schema defined in:
+//   - docs/ERD.md             (52 tables, 98 relations, 14 enums)
+//   - docs/DATA_DICTIONARY.md  (per-table field definitions)
+//   - src/lib/mock/types.ts    (data contract from the mock layer)
 //
-// Provider: PostgreSQL 16 (via Docker — see docker-compose.yml)
-// Connection: env("DATABASE_URL") from .env
+// Layer breakdown:
+//   Foundation    (10) — organizations, branches, users, roles, permissions,
+//                          role_permissions, audit_logs, module_configs,
+//                          security_policies, backup_records
+//   People         (9) — classes, sections, students, guardians,
+//                          student_guardians, teachers, employees,
+//                          admissions, teacher_assignments
+//   Academic       (8) — subjects, routines, attendance_sessions,
+//                          attendance_records, exams, marks, results,
+//                          student_history
+//   Finance        (9) — accounts, fee_plans, fee_installments,
+//                          fee_payments, scholarships, ledger_entries,
+//                          cash_bank_transfers, zakat_transactions, donations
+//   Operations    (12) — inventory_items, purchases, purchase_items,
+//                          suppliers, assets, hostel_rooms, hostel_beds,
+//                          meal_plans, library_books, library_issues,
+//                          vehicles, fuel_logs
+//   Communication  (4) — notices, documents, reports, approvals
+//                       ──────────────────────
+//                       Total: 52 tables
 //
-// NOTE: This schema currently contains NO models. Session B0.3
-// will add all 40+ models. Session B1.1-B1.3 will create the
-// migrations. For now, this file just establishes the PostgreSQL
-// connection so `prisma db pull` + `prisma validate` work.
+// Conventions:
+//   • snake_case field names (mirror DB columns; no @map needed)
+//   • PascalCase model names mapped via @@map to snake_case plural tables
+//   • UUID PKs (uuid_generate_v4 via Prisma default)
+//   • Money = Decimal(14, 2); JSONB = Json
+//   • Soft-delete (deleted_at) on every table
+//   • Multi-tenant scoping (organization_id, branch_id) on every table
+//     except organizations (root) and permissions (global catalog)
+//   • created_by / updated_by kept as plain UUID scalars (audit fields)
+//     to avoid bloating User with 100+ back-relations
 // ============================================================
 
 generator client {
@@ -23,5 +50,2222 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Models will be added in Session B0.3 (Prisma Schema Draft)
-// and migrated in Sessions B1.1–B1.3.
+// ============================================================
+// ENUMS (15)
+// ============================================================
+
+/// The 8 role code values documented in src/stores/types.ts.
+/// NOTE: Named `RoleCode` (not `Role`) because Prisma forbids an enum and
+/// a model from sharing a name. The `roles.code` column is a plain varchar
+/// (to allow extension per the ERD), so this enum is a typing reference —
+/// it is not used as a column type.
+enum RoleCode {
+  super_admin
+  authority
+  administrator
+  accountant
+  teacher
+  storekeeper
+  guardian
+  student
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum StudentStatus {
+  active
+  graduated
+  withdrawn
+}
+
+enum AdmissionStatus {
+  applied
+  interviewed
+  approved
+  registered
+  rejected
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  leave
+}
+
+enum ExamStatus {
+  draft
+  active
+  published
+}
+
+enum MarkGrade {
+  a_plus
+  a
+  b
+  c
+  d
+  f
+}
+
+/// C6 / D18 — Zakat fund isolation. General vs Zakat accounts cannot mix.
+enum FundType {
+  general
+  zakat
+}
+
+enum AccountType {
+  asset
+  liability
+  equity
+  income
+  expense
+}
+
+enum FeeMethod {
+  cash
+  bank
+  mobile
+}
+
+/// Golden Flow §3.6 — ledger entry lifecycle.
+enum LedgerStatus {
+  posted
+  pending
+  rejected
+}
+
+enum ApprovalType {
+  expense
+  purchase
+  discount
+  admission
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum NoticeAudience {
+  all
+  class
+  guardians
+  staff
+}
+
+enum DocumentType {
+  pdf
+  word
+  image
+  excel
+  other
+}
+
+// ============================================================
+// FOUNDATION LAYER (10 models)
+// ============================================================
+
+/// Top-level tenant — a single madrasha trust. Root of the multi-tenant tree.
+/// Omits organization_id (it IS the tenant root) and branch_id (platform-level).
+model Organization {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String
+  name_bn          String
+  slug             String    @unique
+  phone            String?
+  email            String?
+  address          String?
+  logo_url         String?
+  website_url      String?
+  established_year Int?
+  settings         Json      @default("{}")
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  branches            Branch[]
+  users               User[]
+  roles               Role[]
+  role_permissions    RolePermission[]
+  module_configs      ModuleConfig[]
+  security_policies   SecurityPolicy[]
+  backup_records      BackupRecord[]
+  audit_logs          AuditLog[]
+  classes             Class[]
+  sections            Section[]
+  students            Student[]
+  guardians           Guardian[]
+  student_guardians   StudentGuardian[]
+  teachers            Teacher[]
+  employees           Employee[]
+  admissions          Admission[]
+  teacher_assignments TeacherAssignment[]
+  subjects            Subject[]
+  routines            Routine[]
+  attendance_sessions AttendanceSession[]
+  attendance_records  AttendanceRecord[]
+  exams               Exam[]
+  marks               Mark[]
+  results             Result[]
+  student_histories   StudentHistory[]
+  accounts            Account[]
+  fee_plans           FeePlan[]
+  fee_installments    FeeInstallment[]
+  fee_payments        FeePayment[]
+  scholarships        Scholarship[]
+  ledger_entries      LedgerEntry[]
+  cash_bank_transfers CashBankTransfer[]
+  zakat_transactions  ZakatTransaction[]
+  donations           Donation[]
+  inventory_items     InventoryItem[]
+  purchases           Purchase[]
+  purchase_items      PurchaseItem[]
+  suppliers           Supplier[]
+  assets              Asset[]
+  hostel_rooms        HostelRoom[]
+  hostel_beds         HostelBed[]
+  meal_plans          MealPlan[]
+  library_books       LibraryBook[]
+  library_issues      LibraryIssue[]
+  vehicles            Vehicle[]
+  fuel_logs           FuelLog[]
+  notices             Notice[]
+  documents           Document[]
+  reports             Report[]
+  approvals           Approval[]
+
+  @@index([deleted_at])
+  @@index([created_at])
+  @@map("organizations")
+}
+
+/// Campus / branch under an organization. Three seeded: Dhaka, Chittagong, Sylhet.
+model Branch {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  code             String
+  name             String
+  name_bn          String
+  address          String?
+  phone            String?
+  email            String?
+  established_year Int?
+  is_active        Boolean   @default(true)
+  latitude         Decimal?  @db.Decimal(10, 7)
+  longitude        Decimal?  @db.Decimal(10, 7)
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization        Organization        @relation(fields: [organization_id], references: [id])
+  users               User[]
+  classes             Class[]
+  sections            Section[]
+  students            Student[]
+  guardians           Guardian[]
+  teachers            Teacher[]
+  employees           Employee[]
+  roles               Role[]
+  role_permissions    RolePermission[]
+  admissions          Admission[]
+  subjects            Subject[]
+  routines            Routine[]
+  teacher_assignments TeacherAssignment[]
+  student_guardians   StudentGuardian[]
+  audit_logs          AuditLog[]
+  module_configs      ModuleConfig[]
+  security_policies   SecurityPolicy[]
+  backup_records      BackupRecord[]
+  attendance_sessions AttendanceSession[]
+  attendance_records  AttendanceRecord[]
+  exams               Exam[]
+  marks               Mark[]
+  results             Result[]
+  student_histories   StudentHistory[]
+  accounts            Account[]
+  fee_plans           FeePlan[]
+  fee_installments    FeeInstallment[]
+  fee_payments        FeePayment[]
+  scholarships        Scholarship[]
+  ledger_entries      LedgerEntry[]
+  cash_bank_transfers CashBankTransfer[]
+  zakat_transactions  ZakatTransaction[]
+  donations           Donation[]
+  inventory_items     InventoryItem[]
+  purchases           Purchase[]
+  purchase_items      PurchaseItem[]
+  suppliers           Supplier[]
+  assets              Asset[]
+  hostel_rooms        HostelRoom[]
+  hostel_beds         HostelBed[]
+  meal_plans          MealPlan[]
+  library_books       LibraryBook[]
+  library_issues      LibraryIssue[]
+  vehicles            Vehicle[]
+  fuel_logs           FuelLog[]
+  notices             Notice[]
+  documents           Document[]
+  reports             Report[]
+  approvals           Approval[]
+  assets_transferred  Asset[]             @relation("AssetTransferredToBranch")
+
+  @@unique([organization_id, code])
+  @@index([organization_id])
+  @@index([deleted_at])
+  @@index([created_at])
+  @@map("branches")
+}
+
+/// Login accounts. Each user has exactly one role_id and is scoped to a branch_id.
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organization_id    String    @db.Uuid
+  branch_id          String?   @db.Uuid
+  role_id            String    @db.Uuid
+  name               String
+  name_bn            String?
+  email              String
+  phone              String?
+  password_hash      String
+  avatar_initial     String?   @db.VarChar(2)
+  avatar_url         String?
+  status             String    @default("active") // active | disabled | locked
+  last_login_at      DateTime? @db.Timestamptz
+  last_login_ip      String?
+  mfa_secret         String?
+  mfa_enabled        Boolean   @default(false)
+  failed_login_count Int       @default(0)
+  locked_until       DateTime? @db.Timestamptz
+  preferences        Json      @default("{}")
+  created_at         DateTime  @default(now()) @db.Timestamptz
+  updated_at         DateTime  @updatedAt @db.Timestamptz
+  deleted_at         DateTime? @db.Timestamptz
+  created_by         String?   @db.Uuid
+  updated_by         String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  role         Role         @relation(fields: [role_id], references: [id])
+
+  // Profile back-relations (1:1 with users)
+  teacher_profile  Teacher?
+  employee_profile Employee?
+
+  // Guardian linked account
+  guardian_profile Guardian?
+
+  // Audit / backup actor
+  audit_logs_actor AuditLog[]       @relation("AuditLogActor")
+  backup_records   BackupRecord[]   @relation("BackupRecordTriggeredBy")
+  role_permissions RolePermission[] @relation("RolePermissionGrantedBy")
+
+  // People-layer actor relations
+  admissions_requested        Admission[]         @relation("AdmissionRequestedBy")
+  admissions_decided          Admission[]         @relation("AdmissionDecidedBy")
+  attendance_sessions_taken   AttendanceSession[] @relation("AttendanceTakenBy")
+  attendance_records_recorded AttendanceRecord[]  @relation("AttendanceRecordedBy")
+  exams_published             Exam[]              @relation("ExamPublishedBy")
+  marks_entered               Mark[]              @relation("MarkEnteredBy")
+  results_generated           Result[]            @relation("ResultGeneratedBy")
+  student_history_actions     StudentHistory[]    @relation("StudentHistoryActionBy")
+
+  // Finance-layer actor relations
+  fee_payments_collected        FeePayment[]       @relation("FeePaymentCollectedBy")
+  scholarships_approved         Scholarship[]      @relation("ScholarshipApprovedBy")
+  ledger_entries_posted         LedgerEntry[]      @relation("LedgerPostedBy")
+  ledger_entries_approved       LedgerEntry[]      @relation("LedgerApprovedBy")
+  cash_bank_transfers_initiated CashBankTransfer[] @relation("TransferInitiatedBy")
+  zakat_transactions_handled    ZakatTransaction[] @relation("ZakatHandledBy")
+  donations_confirmed           Donation[]         @relation("DonationConfirmedBy")
+
+  // Operations-layer actor relations
+  purchases_requested     Purchase[]     @relation("PurchaseRequestedBy")
+  purchases_approved      Purchase[]     @relation("PurchaseApprovedBy")
+  assets_disposed         Asset[]        @relation("AssetDisposedBy")
+  meal_plans_prepared     MealPlan[]     @relation("MealPreparedBy")
+  library_issues_created  LibraryIssue[] @relation("LibraryIssuedBy")
+  library_issues_returned LibraryIssue[] @relation("LibraryReturnedTo")
+  fuel_logs               FuelLog[]      @relation("FuelLoggedBy")
+
+  // Communication-layer actor relations
+  notices_sent        Notice[]   @relation("NoticeSentBy")
+  documents_uploaded  Document[] @relation("DocumentUploadedBy")
+  reports_generated   Report[]   @relation("ReportGeneratedBy")
+  approvals_requested Approval[] @relation("ApprovalRequestedBy")
+  approvals_decided   Approval[] @relation("ApprovalDecidedBy")
+  approvals_delegated Approval[] @relation("ApprovalDelegatedTo")
+
+  @@unique([organization_id, email])
+  @@index([organization_id, branch_id])
+  @@index([role_id])
+  @@index([deleted_at])
+  @@index([created_at])
+  @@map("users")
+}
+
+/// The 8 personas from src/stores/types.ts. System roles cannot be deleted.
+/// organization_id is NULL for system/platform roles (super-admin).
+/// `code` is a varchar (not a Postgres enum) to allow runtime extension —
+/// see the `RoleCode` Prisma enum for the 8 seeded values.
+model Role {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String?   @db.Uuid
+  branch_id       String?   @db.Uuid
+  code            String // super_admin | authority | administrator | accountant | teacher | storekeeper | guardian | student
+  name            String
+  name_bn         String?
+  description     String?
+  is_system       Boolean   @default(false)
+  is_platform     Boolean   @default(false)
+  priority        Int       @default(100)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization     Organization?    @relation(fields: [organization_id], references: [id])
+  branch           Branch?          @relation(fields: [branch_id], references: [id])
+  users            User[]
+  role_permissions RolePermission[]
+
+  @@unique([organization_id, code])
+  @@index([organization_id])
+  @@index([branch_id])
+  @@index([deleted_at])
+  @@map("roles")
+}
+
+/// Global catalog of 110+ permission codes from src/lib/auth/permissions.ts.
+/// No organization_id / branch_id — globally seeded. This is the documented
+/// exception to the multi-tenant rule (see ERD §"Base Mixin").
+model Permission {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique @db.VarChar(64)
+  module      String // foundation | people | academic | finance | operations | communication
+  name        String
+  description String?
+  is_system   Boolean   @default(true)
+  is_scoped   Boolean   @default(false) // true for *.view.own / *.create.own
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  deleted_at  DateTime? @db.Timestamptz
+
+  role_permissions RolePermission[]
+
+  @@index([module])
+  @@index([deleted_at])
+  @@map("permissions")
+}
+
+/// M:M junction between roles and permissions. Carries the grant timestamp.
+model RolePermission {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  role_id         String    @db.Uuid
+  permission_id   String    @db.Uuid
+  granted_at      DateTime  @default(now()) @db.Timestamptz
+  granted_by      String?   @db.Uuid
+  scope_note      String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  role         Role         @relation(fields: [role_id], references: [id])
+  permission   Permission   @relation(fields: [permission_id], references: [id])
+  granter      User?        @relation("RolePermissionGrantedBy", fields: [granted_by], references: [id])
+
+  @@unique([role_id, permission_id])
+  @@index([organization_id, branch_id])
+  @@index([role_id])
+  @@index([permission_id])
+  @@index([deleted_at])
+  @@map("role_permissions")
+}
+
+/// Field-level diff audit trail (SRS §2.1.4, §3.4, BP5).
+/// Every write to audited entities produces a row here.
+model AuditLog {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  actor_user_id   String?   @db.Uuid
+  action          String // create | update | delete | login | logout | approve | reject | ...
+  entity_type     String // students | fee_payments | ...
+  entity_id       String    @db.Uuid
+  old_values      Json? // full row snapshot before change (NULL for create)
+  new_values      Json? // full row snapshot after change (NULL for delete)
+  diff_summary    String?
+  ip_address      String?
+  user_agent      String?
+  request_id      String?
+  session_id      String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  actor        User?        @relation("AuditLogActor", fields: [actor_user_id], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([entity_type, entity_id])
+  @@index([actor_user_id])
+  @@index([action])
+  @@index([created_at])
+  @@index([deleted_at])
+  @@map("audit_logs")
+}
+
+/// Per-branch module on/off toggles (SRS §2.1.2). When branch_id is NULL,
+/// the row is the org-level default.
+model ModuleConfig {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  module_key      String // fees | accounting | zakat | hostel | library | ...
+  is_enabled      Boolean   @default(true)
+  config          Json      @default("{}")
+  display_order   Int       @default(100)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+
+  @@unique([organization_id, branch_id, module_key])
+  @@index([organization_id, branch_id])
+  @@index([deleted_at])
+  @@map("module_configs")
+}
+
+/// Password rules, MFA policy, session TTL, IP allowlist.
+/// One row per organization (1:1 enforced by UNIQUE).
+model SecurityPolicy {
+  id                             String    @id @default(uuid()) @db.Uuid
+  organization_id                String    @db.Uuid
+  branch_id                      String?   @db.Uuid
+  password_min_length            Int       @default(8)
+  password_require_special       Boolean   @default(true)
+  password_require_digit         Boolean   @default(true)
+  password_require_upper         Boolean   @default(true)
+  password_expiry_days           Int       @default(90)
+  password_history_count         Int       @default(5)
+  mfa_required                   Boolean   @default(false)
+  mfa_required_roles             Json      @default("[]")
+  session_ttl_minutes            Int       @default(15)
+  refresh_ttl_days               Int       @default(7)
+  max_concurrent_sessions        Int       @default(3)
+  ip_allowlist                   Json      @default("[]")
+  failed_login_lockout_threshold Int       @default(5)
+  failed_login_lockout_minutes   Int       @default(15)
+  created_at                     DateTime  @default(now()) @db.Timestamptz
+  updated_at                     DateTime  @updatedAt @db.Timestamptz
+  deleted_at                     DateTime? @db.Timestamptz
+  created_by                     String?   @db.Uuid
+  updated_by                     String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+
+  @@unique([organization_id])
+  @@index([organization_id, branch_id])
+  @@index([deleted_at])
+  @@map("security_policies")
+}
+
+/// Backup run history (manual + scheduled).
+model BackupRecord {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  backup_type     String // manual | scheduled | pre-migration
+  status          String    @default("running") // running | completed | failed | partial
+  size_bytes      BigInt?
+  storage_url     String?
+  storage_type    String? // local | s3 | gcs | azure
+  checksum_sha256 String?
+  error_message   String?
+  triggered_by    String?   @db.Uuid
+  started_at      DateTime  @default(now()) @db.Timestamptz
+  completed_at    DateTime? @db.Timestamptz
+  table_count     Int?
+  row_count       BigInt?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  triggerer    User?        @relation("BackupRecordTriggeredBy", fields: [triggered_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([status])
+  @@index([started_at])
+  @@index([deleted_at])
+  @@map("backup_records")
+}
+
+// ============================================================
+// PEOPLE LAYER (9 models)
+// ============================================================
+
+/// Academic grade level (e.g. "Class 5"). Branch-scoped.
+model Class {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  name            String
+  name_bn         String
+  level           Int
+  stream          String? // general | hifz | alim | nazera
+  is_active       Boolean   @default(true)
+  display_order   Int       @default(100)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization         Organization        @relation(fields: [organization_id], references: [id])
+  branch               Branch?             @relation(fields: [branch_id], references: [id])
+  sections             Section[]
+  students             Student[]
+  routines             Routine[]
+  attendance_sessions  AttendanceSession[]
+  exams                Exam[]
+  teacher_assignments  TeacherAssignment[]
+  student_history_from StudentHistory[]    @relation("ClassFromHistory")
+  student_history_to   StudentHistory[]    @relation("ClassToHistory")
+
+  @@unique([organization_id, branch_id, name])
+  @@index([organization_id, branch_id])
+  @@index([deleted_at])
+  @@map("classes")
+}
+
+/// Section within a class (A, B, C). Each section has a class teacher.
+model Section {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  class_id        String    @db.Uuid
+  name            String
+  capacity        Int       @default(40)
+  teacher_id      String?   @db.Uuid // class teacher
+  room            String?
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization         Organization        @relation(fields: [organization_id], references: [id])
+  branch               Branch?             @relation(fields: [branch_id], references: [id])
+  class                Class               @relation(fields: [class_id], references: [id])
+  class_teacher        Teacher?            @relation("SectionClassTeacher", fields: [teacher_id], references: [id])
+  students             Student[]
+  routines             Routine[]
+  attendance_sessions  AttendanceSession[]
+  teacher_assignments  TeacherAssignment[]
+  student_history_from StudentHistory[]    @relation("SectionFromHistory")
+  student_history_to   StudentHistory[]    @relation("SectionToHistory")
+
+  @@unique([class_id, name])
+  @@index([organization_id, branch_id])
+  @@index([class_id])
+  @@index([deleted_at])
+  @@map("sections")
+}
+
+/// Enrolled student. Linked to class_id + section_id. Can have multiple
+/// guardians via student_guardians. Risk R4: every class change is logged in
+/// student_history.
+model Student {
+  id                String        @id @default(uuid()) @db.Uuid
+  organization_id   String        @db.Uuid
+  branch_id         String?       @db.Uuid
+  code              String
+  name              String
+  name_bn           String
+  name_ar           String?
+  class_id          String        @db.Uuid
+  section_id        String?       @db.Uuid
+  roll              Int
+  gender            Gender
+  dob               DateTime      @db.Date
+  blood_group       String?
+  present_address   String?
+  permanent_address String?
+  phone             String?
+  email             String?
+  admitted_at       DateTime      @db.Date
+  status            StudentStatus @default(active)
+  special_notes     String? // permission-gated: students.notes.view
+  photo_url         String?
+  previous_school   String?
+  blood_donor       Boolean       @default(false)
+  created_at        DateTime      @default(now()) @db.Timestamptz
+  updated_at        DateTime      @updatedAt @db.Timestamptz
+  deleted_at        DateTime?     @db.Timestamptz
+  created_by        String?       @db.Uuid
+  updated_by        String?       @db.Uuid
+
+  organization       Organization       @relation(fields: [organization_id], references: [id])
+  branch             Branch?            @relation(fields: [branch_id], references: [id])
+  class              Class              @relation(fields: [class_id], references: [id])
+  section            Section?           @relation(fields: [section_id], references: [id])
+  student_guardians  StudentGuardian[]
+  admissions         Admission[]
+  fee_plans          FeePlan[]
+  fee_installments   FeeInstallment[]
+  fee_payments       FeePayment[]
+  scholarships       Scholarship[]
+  attendance_records AttendanceRecord[]
+  marks              Mark[]
+  results            Result[]
+  student_history    StudentHistory[]
+  library_issues     LibraryIssue[]
+  hostel_beds        HostelBed[]
+  zakat_transactions ZakatTransaction[]
+
+  @@unique([organization_id, code])
+  @@unique([section_id, roll])
+  @@index([organization_id, branch_id])
+  @@index([class_id, section_id])
+  @@index([status])
+  @@index([admitted_at])
+  @@index([deleted_at])
+  @@map("students")
+}
+
+/// Parent / guardian contact. A guardian can be linked to multiple students
+/// (siblings).
+model Guardian {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  name            String
+  name_bn         String?
+  phone           String
+  email           String?
+  occupation      String?
+  relation        String    @default("father") // father | mother | uncle | aunt | guardian | other
+  nid_number      String?
+  annual_income   Decimal?  @db.Decimal(14, 2)
+  is_primary      Boolean   @default(true)
+  address         String?
+  user_id         String?   @unique @db.Uuid // linked user account (guardian portal login)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization      Organization      @relation(fields: [organization_id], references: [id])
+  branch            Branch?           @relation(fields: [branch_id], references: [id])
+  user              User?             @relation(fields: [user_id], references: [id])
+  student_guardians StudentGuardian[]
+
+  @@unique([organization_id, phone])
+  @@index([organization_id, branch_id])
+  @@index([user_id])
+  @@index([deleted_at])
+  @@map("guardians")
+}
+
+/// M:M junction between students and guardians — a student may have multiple
+/// guardians; a guardian may have multiple children.
+model StudentGuardian {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  student_id      String    @db.Uuid
+  guardian_id     String    @db.Uuid
+  relation        String // father | mother | uncle | aunt | guardian | other
+  is_primary      Boolean   @default(false)
+  can_pickup      Boolean   @default(true)
+  receive_sms     Boolean   @default(true)
+  receive_email   Boolean   @default(false)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  student      Student      @relation(fields: [student_id], references: [id])
+  guardian     Guardian     @relation(fields: [guardian_id], references: [id])
+
+  @@unique([student_id, guardian_id])
+  @@index([organization_id, branch_id])
+  @@index([student_id])
+  @@index([guardian_id])
+  @@index([deleted_at])
+  @@map("student_guardians")
+}
+
+/// Teacher profile (1:1 with a users row of role `teacher`).
+model Teacher {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  user_id         String    @db.Uuid
+  employee_code   String
+  designation     String? // lecturer | senior-lecturer | head-teacher | qari | qaria | ...
+  qualification   String?
+  specialization  String? // Quran, Hadith, Fiqh, Bangla, Math, ...
+  joined_at       DateTime  @db.Date
+  left_at         DateTime? @db.Date
+  salary          Decimal?  @db.Decimal(14, 2)
+  status          String    @default("active") // active | on-leave | resigned
+  phone           String?
+  nid_number      String?
+  photo_url       String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization        Organization        @relation(fields: [organization_id], references: [id])
+  branch              Branch?             @relation(fields: [branch_id], references: [id])
+  user                User                @relation(fields: [user_id], references: [id])
+  sections_taught     Section[]           @relation("SectionClassTeacher")
+  routines            Routine[]
+  teacher_assignments TeacherAssignment[]
+
+  @@unique([organization_id, employee_code])
+  @@unique([user_id])
+  @@index([organization_id, branch_id])
+  @@index([user_id])
+  @@index([status])
+  @@index([joined_at])
+  @@index([deleted_at])
+  @@map("teachers")
+}
+
+/// Non-teaching staff (accountant, librarian, storekeeper, ...). 1:1 with a
+/// users row.
+model Employee {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  user_id         String    @db.Uuid
+  employee_code   String
+  designation     String // accountant | librarian | storekeeper | clerk | driver | cook | guard | ...
+  department      String? // finance | operations | library | hostel | transport | administration
+  joined_at       DateTime  @db.Date
+  left_at         DateTime? @db.Date
+  salary          Decimal?  @db.Decimal(14, 2)
+  status          String    @default("active")
+  nid_number      String?
+  photo_url       String?
+  phone           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  user         User         @relation(fields: [user_id], references: [id])
+
+  @@unique([organization_id, employee_code])
+  @@unique([user_id])
+  @@index([organization_id, branch_id])
+  @@index([user_id])
+  @@index([status])
+  @@index([joined_at])
+  @@index([deleted_at])
+  @@map("employees")
+}
+
+/// Admission pipeline (applied → interviewed → approved → registered / rejected).
+/// When status = 'registered', a Student row is created and student_id is set.
+model Admission {
+  id                 String          @id @default(uuid()) @db.Uuid
+  organization_id    String          @db.Uuid
+  branch_id          String?         @db.Uuid
+  applicant_name     String
+  applicant_name_bn  String?
+  parent_name        String
+  parent_phone       String
+  parent_email       String?
+  desired_class      String?
+  desired_program    String? // alim | nazera | hifz | tajweed | arabic | one-to-one
+  previous_education Json?
+  notes              String?
+  status             AdmissionStatus @default(applied)
+  student_id         String?         @db.Uuid // set when registered
+  requested_by       String?         @db.Uuid // NULL for public form submissions
+  decided_by         String?         @db.Uuid
+  decided_at         DateTime?       @db.Timestamptz
+  rejection_reason   String?
+  submitted_at       DateTime        @default(now()) @db.Timestamptz
+  form_source        String          @default("public") // public | office
+  created_at         DateTime        @default(now()) @db.Timestamptz
+  updated_at         DateTime        @updatedAt @db.Timestamptz
+  deleted_at         DateTime?       @db.Timestamptz
+  created_by         String?         @db.Uuid
+  updated_by         String?         @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  student      Student?     @relation(fields: [student_id], references: [id])
+  requester    User?        @relation("AdmissionRequestedBy", fields: [requested_by], references: [id])
+  decider      User?        @relation("AdmissionDecidedBy", fields: [decided_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([status])
+  @@index([applicant_name])
+  @@index([parent_phone])
+  @@index([submitted_at])
+  @@index([deleted_at])
+  @@map("admissions")
+}
+
+/// Teacher × Class × Section × Subject assignment. Used by routines + marks
+/// entry scoping. Ternary junction modeled as a full entity with metadata
+/// (academic_year, is_active).
+model TeacherAssignment {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  teacher_id      String    @db.Uuid
+  class_id        String    @db.Uuid
+  section_id      String?   @db.Uuid // NULL = all sections
+  subject_id      String    @db.Uuid
+  academic_year   Int
+  is_active       Boolean   @default(true)
+  notes           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  teacher      Teacher      @relation(fields: [teacher_id], references: [id])
+  class        Class        @relation(fields: [class_id], references: [id])
+  section      Section?     @relation(fields: [section_id], references: [id])
+  subject      Subject      @relation(fields: [subject_id], references: [id])
+
+  @@unique([organization_id, academic_year, teacher_id, class_id, section_id, subject_id])
+  @@index([organization_id, branch_id])
+  @@index([teacher_id])
+  @@index([class_id, section_id])
+  @@index([subject_id])
+  @@index([is_active])
+  @@index([deleted_at])
+  @@map("teacher_assignments")
+}
+
+// ============================================================
+// ACADEMIC LAYER (8 models)
+// ============================================================
+
+/// Subject catalog (Quran, Hadith, Bangla, Math, ...). Quranic subjects flagged
+/// for routing.
+model Subject {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  code            String
+  name            String
+  name_bn         String?
+  name_ar         String?
+  is_quranic      Boolean   @default(false)
+  category        String? // quranic | language | science | social | arts
+  full_marks      Int       @default(100)
+  pass_marks      Int       @default(33)
+  is_active       Boolean   @default(true)
+  display_order   Int       @default(100)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization        Organization        @relation(fields: [organization_id], references: [id])
+  branch              Branch?             @relation(fields: [branch_id], references: [id])
+  routines            Routine[]
+  exams               Exam[]
+  marks               Mark[]
+  teacher_assignments TeacherAssignment[]
+
+  @@unique([organization_id, code])
+  @@index([organization_id, branch_id])
+  @@index([is_quranic])
+  @@index([deleted_at])
+  @@map("subjects")
+}
+
+/// Class × Day × Period × Subject × Teacher slot.
+model Routine {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  class_id        String    @db.Uuid
+  section_id      String?   @db.Uuid
+  subject_id      String    @db.Uuid
+  teacher_id      String    @db.Uuid
+  academic_year   Int
+  day_of_week     String // sun | mon | tue | wed | thu | fri | sat
+  period_number   Int
+  start_time      DateTime  @db.Time
+  end_time        DateTime  @db.Time
+  room            String?
+  is_break        Boolean   @default(false)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  class        Class        @relation(fields: [class_id], references: [id])
+  section      Section?     @relation(fields: [section_id], references: [id])
+  subject      Subject      @relation(fields: [subject_id], references: [id])
+  teacher      Teacher      @relation(fields: [teacher_id], references: [id])
+
+  @@unique([organization_id, academic_year, class_id, section_id, day_of_week, period_number])
+  @@index([organization_id, branch_id])
+  @@index([class_id, section_id])
+  @@index([teacher_id])
+  @@index([subject_id])
+  @@index([academic_year])
+  @@index([deleted_at])
+  @@map("routines")
+}
+
+/// One teacher's attendance pass for one class+section+date.
+model AttendanceSession {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  class_id        String    @db.Uuid
+  section_id      String?   @db.Uuid
+  date            DateTime  @db.Date
+  taken_by        String    @db.Uuid // teacher user id
+  academic_year   Int
+  period          String    @default("full") // morning | afternoon | full
+  submitted_at    DateTime? @db.Timestamptz
+  is_locked       Boolean   @default(false)
+  device_id       String? // offline device ID (Risk R6)
+  sync_status     String    @default("synced") // pending | synced | conflict
+  total_present   Int?
+  total_absent    Int?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization       Organization       @relation(fields: [organization_id], references: [id])
+  branch             Branch?            @relation(fields: [branch_id], references: [id])
+  class              Class              @relation(fields: [class_id], references: [id])
+  section            Section?           @relation(fields: [section_id], references: [id])
+  taken_by_user      User               @relation("AttendanceTakenBy", fields: [taken_by], references: [id])
+  attendance_records AttendanceRecord[]
+
+  @@unique([organization_id, class_id, section_id, date, period])
+  @@index([organization_id, branch_id])
+  @@index([class_id, section_id, date])
+  @@index([taken_by])
+  @@index([date])
+  @@index([sync_status])
+  @@index([deleted_at])
+  @@map("attendance_sessions")
+}
+
+/// Per-student attendance row inside a session.
+model AttendanceRecord {
+  id              String           @id @default(uuid()) @db.Uuid
+  organization_id String           @db.Uuid
+  branch_id       String?          @db.Uuid
+  session_id      String           @db.Uuid
+  student_id      String           @db.Uuid
+  status          AttendanceStatus @default(present)
+  note            String?
+  recorded_at     DateTime         @default(now()) @db.Timestamptz
+  recorded_by     String?          @db.Uuid
+  created_at      DateTime         @default(now()) @db.Timestamptz
+  updated_at      DateTime         @updatedAt @db.Timestamptz
+  deleted_at      DateTime?        @db.Timestamptz
+  created_by      String?          @db.Uuid
+  updated_by      String?          @db.Uuid
+
+  organization Organization      @relation(fields: [organization_id], references: [id])
+  branch       Branch?           @relation(fields: [branch_id], references: [id])
+  session      AttendanceSession @relation(fields: [session_id], references: [id])
+  student      Student           @relation(fields: [student_id], references: [id])
+  recorder     User?             @relation("AttendanceRecordedBy", fields: [recorded_by], references: [id])
+
+  @@unique([session_id, student_id])
+  @@index([organization_id, branch_id])
+  @@index([student_id])
+  @@index([status])
+  @@index([recorded_at])
+  @@index([deleted_at])
+  @@map("attendance_records")
+}
+
+/// Exam definition (term, date, class, subject).
+model Exam {
+  id              String     @id @default(uuid()) @db.Uuid
+  organization_id String     @db.Uuid
+  branch_id       String?    @db.Uuid
+  name            String
+  name_bn         String?
+  class_id        String     @db.Uuid
+  subject_id      String?    @db.Uuid // NULL for combined exam
+  academic_year   Int
+  term            String     @default("first") // first | second | final | test | quiz
+  exam_date       DateTime   @db.Date
+  full_marks      Int        @default(100)
+  pass_marks      Int        @default(33)
+  status          ExamStatus @default(draft)
+  published_by    String?    @db.Uuid
+  published_at    DateTime?  @db.Timestamptz
+  description     String?
+  created_at      DateTime   @default(now()) @db.Timestamptz
+  updated_at      DateTime   @updatedAt @db.Timestamptz
+  deleted_at      DateTime?  @db.Timestamptz
+  created_by      String?    @db.Uuid
+  updated_by      String?    @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  class        Class        @relation(fields: [class_id], references: [id])
+  subject      Subject?     @relation(fields: [subject_id], references: [id])
+  publisher    User?        @relation("ExamPublishedBy", fields: [published_by], references: [id])
+  marks        Mark[]
+  results      Result[]
+
+  @@unique([organization_id, academic_year, class_id, subject_id, term])
+  @@index([organization_id, branch_id])
+  @@index([class_id])
+  @@index([subject_id])
+  @@index([exam_date])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("exams")
+}
+
+/// One student's mark in one exam × subject.
+model Mark {
+  id              String     @id @default(uuid()) @db.Uuid
+  organization_id String     @db.Uuid
+  branch_id       String?    @db.Uuid
+  exam_id         String     @db.Uuid
+  student_id      String     @db.Uuid
+  subject_id      String     @db.Uuid
+  marks_obtained  Decimal    @db.Decimal(14, 2)
+  grade           MarkGrade?
+  gpa             Decimal?   @db.Decimal(3, 2)
+  remark          String?
+  entered_by      String?    @db.Uuid
+  entered_at      DateTime   @default(now()) @db.Timestamptz
+  is_absent       Boolean    @default(false)
+  created_at      DateTime   @default(now()) @db.Timestamptz
+  updated_at      DateTime   @updatedAt @db.Timestamptz
+  deleted_at      DateTime?  @db.Timestamptz
+  created_by      String?    @db.Uuid
+  updated_by      String?    @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  exam         Exam         @relation(fields: [exam_id], references: [id])
+  student      Student      @relation(fields: [student_id], references: [id])
+  subject      Subject      @relation(fields: [subject_id], references: [id])
+  enterer      User?        @relation("MarkEnteredBy", fields: [entered_by], references: [id])
+
+  @@unique([exam_id, student_id, subject_id])
+  @@index([organization_id, branch_id])
+  @@index([student_id])
+  @@index([subject_id])
+  @@index([grade])
+  @@index([entered_at])
+  @@index([deleted_at])
+  @@map("marks")
+}
+
+/// Aggregated GPA + position per student × exam.
+model Result {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  exam_id         String    @db.Uuid
+  student_id      String    @db.Uuid
+  total_marks     Decimal   @db.Decimal(14, 2)
+  gpa             Decimal   @db.Decimal(3, 2)
+  grade           String
+  position        Int?
+  division        String? // first | second | third
+  is_passed       Boolean
+  generated_by    String?   @db.Uuid
+  generated_at    DateTime  @default(now()) @db.Timestamptz
+  remark          String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  exam         Exam         @relation(fields: [exam_id], references: [id])
+  student      Student      @relation(fields: [student_id], references: [id])
+  generator    User?        @relation("ResultGeneratedBy", fields: [generated_by], references: [id])
+
+  @@unique([exam_id, student_id])
+  @@index([organization_id, branch_id])
+  @@index([student_id])
+  @@index([position])
+  @@index([generated_at])
+  @@index([deleted_at])
+  @@map("results")
+}
+
+/// Promotion history (Risk R4 — full audit of class changes).
+model StudentHistory {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  student_id      String    @db.Uuid
+  academic_year   Int
+  from_class_id   String?   @db.Uuid // NULL for initial admission
+  from_section_id String?   @db.Uuid
+  to_class_id     String    @db.Uuid
+  to_section_id   String?   @db.Uuid
+  action          String // admitted | promoted | demoted | transferred | graduated | withdrawn | re-enrolled
+  result_grade    String?
+  result_gpa      Decimal?  @db.Decimal(3, 2)
+  remark          String?
+  action_by       String?   @db.Uuid
+  effective_date  DateTime  @db.Date
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  student      Student      @relation(fields: [student_id], references: [id])
+  from_class   Class?       @relation("ClassFromHistory", fields: [from_class_id], references: [id])
+  to_class     Class        @relation("ClassToHistory", fields: [to_class_id], references: [id])
+  from_section Section?     @relation("SectionFromHistory", fields: [from_section_id], references: [id])
+  to_section   Section?     @relation("SectionToHistory", fields: [to_section_id], references: [id])
+  actioner     User?        @relation("StudentHistoryActionBy", fields: [action_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([student_id])
+  @@index([action])
+  @@index([effective_date])
+  @@index([deleted_at])
+  @@map("student_history")
+}
+
+// ============================================================
+// FINANCE LAYER (9 models)
+// ============================================================
+
+/// Chart of accounts. `fund` column isolates Zakat (C6/D18). Self-referencing
+/// tree via parent_account_id.
+model Account {
+  id                String      @id @default(uuid()) @db.Uuid
+  organization_id   String      @db.Uuid
+  branch_id         String?     @db.Uuid
+  code              String
+  name              String
+  name_bn           String?
+  type              AccountType
+  fund              FundType    @default(general)
+  balance           Decimal     @default(0) @db.Decimal(14, 2)
+  currency          String      @default("BDT") @db.VarChar(3)
+  parent_account_id String?     @db.Uuid
+  is_active         Boolean     @default(true)
+  is_bank           Boolean     @default(false)
+  bank_name         String?
+  bank_account_no   String?
+  is_cash           Boolean     @default(false)
+  description       String?
+  created_at        DateTime    @default(now()) @db.Timestamptz
+  updated_at        DateTime    @updatedAt @db.Timestamptz
+  deleted_at        DateTime?   @db.Timestamptz
+  created_by        String?     @db.Uuid
+  updated_by        String?     @db.Uuid
+
+  organization       Organization       @relation(fields: [organization_id], references: [id])
+  branch             Branch?            @relation(fields: [branch_id], references: [id])
+  parent_account     Account?           @relation("AccountParent", fields: [parent_account_id], references: [id])
+  child_accounts     Account[]          @relation("AccountParent")
+  fee_payments       FeePayment[]
+  ledger_debits      LedgerEntry[]      @relation("LedgerDebit")
+  ledger_credits     LedgerEntry[]      @relation("LedgerCredit")
+  transfers_from     CashBankTransfer[] @relation("TransferFromAccount")
+  transfers_to       CashBankTransfer[] @relation("TransferToAccount")
+  zakat_transactions ZakatTransaction[]
+  donations          Donation[]
+
+  @@unique([organization_id, code])
+  @@index([organization_id, branch_id])
+  @@index([fund])
+  @@index([type])
+  @@index([parent_account_id])
+  @@index([is_active])
+  @@index([deleted_at])
+  @@map("accounts")
+}
+
+/// Yearly fee plan per student.
+model FeePlan {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organization_id    String    @db.Uuid
+  branch_id          String?   @db.Uuid
+  student_id         String    @db.Uuid
+  academic_year      Int
+  total_amount       Decimal   @db.Decimal(14, 2)
+  scholarship_amount Decimal   @default(0) @db.Decimal(14, 2)
+  net_payable        Decimal   @db.Decimal(14, 2)
+  installment_count  Int       @default(3)
+  status             String    @default("draft") // draft | active | closed
+  notes              String?
+  created_at         DateTime  @default(now()) @db.Timestamptz
+  updated_at         DateTime  @updatedAt @db.Timestamptz
+  deleted_at         DateTime? @db.Timestamptz
+  created_by         String?   @db.Uuid
+  updated_by         String?   @db.Uuid
+
+  organization     Organization     @relation(fields: [organization_id], references: [id])
+  branch           Branch?          @relation(fields: [branch_id], references: [id])
+  student          Student          @relation(fields: [student_id], references: [id])
+  fee_installments FeeInstallment[]
+
+  @@unique([student_id, academic_year])
+  @@index([organization_id, branch_id])
+  @@index([student_id])
+  @@index([status])
+  @@index([academic_year])
+  @@index([deleted_at])
+  @@map("fee_plans")
+}
+
+/// Installment schedule under a fee plan.
+model FeeInstallment {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  fee_plan_id     String    @db.Uuid
+  student_id      String    @db.Uuid
+  label           String
+  amount          Decimal   @db.Decimal(14, 2)
+  due_date        DateTime  @db.Date
+  is_paid         Boolean   @default(false)
+  paid_date       DateTime? @db.Date
+  receipt_no      String?
+  penalty         Decimal   @default(0) @db.Decimal(14, 2)
+  discount        Decimal   @default(0) @db.Decimal(14, 2)
+  amount_paid     Decimal   @default(0) @db.Decimal(14, 2)
+  status          String    @default("unpaid") // unpaid | partial | paid | overdue
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  fee_plan     FeePlan      @relation(fields: [fee_plan_id], references: [id])
+  student      Student      @relation(fields: [student_id], references: [id])
+  fee_payments FeePayment[]
+
+  @@index([organization_id, branch_id])
+  @@index([fee_plan_id])
+  @@index([student_id])
+  @@index([due_date])
+  @@index([status])
+  @@index([is_paid])
+  @@index([deleted_at])
+  @@map("fee_installments")
+}
+
+/// Receipt for a collected installment.
+model FeePayment {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  student_id      String    @db.Uuid
+  installment_id  String?   @db.Uuid // NULL for ad-hoc payment
+  account_id      String    @db.Uuid
+  amount          Decimal   @db.Decimal(14, 2)
+  method          FeeMethod @default(cash)
+  receipt_no      String
+  transaction_ref String?
+  collected_by    String    @db.Uuid
+  collected_at    DateTime  @default(now()) @db.Timestamptz
+  idempotency_key String?   @unique
+  reverse_of      String?   @unique @db.Uuid
+  is_reversed     Boolean   @default(false)
+  notes           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization    @relation(fields: [organization_id], references: [id])
+  branch       Branch?         @relation(fields: [branch_id], references: [id])
+  student      Student         @relation(fields: [student_id], references: [id])
+  installment  FeeInstallment? @relation(fields: [installment_id], references: [id])
+  account      Account         @relation(fields: [account_id], references: [id])
+  collector    User            @relation("FeePaymentCollectedBy", fields: [collected_by], references: [id])
+  reversal_of  FeePayment?     @relation("FeePaymentReversal", fields: [reverse_of], references: [id])
+  reversed_by  FeePayment?     @relation("FeePaymentReversal")
+
+  @@unique([organization_id, receipt_no])
+  @@index([organization_id, branch_id])
+  @@index([student_id, collected_at])
+  @@index([installment_id])
+  @@index([account_id])
+  @@index([method])
+  @@index([collected_at])
+  @@index([is_reversed])
+  @@index([deleted_at])
+  @@map("fee_payments")
+}
+
+/// Scholarship / discount granted to a student.
+model Scholarship {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  student_id      String    @db.Uuid
+  name            String
+  type            String    @default("partial") // full | partial
+  percentage      Decimal   @default(0) @db.Decimal(5, 2)
+  amount_per_year Decimal   @default(0) @db.Decimal(14, 2)
+  fund_source     String    @default("general") // general | zakat | donation
+  academic_year   Int
+  status          String    @default("pending") // pending | approved | active | closed | revoked
+  approved_by     String?   @db.Uuid
+  approved_at     DateTime? @db.Timestamptz
+  note            String?
+  expires_at      DateTime? @db.Date
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  student      Student      @relation(fields: [student_id], references: [id])
+  approver     User?        @relation("ScholarshipApprovedBy", fields: [approved_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([student_id])
+  @@index([status])
+  @@index([fund_source])
+  @@index([academic_year])
+  @@index([deleted_at])
+  @@map("scholarships")
+}
+
+/// Balanced double-entry row (debit = credit — Golden Flow §3.6).
+/// Fund isolation enforced via trigger: when fund = 'zakat', both
+/// debit_account_id and credit_account_id must point to zakat accounts.
+model LedgerEntry {
+  id                String       @id @default(uuid()) @db.Uuid
+  organization_id   String       @db.Uuid
+  branch_id         String?      @db.Uuid
+  voucher_no        String
+  date              DateTime     @db.Date
+  narration         String
+  debit_account_id  String       @db.Uuid
+  credit_account_id String       @db.Uuid
+  amount            Decimal      @db.Decimal(14, 2)
+  fund              FundType     @default(general)
+  status            LedgerStatus @default(pending)
+  posted_by         String?      @db.Uuid
+  posted_at         DateTime?    @db.Timestamptz
+  approved_by       String?      @db.Uuid
+  source_type       String? // fee_payment | donation | salary | purchase | zakat_transaction | cash_bank_transfer | manual
+  source_id         String?      @db.Uuid
+  voucher_group_id  String?      @db.Uuid
+  is_reversed       Boolean      @default(false)
+  reverse_of        String?      @unique @db.Uuid
+  created_at        DateTime     @default(now()) @db.Timestamptz
+  updated_at        DateTime     @updatedAt @db.Timestamptz
+  deleted_at        DateTime?    @db.Timestamptz
+  created_by        String?      @db.Uuid
+  updated_by        String?      @db.Uuid
+
+  organization       Organization      @relation(fields: [organization_id], references: [id])
+  branch             Branch?           @relation(fields: [branch_id], references: [id])
+  debit_account      Account           @relation("LedgerDebit", fields: [debit_account_id], references: [id])
+  credit_account     Account           @relation("LedgerCredit", fields: [credit_account_id], references: [id])
+  poster             User?             @relation("LedgerPostedBy", fields: [posted_by], references: [id])
+  approver           User?             @relation("LedgerApprovedBy", fields: [approved_by], references: [id])
+  reversal_of        LedgerEntry?      @relation("LedgerReversal", fields: [reverse_of], references: [id])
+  reversed_by        LedgerEntry?      @relation("LedgerReversal")
+  cash_bank_transfer CashBankTransfer?
+
+  @@unique([organization_id, voucher_no])
+  @@index([organization_id, branch_id])
+  @@index([date])
+  @@index([debit_account_id, credit_account_id])
+  @@index([fund])
+  @@index([status])
+  @@index([source_type, source_id])
+  @@index([posted_by])
+  @@index([deleted_at])
+  @@map("ledger_entries")
+}
+
+/// Inter-account transfer (cash ↔ bank ↔ mobile).
+model CashBankTransfer {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  voucher_no      String
+  from_account_id String    @db.Uuid
+  to_account_id   String    @db.Uuid
+  amount          Decimal   @db.Decimal(14, 2)
+  fund            FundType  @default(general)
+  transfer_date   DateTime  @db.Date
+  narration       String?
+  initiated_by    String    @db.Uuid
+  status          String    @default("pending") // pending | completed | reversed
+  completed_at    DateTime? @db.Timestamptz
+  ledger_entry_id String?   @unique @db.Uuid
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  from_account Account      @relation("TransferFromAccount", fields: [from_account_id], references: [id])
+  to_account   Account      @relation("TransferToAccount", fields: [to_account_id], references: [id])
+  initiator    User         @relation("TransferInitiatedBy", fields: [initiated_by], references: [id])
+  ledger_entry LedgerEntry? @relation(fields: [ledger_entry_id], references: [id])
+
+  @@unique([organization_id, voucher_no])
+  @@index([organization_id, branch_id])
+  @@index([from_account_id])
+  @@index([to_account_id])
+  @@index([fund])
+  @@index([transfer_date])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("cash_bank_transfers")
+}
+
+/// Zakat receive / distribute (fund = 'zakat' enforced — account must have
+/// fund='zakat').
+model ZakatTransaction {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  account_id       String    @db.Uuid // must point to a fund='zakat' account
+  direction        String // receive | distribute
+  student_id       String?   @db.Uuid // recipient — NULL on receive
+  recipient_name   String?
+  amount           Decimal   @db.Decimal(14, 2)
+  transaction_date DateTime  @db.Date
+  narration        String?
+  purpose          String? // education | food | medical | shelter | other
+  handled_by       String    @db.Uuid
+  voucher_no       String
+  receipt_no       String?
+  donor_name       String?
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  account      Account      @relation(fields: [account_id], references: [id])
+  student      Student?     @relation(fields: [student_id], references: [id])
+  handler      User         @relation("ZakatHandledBy", fields: [handled_by], references: [id])
+
+  @@unique([organization_id, voucher_no])
+  @@index([organization_id, branch_id])
+  @@index([account_id])
+  @@index([student_id])
+  @@index([direction])
+  @@index([transaction_date])
+  @@index([deleted_at])
+  @@map("zakat_transactions")
+}
+
+/// Public donation (general fund only — public form on `/donate`).
+/// honeypot_filled is the anti-bot field (Risk R10).
+model Donation {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  account_id      String    @db.Uuid // must point to a fund='general' account
+  donor_name      String? // NULL if anonymous
+  donor_email     String?
+  donor_phone     String?
+  amount          Decimal   @db.Decimal(14, 2)
+  donation_type   String    @default("general") // general | zakat | sadaqah
+  fund            FundType  @default(general)
+  donation_date   DateTime  @db.Date
+  transaction_ref String?
+  receipt_no      String?
+  note            String?
+  is_anonymous    Boolean   @default(false)
+  status          String    @default("pending") // pending | confirmed | failed
+  confirmed_by    String?   @db.Uuid
+  confirmed_at    DateTime? @db.Timestamptz
+  payment_method  String? // card | mobile | bank | cash
+  honeypot_filled Boolean   @default(false) // Risk R10 — anti-bot honeypot
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  account      Account      @relation(fields: [account_id], references: [id])
+  confirmer    User?        @relation("DonationConfirmedBy", fields: [confirmed_by], references: [id])
+
+  @@unique([organization_id, receipt_no])
+  @@index([organization_id, branch_id])
+  @@index([account_id])
+  @@index([donation_type])
+  @@index([status])
+  @@index([donation_date])
+  @@index([deleted_at])
+  @@map("donations")
+}
+
+// ============================================================
+// OPERATIONS LAYER (12 models)
+// ============================================================
+
+/// Stock item (book, pen, uniform, …).
+model InventoryItem {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  code             String
+  name             String
+  name_bn          String?
+  category         String // book | uniform | stationery | furniture | food | other
+  unit             String    @default("piece")
+  qty_in_stock     Decimal   @default(0) @db.Decimal(14, 2)
+  reorder_level    Decimal   @default(0) @db.Decimal(14, 2)
+  unit_cost        Decimal   @default(0) @db.Decimal(14, 2)
+  storage_location String?
+  is_active        Boolean   @default(true)
+  image_url        String?
+  description      String?
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization   Organization   @relation(fields: [organization_id], references: [id])
+  branch         Branch?        @relation(fields: [branch_id], references: [id])
+  purchase_items PurchaseItem[]
+
+  @@unique([organization_id, code])
+  @@index([organization_id, branch_id])
+  @@index([category])
+  @@index([name])
+  @@index([is_active])
+  @@index([deleted_at])
+  @@map("inventory_items")
+}
+
+/// Purchase order header.
+model Purchase {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  po_number       String
+  supplier_id     String    @db.Uuid
+  order_date      DateTime  @db.Date
+  received_date   DateTime? @db.Date
+  total_amount    Decimal   @default(0) @db.Decimal(14, 2)
+  status          String    @default("draft") // draft | pending | approved | received | cancelled
+  requested_by    String    @db.Uuid
+  approved_by     String?   @db.Uuid
+  approved_at     DateTime? @db.Timestamptz
+  note            String?
+  payment_status  String    @default("unpaid") // unpaid | partial | paid
+  paid_amount     Decimal   @default(0) @db.Decimal(14, 2)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization   Organization   @relation(fields: [organization_id], references: [id])
+  branch         Branch?        @relation(fields: [branch_id], references: [id])
+  supplier       Supplier       @relation(fields: [supplier_id], references: [id])
+  requester      User           @relation("PurchaseRequestedBy", fields: [requested_by], references: [id])
+  approver       User?          @relation("PurchaseApprovedBy", fields: [approved_by], references: [id])
+  purchase_items PurchaseItem[]
+
+  @@unique([organization_id, po_number])
+  @@index([organization_id, branch_id])
+  @@index([supplier_id])
+  @@index([status])
+  @@index([order_date])
+  @@index([payment_status])
+  @@index([deleted_at])
+  @@map("purchases")
+}
+
+/// Line items under a purchase. Junction-as-entity (carries qty_ordered,
+/// qty_received, unit_cost, line_total).
+model PurchaseItem {
+  id                String    @id @default(uuid()) @db.Uuid
+  organization_id   String    @db.Uuid
+  branch_id         String?   @db.Uuid
+  purchase_id       String    @db.Uuid
+  inventory_item_id String    @db.Uuid
+  qty_ordered       Decimal   @db.Decimal(14, 2)
+  qty_received      Decimal   @default(0) @db.Decimal(14, 2)
+  unit_cost         Decimal   @db.Decimal(14, 2)
+  line_total        Decimal   @db.Decimal(14, 2)
+  note              String?
+  created_at        DateTime  @default(now()) @db.Timestamptz
+  updated_at        DateTime  @updatedAt @db.Timestamptz
+  deleted_at        DateTime? @db.Timestamptz
+  created_by        String?   @db.Uuid
+  updated_by        String?   @db.Uuid
+
+  organization   Organization  @relation(fields: [organization_id], references: [id])
+  branch         Branch?       @relation(fields: [branch_id], references: [id])
+  purchase       Purchase      @relation(fields: [purchase_id], references: [id])
+  inventory_item InventoryItem @relation(fields: [inventory_item_id], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([purchase_id])
+  @@index([inventory_item_id])
+  @@index([deleted_at])
+  @@map("purchase_items")
+}
+
+/// Vendor master.
+model Supplier {
+  id                  String    @id @default(uuid()) @db.Uuid
+  organization_id     String    @db.Uuid
+  branch_id           String?   @db.Uuid
+  code                String
+  name                String
+  name_bn             String?
+  contact_person      String?
+  phone               String?
+  email               String?
+  address             String?
+  tin                 String?
+  outstanding_balance Decimal   @default(0) @db.Decimal(14, 2)
+  total_purchased     Decimal   @default(0) @db.Decimal(14, 2)
+  total_paid          Decimal   @default(0) @db.Decimal(14, 2)
+  is_active           Boolean   @default(true)
+  notes               String?
+  created_at          DateTime  @default(now()) @db.Timestamptz
+  updated_at          DateTime  @updatedAt @db.Timestamptz
+  deleted_at          DateTime? @db.Timestamptz
+  created_by          String?   @db.Uuid
+  updated_by          String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  purchases    Purchase[]
+
+  @@unique([organization_id, code])
+  @@index([organization_id, branch_id])
+  @@index([name])
+  @@index([is_active])
+  @@index([deleted_at])
+  @@map("suppliers")
+}
+
+/// Fixed asset (furniture, equipment, IT, vehicle, building, ...).
+model Asset {
+  id                       String    @id @default(uuid()) @db.Uuid
+  organization_id          String    @db.Uuid
+  branch_id                String?   @db.Uuid
+  asset_code               String
+  name                     String
+  name_bn                  String?
+  category                 String // furniture | equipment | it | vehicle | building | other
+  purchase_date            DateTime  @db.Date
+  purchase_value           Decimal   @default(0) @db.Decimal(14, 2)
+  current_value            Decimal   @default(0) @db.Decimal(14, 2)
+  depreciation_rate        Decimal   @default(0) @db.Decimal(5, 2)
+  depreciation_date        DateTime? @db.Date
+  location                 String?
+  status                   String    @default("in-use") // in-use | stored | transferred | disposed | under-repair
+  transferred_to_branch_id String?   @db.Uuid
+  transferred_at           DateTime? @db.Date
+  disposed_by              String?   @db.Uuid
+  disposed_at              DateTime? @db.Date
+  disposal_reason          String?
+  image_url                String?
+  created_at               DateTime  @default(now()) @db.Timestamptz
+  updated_at               DateTime  @updatedAt @db.Timestamptz
+  deleted_at               DateTime? @db.Timestamptz
+  created_by               String?   @db.Uuid
+  updated_by               String?   @db.Uuid
+
+  organization          Organization @relation(fields: [organization_id], references: [id])
+  branch                Branch?      @relation(fields: [branch_id], references: [id])
+  transferred_to_branch Branch?      @relation("AssetTransferredToBranch", fields: [transferred_to_branch_id], references: [id])
+  disposer              User?        @relation("AssetDisposedBy", fields: [disposed_by], references: [id])
+
+  @@unique([organization_id, asset_code])
+  @@index([organization_id, branch_id])
+  @@index([category])
+  @@index([status])
+  @@index([purchase_date])
+  @@index([deleted_at])
+  @@map("assets")
+}
+
+/// Hostel room.
+model HostelRoom {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  room_number     String
+  building        String?
+  floor           Int       @default(1)
+  capacity        Int       @default(4)
+  gender          Gender?
+  is_active       Boolean   @default(true)
+  notes           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  beds         HostelBed[]
+
+  @@unique([organization_id, branch_id, room_number])
+  @@index([organization_id, branch_id])
+  @@index([gender])
+  @@index([is_active])
+  @@index([deleted_at])
+  @@map("hostel_rooms")
+}
+
+/// Bed allocation (bed × student × date range).
+model HostelBed {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  room_id         String    @db.Uuid
+  bed_number      String
+  student_id      String?   @db.Uuid // NULL = vacant
+  allocated_at    DateTime? @db.Date
+  vacated_at      DateTime? @db.Date
+  status          String    @default("vacant") // vacant | occupied | reserved | maintenance
+  monthly_fee     Decimal   @default(0) @db.Decimal(14, 2)
+  notes           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  room         HostelRoom   @relation(fields: [room_id], references: [id])
+  student      Student?     @relation(fields: [student_id], references: [id])
+
+  @@unique([room_id, bed_number])
+  @@index([organization_id, branch_id])
+  @@index([room_id])
+  @@index([student_id])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("hostel_beds")
+}
+
+/// Daily / weekly meal plan.
+model MealPlan {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  meal_date       DateTime  @db.Date
+  meal_type       String // breakfast | lunch | dinner | snack
+  menu            String
+  menu_bn         String?
+  head_count      Int       @default(0)
+  cost_per_head   Decimal   @default(0) @db.Decimal(14, 2)
+  total_cost      Decimal   @default(0) @db.Decimal(14, 2)
+  prepared_by     String?   @db.Uuid
+  notes           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  preparer     User?        @relation("MealPreparedBy", fields: [prepared_by], references: [id])
+
+  @@unique([organization_id, branch_id, meal_date, meal_type])
+  @@index([organization_id, branch_id])
+  @@index([meal_date])
+  @@index([meal_type])
+  @@index([deleted_at])
+  @@map("meal_plans")
+}
+
+/// Book catalog copy.
+model LibraryBook {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  accession_no     String
+  title            String
+  title_bn         String?
+  title_ar         String?
+  author           String?
+  category         String? // quranic | hadith | fiqh | language | science | other
+  isbn             String?
+  total_copies     Int       @default(1)
+  available_copies Int       @default(1)
+  purchase_price   Decimal   @default(0) @db.Decimal(14, 2)
+  purchase_date    DateTime? @db.Date
+  shelf_location   String?
+  is_active        Boolean   @default(true)
+  description      String?
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization Organization   @relation(fields: [organization_id], references: [id])
+  branch       Branch?        @relation(fields: [branch_id], references: [id])
+  issues       LibraryIssue[]
+
+  @@unique([organization_id, accession_no])
+  @@index([organization_id, branch_id])
+  @@index([title])
+  @@index([category])
+  @@index([is_active])
+  @@index([deleted_at])
+  @@map("library_books")
+}
+
+/// Issue + return tracking.
+model LibraryIssue {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  book_id         String    @db.Uuid
+  student_id      String    @db.Uuid
+  issue_date      DateTime  @db.Date
+  due_date        DateTime  @db.Date
+  returned_date   DateTime? @db.Date
+  fine_amount     Decimal   @default(0) @db.Decimal(14, 2)
+  status          String    @default("issued") // issued | returned | overdue | lost
+  issued_by       String    @db.Uuid
+  returned_to     String?   @db.Uuid
+  notes           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  branch          Branch?      @relation(fields: [branch_id], references: [id])
+  book            LibraryBook  @relation(fields: [book_id], references: [id])
+  student         Student      @relation(fields: [student_id], references: [id])
+  issuer          User         @relation("LibraryIssuedBy", fields: [issued_by], references: [id])
+  return_receiver User?        @relation("LibraryReturnedTo", fields: [returned_to], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([book_id])
+  @@index([student_id])
+  @@index([issue_date])
+  @@index([status])
+  @@index([returned_date])
+  @@index([deleted_at])
+  @@map("library_issues")
+}
+
+/// Transport vehicle.
+model Vehicle {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  registration_no  String
+  type             String // bus | microbus | car | motorcycle | van
+  model            String?
+  capacity         Int       @default(0)
+  purchase_date    DateTime? @db.Date
+  purchase_value   Decimal   @default(0) @db.Decimal(14, 2)
+  current_value    Decimal   @default(0) @db.Decimal(14, 2)
+  current_driver   String?
+  status           String    @default("active") // active | maintenance | retired
+  insurance_expiry DateTime? @db.Date
+  fitness_expiry   DateTime? @db.Date
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  fuel_logs    FuelLog[]
+
+  @@unique([organization_id, registration_no])
+  @@index([organization_id, branch_id])
+  @@index([type])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("vehicles")
+}
+
+/// Vehicle fuel / maintenance log.
+model FuelLog {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  vehicle_id       String    @db.Uuid
+  log_date         DateTime  @db.Date
+  liters           Decimal   @db.Decimal(14, 2)
+  amount           Decimal   @db.Decimal(14, 2)
+  odometer_reading Int?
+  fuel_station     String?
+  payment_method   String    @default("cash") // cash | bank | mobile
+  logged_by        String    @db.Uuid
+  note             String?
+  log_type         String    @default("fuel") // fuel | maintenance | repair
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  vehicle      Vehicle      @relation(fields: [vehicle_id], references: [id])
+  logger       User         @relation("FuelLoggedBy", fields: [logged_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([vehicle_id])
+  @@index([log_date])
+  @@index([log_type])
+  @@index([deleted_at])
+  @@map("fuel_logs")
+}
+
+// ============================================================
+// COMMUNICATION LAYER (4 models)
+// ============================================================
+
+/// Notice / announcement (audience-scoped).
+model Notice {
+  id              String         @id @default(uuid()) @db.Uuid
+  organization_id String         @db.Uuid
+  branch_id       String?        @db.Uuid
+  title           String
+  title_bn        String?
+  body            String
+  body_bn         String?
+  audience        NoticeAudience @default(all)
+  audience_filter String? // e.g. "class-5" or "section-5-A". NULL when audience is `all` or `staff`.
+  recipient_count Int            @default(0)
+  category        String         @default("general") // admission | holiday | event | exam | general
+  sent_by         String         @db.Uuid
+  sent_at         DateTime?      @db.Timestamptz
+  is_pinned       Boolean        @default(false)
+  expires_at      DateTime?      @db.Date
+  status          String         @default("draft") // draft | scheduled | sent
+  attachment_url  String?
+  is_sms_sent     Boolean        @default(false)
+  created_at      DateTime       @default(now()) @db.Timestamptz
+  updated_at      DateTime       @updatedAt @db.Timestamptz
+  deleted_at      DateTime?      @db.Timestamptz
+  created_by      String?        @db.Uuid
+  updated_by      String?        @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  sender       User         @relation("NoticeSentBy", fields: [sent_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([branch_id, audience, sent_at])
+  @@index([category])
+  @@index([status])
+  @@index([sent_at])
+  @@index([is_pinned])
+  @@index([expires_at])
+  @@index([deleted_at])
+  @@map("notices")
+}
+
+/// Uploaded document (PDF, image, Excel, Word, ...).
+model Document {
+  id                String       @id @default(uuid()) @db.Uuid
+  organization_id   String       @db.Uuid
+  branch_id         String?      @db.Uuid
+  name              String
+  original_filename String
+  storage_url       String
+  mime_type         String
+  type              DocumentType @default(other)
+  size_bytes        BigInt       @default(0)
+  sha256            String?
+  uploaded_by       String       @db.Uuid
+  uploaded_at       DateTime     @default(now()) @db.Timestamptz
+  visibility        String       @default("staff") // public | staff | authority
+  tags              Json         @default("[]")
+  description       String?
+  expires_at        DateTime?    @db.Timestamptz
+  download_count    Int          @default(0)
+  created_at        DateTime     @default(now()) @db.Timestamptz
+  updated_at        DateTime     @updatedAt @db.Timestamptz
+  deleted_at        DateTime?    @db.Timestamptz
+  created_by        String?      @db.Uuid
+  updated_by        String?      @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  uploader     User         @relation("DocumentUploadedBy", fields: [uploaded_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([name])
+  @@index([type])
+  @@index([visibility])
+  @@index([uploaded_at])
+  @@index([deleted_at])
+  @@map("documents")
+}
+
+/// Generated report (filtered + async export).
+model Report {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  name            String
+  report_type     String // finance | attendance | students | inventory | academic | audit | custom
+  parameters      Json      @default("{}")
+  format          String    @default("pdf") // pdf | csv | xlsx | json
+  storage_url     String?
+  status          String    @default("queued") // queued | running | completed | failed
+  size_bytes      BigInt?
+  generated_by    String    @db.Uuid
+  started_at      DateTime? @db.Timestamptz
+  completed_at    DateTime? @db.Timestamptz
+  error_message   String?
+  row_count       Int?
+  expires_at      DateTime? @db.Timestamptz
+  is_finance      Boolean   @default(false)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  generator    User         @relation("ReportGeneratedBy", fields: [generated_by], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([name])
+  @@index([report_type])
+  @@index([status])
+  @@index([generated_by])
+  @@index([started_at])
+  @@index([deleted_at])
+  @@map("reports")
+}
+
+/// Approval workflow (no self-approve — D16: requested_by ≠ decided_by).
+model Approval {
+  id               String         @id @default(uuid()) @db.Uuid
+  organization_id  String         @db.Uuid
+  branch_id        String?        @db.Uuid
+  type             ApprovalType
+  title            String
+  description      String?
+  amount           Decimal?       @db.Decimal(14, 2)
+  payload          Json           @default("{}")
+  status           ApprovalStatus @default(pending)
+  requested_by     String         @db.Uuid
+  requested_at     DateTime       @default(now()) @db.Timestamptz
+  decided_by       String?        @db.Uuid
+  decided_at       DateTime?      @db.Timestamptz
+  decision_note    String?
+  rejection_reason String?
+  delegated_to     String?        @db.Uuid
+  expires_at       DateTime?      @db.Timestamptz
+  entity_type      String?
+  entity_id        String?        @db.Uuid
+  created_at       DateTime       @default(now()) @db.Timestamptz
+  updated_at       DateTime       @updatedAt @db.Timestamptz
+  deleted_at       DateTime?      @db.Timestamptz
+  created_by       String?        @db.Uuid
+  updated_by       String?        @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  branch       Branch?      @relation(fields: [branch_id], references: [id])
+  requester    User         @relation("ApprovalRequestedBy", fields: [requested_by], references: [id])
+  decider      User?        @relation("ApprovalDecidedBy", fields: [decided_by], references: [id])
+  delegate     User?        @relation("ApprovalDelegatedTo", fields: [delegated_to], references: [id])
+
+  @@index([organization_id, branch_id])
+  @@index([type])
+  @@index([title])
+  @@index([status])
+  @@index([requested_by])
+  @@index([decided_by])
+  @@index([requested_at])
+  @@index([expires_at])
+  @@index([deleted_at])
+  @@map("approvals")
+}

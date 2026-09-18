@@ -92,7 +92,7 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 |-------|---------|-------|--------|--------|------|-------------|
 | B0 | 0.1 | PostgreSQL Setup + Connection | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-16 | `docker-compose.yml` (PostgreSQL 16 Alpine) + `.env` + `.env.example` + Prisma schema switched to PostgreSQL + `db.ts` client updated + `scripts/setup-db.sh` + `scripts/verify-db.ts` + 7 `db:*` npm scripts |
 | B0 | 0.2 | ERD Document Generation | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-18 | `docs/ERD.md` (1388 lines — 52 tables, 98 relations, 6 Mermaid diagrams, 14 enums, multi-tenant strategy, index strategy) + `docs/DATA_DICTIONARY.md` (1797 lines — per-table field definitions for all 52 tables with 8-column base mixin, relations, constraints) |
-| B0 | 0.3 | Prisma Schema Draft (all 40+ models) | ⏳ Pending | — | — | — |
+| B0 | 0.3 | Prisma Schema Draft (all 40+ models) | ✅ Done | [`<pending>`](https://github.com/sajidchowdhury/MadrashaOS) | 2026-09-18 | `prisma/schema.prisma` (2,271 lines — 52 models, 15 enums, 260 indexes, 40 unique constraints, 238 relations, all `@@map` to snake_case) + `prisma validate` ✅ + `prisma generate` ✅ |
 | B1 | 1.1 | Foundation Models Migration | ⏳ Pending | — | — | — |
 | B1 | 1.2 | People Models Migration | ⏳ Pending | — | — | — |
 | B1 | 1.3 | Academic + Finance Models Migration | ⏳ Pending | — | — | — |
@@ -131,7 +131,9 @@ src/lib/query/client.ts          →  UNCHANGED (hooks call client.ts, which swa
 | B9 | 9.2 | Frontend Client Swap (mockApi → real) | ⏳ Pending | — | — | — |
 | B9 | 9.3 | End-to-End Verification (8 flows) | ⏳ Pending | — | — | — |
 
-**Summary:** 2 / 36 sessions done · 0 in progress · 34 pending · 0 blocked
+**Summary:** 3 / 36 sessions done · 0 in progress · 33 pending · 0 blocked
+
+**Phase B0 (Database Foundation): ✅ Complete** — 3/3 sessions done. PostgreSQL 16 configured via Docker + ERD with 52 tables/98 relations/15 enums + complete Prisma schema (2,271 lines, validated, client generated). Ready for Phase B1 (migrations + seed data).
 
 ---
 
