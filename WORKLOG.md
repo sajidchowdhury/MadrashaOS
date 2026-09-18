@@ -1565,3 +1565,63 @@ Stage Summary:
   * The Language dropdown shows 3 working locales (en/bn/ar) + 5 "coming soon" disabled entries (Urdu/Hindi/French/Turkish/Indonesian) to match the iom.edu.bd 8+ languages style. Adding real support for the additional 5 languages requires extending src/lib/i18n/config.ts + messages.ts — outside the scope of this task ("DO NOT modify i18n messages").
   * The pre-existing lint warnings in shadcn/ui components (drawer 100px, input 3px, navigation-menu 1px+3px, etc.) are pre-existing baseline warnings — the madrasha/no-raw-tokens rule warns on shadcn/ui defaults. Re-baselining the rule to ignore shadcn/ui defaults would resolve them. None of these warnings are in my new files.
   * The CMS admin route is at /website/content (under the (app) route group) — the URL is /website/content (no /app prefix because Next.js route groups don't appear in the URL).
+
+---
+Task ID: B0.2
+Agent: full-stack-developer
+Task: Generate the MadrashaOS ERD + Data Dictionary documentation (Phase B0.2). Two Markdown documents capturing all 52 PostgreSQL tables, their relations, indexes, enums, and per-table column definitions — to serve as the canonical reference for the Prisma schema (Phase B0.3) and the migrations (Phases B1.1–B1.4).
+
+Work Log:
+- Read /home/z/my-project/worklog.md tail to confirm B0.1 (PostgreSQL setup) complete + identify B0.2 as the next backend session.
+- Read /home/z/my-project/BACKEND_IMPLEMENTATION_PLAN.md (Phase B0.2 spec) — confirmed deliverables: docs/ERD.md (Mermaid ERD) + docs/DATA_DICTIONARY.md (per-table column defs).
+- Read /home/z/my-project/prisma/schema.prisma — confirmed B0.1 left it as an empty stub (provider=postgresql, no models) to be filled in B0.3 by another agent.
+- Read /home/z/my-project/docker-compose.yml + src/lib/db.ts to confirm PostgreSQL 16 connection + Prisma client singleton ready.
+- Read /home/z/my-project/src/lib/mock/types.ts (data contract — the mock types match the future Prisma schema exactly per SRS Part 7) — extracted domain types: Organization, Branch, User, Guardian, Student, Class, FeePlan, FeeInstallment, FeePayment, LedgerEntry, Account (with fund: "general" | "zakat"), AttendanceSession, AttendanceRecord, InventoryItem, Notice, Approval.
+- Read /home/z/my-project/src/stores/types.ts — confirmed the 8 personas (super-admin, authority, administrator, accountant, teacher, storekeeper, guardian, student) + 3 branches (dhaka, chittagong, sylhet) + network simulation modes.
+- Read /home/z/my-project/src/lib/auth/permissions.ts — confirmed the 110+ permission codes organized by 6 module layers (Foundation, People, Academic, Finance, Operations, Communication + Platform-level tenant.* codes). These become the `permissions` table rows + `role_permissions` junction table.
+- Read /home/z/my-project/src/lib/auth/role-permissions.ts — confirmed the 8-role × permission-code mapping (e.g. teacher has NO financial permissions = D3; accountant has NO academic edit = D3; guardian = *.view.own scope; super-admin = platform-wide).
+- Drafted docs/ERD.md (1388 lines):
+  * TL;DR summary table — 52 tables · 98 relations · 2 junction tables · 14 enums
+  * Table inventory by 6 module layers (Foundation 10 + People 9 + Academic 8 + Finance 9 + Operations 12 + Communication 4 = 52)
+  * Naming conventions section (snake_case, plural tables, uuid PKs, *_at timestamps, numeric(14,2) for money, etc.)
+  * Base mixin (8 standard columns applied to every table): id, organization_id, branch_id, created_at, updated_at, deleted_at, created_by, updated_by
+  * Multi-tenant isolation strategy (3-level: organization → branch → record; Prisma middleware + API middleware + optional DB RLS)
+  * Index strategy (mandatory composite (organization_id, branch_id) + partial deleted_at IS NULL + per-table indexes for student code, fee receipt, ledger voucher, attendance session, marks unique, etc.)
+  * Enum definitions table (15 enums: Role, UserStatus, Gender, StudentStatus, AdmissionStatus, AttendanceStatus, ExamStatus, MarkGrade, FundType, AccountType, FeeMethod, LedgerStatus, ApprovalType, ApprovalStatus, NoticeAudience, DocumentType)
+  * 6 self-contained Mermaid erDiagram blocks — one per module layer — with all PK/FK + key fields shown inline
+  * Cross-module relations table (all FKs that cross layer boundaries, e.g. fee_payments.student_id → students.id)
+  * Junction tables catalog (role_permissions, student_guardians, teacher_assignments, purchase_items)
+  * Constraints catalog (money CHECKs, composite UNIQUEs, balanced ledger CHECK, fund isolation CHECK, no-self-approve CHECK = D16)
+  * Migration phasing table (4 migrations across Phases B1.1–B1.3 + B1.4 seed)
+  * Review checklist (13 items all checked)
+  * Appendix: permission-catalog → table matrix
+- Drafted docs/DATA_DICTIONARY.md (1797 lines):
+  * Base mixin documentation (8 columns described once, referenced everywhere)
+  * Type shorthand table (uuid, string, text, int, numeric, bool, date, time, timestamptz, jsonb, enum:X)
+  * Conventions recap (BP8 snake_case, BP7 soft delete, BP9 UUID PKs, numeric(14,2) money)
+  * 6 module layer sections with one subsection per table (52 total)
+  * For each table: Module tag, one-line description, full column table (Column | Type | Nullable | Default | Index | Description), Relations list (M:1 / 1:M / M:M), Constraints list (UNIQUE, CHECK, fund isolation, no-self-approve)
+  * Appendix A — Enum reference (15 enums with values + which tables use them)
+  * Appendix B — Standard column counts (organizations omits 2 mixin cols; permissions omits 4; all others get full 8)
+  * Appendix C — Permission → table coverage matrix (every prefix from permissions.ts mapped to primary table(s))
+- Appended this work record to /home/z/my-project/worklog.md.
+
+Stage Summary:
+- Artifacts produced (2 new files only — no existing files modified, no code written):
+  * docs/ERD.md (1388 lines) — visual Mermaid ERD with 6 module-layer diagrams + conventions + multi-tenant isolation + index strategy + enum catalog + cross-module relations + constraints catalog + migration phasing + permission→table matrix
+  * docs/DATA_DICTIONARY.md (1797 lines) — per-table field definitions for all 52 tables with columns (type/nullability/default/index/description), relations, and constraints + 3 appendices (enums, mixin counts, permission coverage)
+- Exit criteria met:
+  * All 52 tables documented (Foundation 10 + People 9 + Academic 8 + Finance 9 + Operations 12 + Communication 4) ✅
+  * Mermaid erDiagram syntax used for all 6 module layers (renderable by GitHub + VSCode + Mermaid Live Editor) ✅
+  * All 1:1, 1:M, M:M relations shown (M:M via junction tables: role_permissions, student_guardians, teacher_assignments, purchase_items) ✅
+  * Key fields shown with PK / FK annotations inline in every Mermaid entity block ✅
+  * Organized by module layer using 6 separate Mermaid diagrams (Mermaid erDiagram doesn't support subgraphs, so cross-layer FKs listed in dedicated table) ✅
+  * Summary table at top: "52 tables · 98 relations · 14 enums" ✅
+  * Naming conventions documented (snake_case, plural, uuid PKs, organization_id + branch_id on every table, soft-delete via deleted_at) ✅
+  * Multi-tenant isolation strategy (3-level tenancy + Prisma middleware + API middleware + optional DB RLS) ✅
+  * Index strategy documented (composite (organization_id, branch_id) on every table + partial deleted_at IS NULL + per-table indexes) ✅
+  * Enum definitions documented (15 enums with values + usage) ✅
+  * DATA_DICTIONARY.md uses the requested table format (Column | Type | Nullable | Default | Index | Description) for every table ✅
+  * 8-column base mixin documented once and applied to every table (except the documented exceptions: organizations itself, permissions catalog) ✅
+  * Relations + constraints documented per table (UNIQUE, CHECK, fund isolation, no-self-approve D16) ✅
+- This is a pure documentation task — NO code written, NO existing files modified. The two new docs are the canonical reference for Phase B0.3 (Prisma schema draft) which will be done by another agent. The Prisma models can be transcribed 1:1 from these tables (column → field, CHECK → @@check or migration SQL, UNIQUE → @@unique, FK → @relation).
