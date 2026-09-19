@@ -41,9 +41,8 @@ export function SideNav({
 
   function handleItemClick(mod: ModuleDef) {
     onNavigate?.();
-    // Map known module IDs to dashboard routes for now (full routes in C3)
+    // Dashboard redirects to the role-appropriate dashboard route.
     if (mod.id === "dashboard") {
-      // Redirect to role-appropriate dashboard
       const role = useSessionStore.getState().role;
       const route =
         role === "authority" || role === "super-admin" || role === "administrator" ? "/dashboard/authority"
@@ -54,8 +53,10 @@ export function SideNav({
         : "/dashboard/authority";
       router.push(route);
     } else {
-      // Other routes wired in C3 — for now, stay on current page
-      // (nav items are visual placeholders for non-dashboard modules)
+      // All other modules navigate to their configured route (defined in
+      // moduleTree.ts — every module now has a real page.tsx built in
+      // Phases 2/3).
+      router.push(mod.route);
     }
   }
 
