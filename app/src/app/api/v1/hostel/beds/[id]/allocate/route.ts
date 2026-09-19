@@ -93,7 +93,7 @@ export const POST = withPermission("hostel.allocate", async (req: Request, ctx: 
       action: "allocate",
       old_values: { status: "vacant", student_id: null },
       new_values: { status: "occupied", student_id: parsed.data.student_id, student_name: student.name, room: bed.room.room_number },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

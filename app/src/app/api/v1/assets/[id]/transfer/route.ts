@@ -84,7 +84,7 @@ export const POST = withPermission("assets.transfer", async (req: Request, ctx: 
       action: "transfer",
       old_values: { status: asset.status, branch_id: asset.branch_id },
       new_values: { status: "transferred", transferred_to_branch_id: parsed.data.to_branch_id, transferred_to: targetBranch.name },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

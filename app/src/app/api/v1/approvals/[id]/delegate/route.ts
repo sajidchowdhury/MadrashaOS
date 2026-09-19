@@ -90,7 +90,7 @@ export const POST = withPermission("approval.delegate", async (req: Request, ctx
         note: parsed.data.note,
         title: approval.title,
       },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

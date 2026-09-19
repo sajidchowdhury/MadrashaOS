@@ -196,7 +196,7 @@ export const POST = withPermission("scholarship.view", async (req) => {
         status: initialStatus,
         routed_to_approval: exceedsThreshold,
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

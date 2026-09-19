@@ -89,7 +89,7 @@ export const POST = withPermission("library.issue", async (req) => {
       action: "issue",
       old_values: { available_copies: book.available_copies },
       new_values: { book: book.title, student: student.name, available_copies: book.available_copies - 1 },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

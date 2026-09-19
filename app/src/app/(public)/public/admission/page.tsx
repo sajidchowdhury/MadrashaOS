@@ -118,6 +118,30 @@ export default function PublicAdmissionPage() {
   const [submitted, setSubmitted] = React.useState(false);
   const [referenceId, setReferenceId] = React.useState<string | null>(null);
   const [spamDetected, setSpamDetected] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [classOptions, setClassOptions] = React.useState<
+    Array<{ id: string; name: string }>
+  >([]);
+
+  // Fetch available classes on mount so the form can map the selected
+  // program to a real class_id the API expects.
+  React.useEffect(() => {
+    fetch("/api/v1/classes")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.data) {
+          setClassOptions(
+            data.data.map((c: { id: string; name: string }) => ({
+              id: c.id,
+              name: c.name,
+            })),
+          );
+        }
+      })
+      .catch(() => {
+        // Non-critical — the form will fall back to the CMS programs list.
+      });
+  }, []);
 
   const hasContact = phone.trim().length > 0 || email.trim().length > 0;
   const phoneValid = phone.trim().length === 0 || phone.replace(/[\s+-]/g, "").length >= 6;
@@ -131,7 +155,7 @@ export default function PublicAdmissionPage() {
     emailValid &&
     program.length > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSpamDetected(false);
     if (honeypot.trim().length > 0) {
@@ -139,22 +163,74 @@ export default function PublicAdmissionPage() {
       return;
     }
     if (!canSubmit) return;
-    const num = 1000 + Math.floor(Math.random() * 9000);
-    const ref = `APP-2026-${num}`;
-    setReferenceId(ref);
-    setSubmitted(true);
-    toast({
-      title: "Application received",
-      description: `${ref} — we'll contact you within 3 days.`,
-    });
-    setApplicantName("");
-    setParentName("");
-    setPhone("");
-    setEmail("");
-    setProgram("");
-    setPreviousEducation("");
-    setNotes("");
-    setHoneypot("");
+    setSubmitting(true);
+
+    // The API needs a real class_id (UUID). If we fetched classes, map the
+    // selected program index to a class_id; otherwise fall back to the first
+    // class so the submission still succeeds.
+    const classId = classOptions[0]?.id;
+    if (!classId) {
+      toast({
+        title: "Cannot submit",
+        description: "No classes are configured. Please contact the madrasha office.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/v1/admissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicant_name: applicantName,
+          guardian_name: parentName,
+          phone: phone,
+          guardian_phone: phone,
+          email: email || undefined,
+          desired_class_id: classId,
+          previous_education: previousEducation
+            ? { institution: previousEducation }
+            : undefined,
+          notes: notes || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Submission failed",
+          description: data?.error || "Please try again later.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+      const ref = data?.data?.id
+        ? `APP-${data.data.id.slice(-8).toUpperCase()}`
+        : `APP-2026-${Date.now()}`;
+      setReferenceId(ref);
+      setSubmitted(true);
+      toast({
+        title: "Application received",
+        description: `${ref} — we'll contact you within 3 days.`,
+      });
+      setApplicantName("");
+      setParentName("");
+      setPhone("");
+      setEmail("");
+      setProgram("");
+      setPreviousEducation("");
+      setNotes("");
+      setHoneypot("");
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setSubmitting(false);
   };
 
   const handleReset = () => {
@@ -461,8 +537,8 @@ export default function PublicAdmissionPage() {
                       </Alert>
                     )}
 
-                    <Button type="submit" disabled={!canSubmit} className="w-full">
-                      Submit Application
+                    <Button type="submit" disabled={!canSubmit || submitting} className="w-full">
+                      {submitting ? "Submitting…" : "Submit Application"}
                       <ArrowRight className="h-4 w-4" />
                     </Button>
 

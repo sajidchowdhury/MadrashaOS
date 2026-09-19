@@ -143,6 +143,46 @@ export function useGuardians(
   });
 }
 
+export function useEmployees(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["employees", ...sessionKey()],
+    queryFn: () => api.getEmployees(),
+    ...options,
+  });
+}
+
+export function useScholarships(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["scholarships", ...sessionKey()],
+    queryFn: () => api.getScholarships(),
+    ...options,
+  });
+}
+
+export function useResults(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["results", ...sessionKey()],
+    queryFn: () => api.getResults(),
+    ...options,
+  });
+}
+
+export function useCashBankTransfers(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["cashbank-transfers", ...sessionKey()],
+    queryFn: () => api.getCashBankTransfers(),
+    ...options,
+  });
+}
+
 export function useFeePlans(
   options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {

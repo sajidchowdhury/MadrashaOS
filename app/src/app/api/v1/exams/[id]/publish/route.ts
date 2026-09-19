@@ -64,7 +64,7 @@ export const POST = withPermission("exams.publish", async (_req: Request, ctx: R
       action: "publish",
       old_values: { status: exam.status },
       new_values: { status: "published", published_by: tenantCtx.user_id },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 
@@ -111,7 +111,7 @@ export const DELETE = withPermission("exams.publish", async (_req: Request, ctx:
       action: "unpublish",
       old_values: { status: "published" },
       new_values: { status: "active" },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

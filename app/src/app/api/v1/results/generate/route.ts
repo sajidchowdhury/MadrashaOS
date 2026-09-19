@@ -199,7 +199,7 @@ export const POST = withPermission("results.generate", async (req) => {
         results_count: created.count,
         ranking_enabled,
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

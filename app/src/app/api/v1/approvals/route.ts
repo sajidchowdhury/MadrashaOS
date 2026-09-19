@@ -130,7 +130,7 @@ export const POST = withPermission("approval.view", async (req) => {
       action: "request",
       old_values: null,
       new_values: { type: data.type, title: data.title, amount: data.amount, status: "pending" },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

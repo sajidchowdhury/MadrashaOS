@@ -227,7 +227,7 @@ export const POST = withPermission("zakat.distribute", async (req) => {
         fund: "zakat",
         ledger_voucher: ledgerVoucherNo,
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

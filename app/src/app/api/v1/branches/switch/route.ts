@@ -75,7 +75,7 @@ export const POST = withPermission("organization.branch.switch", async (req) => 
       action: "branch_switch",
       old_values: { branch_id: ctx.branch_id },
       new_values: { branch_id: branch_id },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
       ip_address: req.headers.get("x-forwarded-for") || null,
       user_agent: req.headers.get("user-agent") || null,
     } as never,

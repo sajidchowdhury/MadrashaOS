@@ -76,7 +76,7 @@ export const POST = withPermission("assets.dispose", async (req: Request, ctx: R
         disposed_by: tenantCtx.user_id,
         record_retained: true, // SRS §2.5.4: record kept
       },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

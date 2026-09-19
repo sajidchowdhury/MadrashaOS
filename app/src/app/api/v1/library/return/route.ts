@@ -75,7 +75,7 @@ export const POST = withPermission("library.return", async (req) => {
       action: "return",
       old_values: { status: issue.status },
       new_values: { status: "returned", book: issue.book.title, student: issue.student.name, fine: parsed.data.fine_amount ?? 0 },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

@@ -186,7 +186,7 @@ export const POST = withPermission("documents.upload", async (req: Request) => {
         sha256: sha256.substring(0, 16) + "...",
         visibility: visibility || "staff",
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

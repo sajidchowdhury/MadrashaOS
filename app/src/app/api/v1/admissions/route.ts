@@ -152,11 +152,45 @@ export const GET = withPermission("admission.view", async (req) => {
   return paginatedResponse(data, total, page, pageSize);
 });
 
-/** POST /api/v1/admissions — create new application. */
-export const POST = withPermission("admission.view", async (req) => {
+/**
+ * POST /api/v1/admissions — create admission application.
+ *
+ * Supports BOTH authenticated staff (with admission.view permission) AND
+ * public visitors (no session — the middleware bypasses auth for this POST).
+ * Public submissions are how prospective parents apply from the website.
+ *
+ * For public requests (no session): uses the first organization's first
+ * branch, sets form_source="public", requested_by=null.
+ */
+export async function POST(req: Request) {
   const ctx = await getTenantContext();
-  if (!ctx) {
-    return errorResponse("Unauthorized", 401);
+  const isPublic = !ctx;
+
+  // For public admissions, resolve the org + branch from the first
+  // available organization (single-tenant for now — matches donations logic).
+  let orgId: string;
+  let branchId: string | null = null;
+  let userId: string | null = null;
+
+  if (ctx) {
+    orgId = ctx.organization_id;
+    branchId = ctx.branch_id;
+    userId = ctx.user_id;
+  } else {
+    const org = await db.organization.findFirst({
+      where: { deleted_at: null },
+      select: {
+        id: true,
+        branches: {
+          where: { deleted_at: null, is_active: true },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+    if (!org) return errorResponse("No organization configured", 500);
+    orgId = org.id;
+    branchId = org.branches[0]?.id ?? null;
   }
 
   let body: unknown;
@@ -173,11 +207,11 @@ export const POST = withPermission("admission.view", async (req) => {
 
   const data = parsed.data;
 
-  // Verify the desired_class_id references a real Class in the current org.
+  // Verify the desired_class_id references a real Class in the org.
   const klass = await db.class.findFirst({
     where: {
       id: data.desired_class_id,
-      organization_id: ctx.organization_id,
+      organization_id: orgId,
       deleted_at: null,
     },
     select: { id: true, name: true },
@@ -198,8 +232,8 @@ export const POST = withPermission("admission.view", async (req) => {
   // contact fields).
   const admission = await db.admission.create({
     data: {
-      organization_id: ctx.organization_id,
-      branch_id: ctx.branch_id,
+      organization_id: orgId,
+      branch_id: branchId,
       applicant_name: data.applicant_name,
       applicant_name_bn: data.applicant_name_bn ?? null,
       parent_name: data.guardian_name,
@@ -211,10 +245,10 @@ export const POST = withPermission("admission.view", async (req) => {
       desired_class: data.desired_class_id,
       previous_education: previousEducation,
       status: "applied",
-      requested_by: ctx.user_id,
+      requested_by: userId,
       decided_by: null,
-      form_source: "office",
-      created_by: ctx.user_id,
+      form_source: isPublic ? "public" : "office",
+      created_by: userId,
     },
     select: {
       id: true,
@@ -248,4 +282,4 @@ export const POST = withPermission("admission.view", async (req) => {
     },
     "Admission application submitted",
   );
-});
+}

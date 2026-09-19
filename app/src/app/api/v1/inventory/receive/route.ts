@@ -61,7 +61,7 @@ export const POST = withPermission("inventory.receive", async (req) => {
       action: "receive_stock",
       old_values: { qty_in_stock: Number(item.qty_in_stock), unit_cost: Number(item.unit_cost) },
       new_values: { qty_in_stock: newQty, unit_cost: newUnitCost, received_qty: parsed.data.qty },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

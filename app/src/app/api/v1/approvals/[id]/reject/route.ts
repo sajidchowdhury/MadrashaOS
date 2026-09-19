@@ -80,7 +80,7 @@ export const POST = withPermission("approval.reject", async (req: Request, ctx: 
         requester: approval.requester.name,
         title: approval.title,
       },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

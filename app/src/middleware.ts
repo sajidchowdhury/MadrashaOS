@@ -68,6 +68,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 2b) Public admission submission — no login required.
+  //     Prospective parents/guardians submit applications from the public
+  //     website without an account. Only POST is exempt; GET (list) still
+  //     requires login + admission.view permission.
+  if (
+    path === "/api/v1/admissions" &&
+    req.method.toUpperCase() === "POST"
+  ) {
+    return NextResponse.next();
+  }
+
   // 3) All other /api/v1/* routes require a session.
   if (path.startsWith("/api/v1/")) {
     const token = await getToken({

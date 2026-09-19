@@ -275,6 +275,67 @@ export const api = {
     return res.data as never;
   },
 
+  // --- Employees ---
+  // Frontend expects flat camelCase fields. The API returns nested objects
+  // (branch, user) so we flatten what the page needs and keep names handy.
+  async getEmployees() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/employees");
+    return res.data.map((e) => ({
+      id: e.id,
+      employeeCode: e.employeeCode,
+      name: e.name,
+      nameBn: (e.nameBn as string | null) ?? "",
+      email: (e.email as string | null) ?? "",
+      designation: (e.designation as string | null) ?? "",
+      department: (e.department as string | null) ?? "",
+      phone: (e.phone as string | null) ?? "",
+      salary: e.salary ?? null,
+      joinedAt: e.joinedAt,
+      status: e.status,
+      photoUrl: e.photoUrl ?? null,
+      branch:
+        (e.branch as { id?: string; name?: string; code?: string } | null) ?? null,
+      user:
+        (e.user as { id?: string; status?: string; lastLoginAt?: string } | null) ??
+        null,
+      createdAt: e.createdAt,
+    })) as never;
+  },
+
+  // --- Scholarships ---
+  async getScholarships() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/scholarships");
+    return res.data as never;
+  },
+
+  // --- Exam Results ---
+  async getResults() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/results");
+    return res.data as never;
+  },
+
+  // --- Cash & Bank Transfers ---
+  // API returns nested from_account / to_account objects (each with id,
+  // name, code, is_cash, is_bank). Flatten the names so the page can render
+  // them directly without a separate accounts lookup.
+  async getCashBankTransfers() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/cashbank/transfers");
+    return res.data.map((t) => ({
+      id: t.id,
+      voucherNo: t.voucherNo,
+      fromAccount: (t.fromAccount as { id?: string; name?: string; code?: string } | null) ?? null,
+      toAccount: (t.toAccount as { id?: string; name?: string; code?: string } | null) ?? null,
+      amount: t.amount,
+      fund: t.fund,
+      transferDate: t.transferDate,
+      narration: t.narration,
+      initiatedBy: t.initiatedBy ?? "",
+      status: t.status,
+      completedAt: t.completedAt,
+      ledgerEntryId: t.ledgerEntryId,
+    })) as never;
+  },
+
   // --- Fee Plans + Payments ---
   async getFeePlans() {
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/fees/plans");

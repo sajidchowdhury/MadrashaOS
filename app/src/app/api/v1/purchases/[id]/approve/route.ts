@@ -67,7 +67,7 @@ export const POST = withPermission("purchase.approve", async (req: Request, ctx:
       action: parsed.data.action,
       old_values: { status: purchase.status },
       new_values: { status: newStatus, approved_by: tenantCtx.user_id },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

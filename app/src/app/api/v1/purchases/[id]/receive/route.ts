@@ -135,7 +135,7 @@ export const POST = withPermission("purchase.create", async (req: Request, ctx: 
         fully_received: result.allReceived,
         new_status: result.allReceived ? "received" : "approved",
       },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

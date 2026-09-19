@@ -208,7 +208,7 @@ export const POST = withPermission("transport.record-expense", async (req) => {
       action: data.log_type,
       old_values: null,
       new_values: { vehicle: vehicle.registration_no, amount: data.amount, log_type: data.log_type, voucher: voucherNo },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

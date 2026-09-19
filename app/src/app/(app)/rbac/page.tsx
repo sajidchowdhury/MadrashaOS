@@ -222,6 +222,32 @@ function RbacMatrixContent() {
   const { locale } = useI18n();
   const currentRole = useSessionStore((s) => s.role);
   const [justSaved, setJustSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Map role code (e.g. "teacher") → role UUID (for the PATCH endpoint).
+  const [roleIds, setRoleIds] = useState<Record<Role, string>>(
+    () => Object.fromEntries(ROLES.map((r) => [r, ""])) as Record<Role, string>,
+  );
+
+  // Fetch role UUIDs on mount so "Save Matrix" can call the API.
+  React.useEffect(() => {
+    fetch("/api/v1/roles")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.data) {
+          const map = { ...roleIds };
+          for (const role of data.data as Array<{ id: string; code: string }>) {
+            if (role.code in map) {
+              map[role.code as Role] = role.id;
+            }
+          }
+          setRoleIds(map);
+        }
+      })
+      .catch(() => {
+        // Non-critical — save will report an error if IDs are missing.
+      });
+  }, []);
 
   const { totalsByGroup, perRole } = useMemo(() => buildGroupStats(), []);
 
@@ -262,8 +288,57 @@ function RbacMatrixContent() {
     setJustSaved(false);
   }
 
-  function handleSave() {
-    setJustSaved(true);
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    setJustSaved(false);
+    try {
+      // For each role, compute the new permission list from the group + approval toggles.
+      for (const role of ROLES) {
+        const roleId = roleIds[role];
+        if (!roleId) {
+          setSaveError(`Could not resolve role ID for "${role}". Save aborted.`);
+          setSaving(false);
+          return;
+        }
+        // Start from the seed permission list, then filter by which groups are checked.
+        const seedCodes = ROLE_PERMISSIONS[role] ?? [];
+        const newCodes = new Set<string>();
+        for (const code of seedCodes) {
+          const g = groupOfPermission(code);
+          const key = `${role}.${g}`;
+          if (groupChecks[key]) {
+            newCodes.add(code);
+          }
+        }
+        // Merge in the individual approval toggles.
+        for (const approvalCode of APPROVAL_CODES) {
+          const key = `${role}.${approvalCode}`;
+          if (approvalChecks[key]) {
+            newCodes.add(approvalCode);
+          } else {
+            newCodes.delete(approvalCode);
+          }
+        }
+        const res = await fetch(`/api/v1/roles/${roleId}/permissions`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ permission_codes: Array.from(newCodes) }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setSaveError(
+            `Failed to save permissions for ${role}: ${data?.error || res.statusText}`,
+          );
+          setSaving(false);
+          return;
+        }
+      }
+      setJustSaved(true);
+    } catch {
+      setSaveError("Network error while saving. Please try again.");
+    }
+    setSaving(false);
   }
 
   const roleLabel = (role: Role) => ROLE_LABELS[role].english;
@@ -282,11 +357,21 @@ function RbacMatrixContent() {
               row is annotated for the current user&apos;s role.
             </p>
           </div>
-          <Button onClick={handleSave}>
+          <Button onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4" />
-            Save Matrix
+            {saving ? "Saving…" : "Save Matrix"}
           </Button>
         </header>
+
+        {saveError && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 p-3 text-body text-text-primary"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 text-semantic-danger" aria-hidden />
+            {saveError}
+          </div>
+        )}
 
         {justSaved && (
           <div
@@ -294,7 +379,7 @@ function RbacMatrixContent() {
             className="flex items-center gap-2 rounded-md border border-semantic-success/40 bg-success-50 p-3 text-body text-text-primary"
           >
             <ShieldCheck className="h-4 w-4 shrink-0 text-semantic-success" aria-hidden />
-            Permission matrix saved (mock mode — no persistence).
+            Permission matrix saved — role permissions updated successfully.
           </div>
         )}
 

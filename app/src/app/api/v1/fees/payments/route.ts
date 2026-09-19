@@ -306,7 +306,7 @@ export const POST = withPermission("fees.payment.create", async (req) => {
         installment_id: data.installment_id,
         voucher_no: voucherNo,
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
       ip_address: req.headers.get("x-forwarded-for") || null,
       user_agent: req.headers.get("user-agent") || null,
     } as never,

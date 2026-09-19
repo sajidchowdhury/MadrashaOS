@@ -186,7 +186,7 @@ export const POST = withPerm("cashbank.transfer", async (req) => {
         ledger_voucher: ledgerVoucherNo,
         status: "completed",
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
       ip_address: req.headers.get("x-forwarded-for") || null,
       user_agent: req.headers.get("user-agent") || null,
     } as never,

@@ -112,7 +112,9 @@ export default function PublicDonatePage() {
     setAmount(Number.isFinite(num) && num > 0 ? num : 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSpamDetected(false);
     if (honeypot.trim().length > 0) {
@@ -120,24 +122,57 @@ export default function PublicDonatePage() {
       return;
     }
     if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/donations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          donor_name: anonymous ? undefined : (donorName || undefined),
+          donor_email: email || undefined,
+          donor_phone: mobile || undefined,
+          amount,
+          donation_type: donationType,
+          is_anonymous: anonymous,
+          payment_method: "online",
+          website: honeypot, // honeypot field — server silently rejects if filled
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Submission failed",
+          description: data?.error || "Please try again later.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+      // Server returns the receipt_no — use it; fall back to a generated one.
+      const rcp = data?.data?.receipt_no || data?.receipt_no || `DON-2026-${Date.now()}`;
+      setSubmittedReceipt(rcp);
+      toast({
+        title: "Donation received",
+        description: `${rcp} — ${formatCurrency(amount, locale)} (${donationType})`,
+      });
 
-    const num = 3000 + Math.floor(Math.random() * 7000);
-    const rcp = `DON-2026-${num}`;
-    setSubmittedReceipt(rcp);
-    toast({
-      title: "Donation received",
-      description: `${rcp} — ${formatCurrency(amount, locale)} (${donationType})`,
-    });
-
-    setDonorName("");
-    setEmail("");
-    setMobile("");
-    setAmount(0);
-    setCustomAmount("");
-    setDonationType("general");
-    setAnonymous(false);
-    setHoneypot("");
-    setRecaptchaChecked(false);
+      setDonorName("");
+      setEmail("");
+      setMobile("");
+      setAmount(0);
+      setCustomAmount("");
+      setDonationType("general");
+      setAnonymous(false);
+      setHoneypot("");
+      setRecaptchaChecked(false);
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setSubmitting(false);
   };
 
   const handleReset = () => {
@@ -474,9 +509,9 @@ export default function PublicDonatePage() {
                       </div>
                     </div>
 
-                    <Button type="submit" disabled={!canSubmit} className="w-full bg-accent-500 text-accent-foreground hover:bg-accent-700">
+                    <Button type="submit" disabled={!canSubmit || submitting} className="w-full bg-accent-500 text-accent-foreground hover:bg-accent-700">
                       <Heart className="h-4 w-4" />
-                      Donate {amount > 0 ? formatCurrency(amount, locale) : ""}
+                      {submitting ? "Processing…" : `Donate ${amount > 0 ? formatCurrency(amount, locale) : ""}`}
                     </Button>
 
                     <p className="flex items-center justify-center gap-1.5 text-caption text-text-muted">

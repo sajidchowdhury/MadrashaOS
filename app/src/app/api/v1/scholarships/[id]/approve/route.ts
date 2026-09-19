@@ -95,7 +95,7 @@ export const POST = withPermission("scholarship.approve", async (req: Request, c
         action: "approve",
         old_values: { status: "pending" },
         new_values: { status: "active", approved_by: tenantCtx.user_id },
-        actor_id: tenantCtx.user_id,
+        actor_user_id: tenantCtx.user_id,
       } as never,
     });
 
@@ -129,7 +129,7 @@ export const POST = withPermission("scholarship.approve", async (req: Request, c
         action: "reject",
         old_values: { status: "pending" },
         new_values: { status: "revoked" },
-        actor_id: tenantCtx.user_id,
+        actor_user_id: tenantCtx.user_id,
       } as never,
     });
 

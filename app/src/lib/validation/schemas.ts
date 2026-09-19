@@ -44,7 +44,7 @@ export const updateBranchSchema = createBranchSchema.partial().extend({
 /* --- Branch Switch (Risk R1) --- */
 
 export const switchBranchSchema = z.object({
-  branch_id: z.string().uuid(),
+  branch_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
 });
 
 /* --- RBAC (Phase B3.3) ---
@@ -114,7 +114,7 @@ export const createAdmissionSchema = z.object({
   // Contact phone + email for the family (stored as parent_phone + parent_email).
   phone: z.string().min(1).max(50),
   email: z.string().email().max(255).optional(),
-  desired_class_id: z.string().uuid(),
+  desired_class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   previous_education: z.record(z.string(), z.unknown()).optional(),
   guardian_name: z.string().min(1).max(255),
   guardian_phone: z.string().min(1).max(50),
@@ -125,7 +125,7 @@ export const updateAdmissionSchema = z.object({
   applicant_name_bn: z.string().max(255).optional(),
   phone: z.string().min(1).max(50).optional(),
   email: z.string().email().max(255).optional().or(z.literal("")),
-  desired_class_id: z.string().uuid().optional(),
+  desired_class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
   previous_education: z.record(z.string(), z.unknown()).optional(),
   guardian_name: z.string().min(1).max(255).optional(),
   guardian_phone: z.string().min(1).max(50).optional(),
@@ -185,9 +185,9 @@ export const createStudentSchema = z.object({
   name: z.string().min(1).max(255),
   name_bn: z.string().min(1).max(255),
   name_ar: z.string().max(255).optional(),
-  class_id: z.string().uuid(),
-  section_id: z.string().uuid().optional(),
-  guardian_id: z.string().uuid(),
+  class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  section_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
+  guardian_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   guardian_relation: z.string().min(1).max(50).optional(),
   roll: z.number().int().min(1),
   gender: studentGenderSchema,
@@ -233,8 +233,8 @@ export const updateStudentSchema = createStudentSchema
  * `to_section_id` is optional (some classes have no sections).
  */
 export const promoteStudentSchema = z.object({
-  to_class_id: z.string().uuid(),
-  to_section_id: z.string().uuid().optional(),
+  to_class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  to_section_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
   effective_date: z.coerce.date(),
   reason: z.string().min(1).max(1000),
 });
@@ -270,7 +270,7 @@ export const createEmployeeSchema = z.object({
   email: z.string().email().min(3).max(255),
   salary: z.number().nonnegative().max(10_000_000).optional(),
   joining_date: z.string().datetime(),
-  branch_id: z.string().uuid().optional(),
+  branch_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
   // Optional — when omitted the User is linked to the closest matching
   // non-teaching staff role in the org (defaults to "storekeeper").
   role_code: z.string().min(1).max(50).optional(),
@@ -289,7 +289,7 @@ export const updateEmployeeSchema = z
     email: z.string().email().min(3).max(255).optional(),
     salary: z.number().nonnegative().max(10_000_000).optional(),
     joining_date: z.string().datetime().optional(),
-    branch_id: z.string().uuid().nullable().optional(),
+    branch_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).nullable().optional(),
     department: z.string().min(1).max(100).optional(),
     nid_number: z.string().min(1).max(100).optional(),
     photo_url: z.string().url().optional(),
@@ -327,8 +327,8 @@ export const createGuardianSchema = z.object({
   annual_income: z.number().nonnegative().optional(),
   is_primary: z.boolean().optional(),
   address: z.string().max(1000).optional(),
-  user_id: z.string().uuid().optional(), // optional link to a User account (guardian portal login)
-  branch_id: z.string().uuid().optional(), // optional: scope to a specific branch
+  user_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(), // optional link to a User account (guardian portal login)
+  branch_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(), // optional: scope to a specific branch
 });
 
 export const updateGuardianSchema = createGuardianSchema.partial().extend({
@@ -341,7 +341,7 @@ export const updateGuardianSchema = createGuardianSchema.partial().extend({
 /* --- Teacher --- */
 
 export const createTeacherSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   employee_code: z
     .string()
     .min(1)
@@ -359,7 +359,7 @@ export const createTeacherSchema = z.object({
   phone: z.string().max(50).optional(),
   nid_number: z.string().max(100).optional(),
   photo_url: z.string().url().optional(),
-  branch_id: z.string().uuid().optional(), // optional: scope to a specific branch
+  branch_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(), // optional: scope to a specific branch
 });
 
 export const updateTeacherSchema = createTeacherSchema
@@ -373,10 +373,10 @@ export const updateTeacherSchema = createTeacherSchema
 /* --- Teacher Assignment --- */
 
 export const assignTeacherSchema = z.object({
-  teacher_id: z.string().uuid(),
-  class_id: z.string().uuid(),
-  section_id: z.string().uuid().optional().nullable(), // null = all sections
-  subject_id: z.string().uuid(),
+  teacher_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  section_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional().nullable(), // null = all sections
+  subject_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   is_class_teacher: z.boolean().optional(), // if true AND section_id present → also set Section.teacher_id
   academic_year: z.number().int().min(2000).max(2100).optional(), // defaults to current year
   notes: z.string().max(2000).optional(),

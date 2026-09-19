@@ -259,7 +259,7 @@ export const POST = withPermission("attendance.take", async (req) => {
         total_present: totalPresent,
         total_absent: totalAbsent,
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
       ip_address: req.headers.get("x-forwarded-for") || null,
       user_agent: req.headers.get("user-agent") || null,
     } as never,

@@ -374,7 +374,7 @@ export async function POST(req: Request) {
           is_anonymous: data.is_anonymous,
           ledger_voucher: ledgerVoucherNo,
         },
-        actor_id: userId,
+        actor_user_id: userId,
       } as never,
     });
   }

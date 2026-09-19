@@ -52,7 +52,7 @@ export const POST = withPermission("hostel.allocate", async (_req: Request, ctx:
       action: "deallocate",
       old_values: { status: "occupied", student_id: bed.student_id, student_name: bed.student?.name },
       new_values: { status: "vacant", student_id: null },
-      actor_id: tenantCtx.user_id,
+      actor_user_id: tenantCtx.user_id,
     } as never,
   });
 

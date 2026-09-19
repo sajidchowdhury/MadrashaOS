@@ -252,7 +252,7 @@ export const POST = withPermission("notices.compose", async (req) => {
         recipient_count: recipientCount,
         status: data.status,
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

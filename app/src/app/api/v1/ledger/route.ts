@@ -275,7 +275,7 @@ export const POST = withPermission("accounting.ledger.post", async (req) => {
         status,
         routed_to_approval: status === "pending",
       },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 

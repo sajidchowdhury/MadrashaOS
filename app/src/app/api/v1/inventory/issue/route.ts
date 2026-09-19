@@ -67,7 +67,7 @@ export const POST = withPermission("inventory.issue", async (req) => {
       action: "issue_stock",
       old_values: { qty_in_stock: currentStock },
       new_values: { qty_in_stock: newQty, issued_qty: parsed.data.qty, issued_to: parsed.data.issued_to ?? null },
-      actor_id: ctx.user_id,
+      actor_user_id: ctx.user_id,
     } as never,
   });
 
