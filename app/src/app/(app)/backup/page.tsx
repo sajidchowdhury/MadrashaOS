@@ -3,17 +3,18 @@
 /**
  * MadrashaOS — Backup & Restore page (SRS §2.1.6)
  *
- * Lists backup records from the BackupRecord table + a "Run Backup" button.
- * Backend: GET /api/v1/backup (to be implemented) + POST /api/v1/backup/run
+ * Session 8.4: Wired to real API — GET /api/v1/backup lists BackupRecord
+ * rows, POST /api/v1/backup runs a real pg_dump via child_process.exec.
+ * Replaces the mock setTimeout + fake data.
  */
 
 import * as React from "react";
-import { DatabaseBackup, Download, RotateCcw, Play, HardDrive } from "lucide-react";
+import { DatabaseBackup, Download, RotateCcw, Play, HardDrive, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IfPermission } from "@/components/auth/IfPermission";
-import { PermissionDenied, LoadingState } from "@/components/states";
+import { PermissionDenied, LoadingState, ErrorState } from "@/components/states";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -22,11 +23,14 @@ import { formatDate } from "@/lib/i18n/format";
 
 type BackupRecord = {
   id: string;
-  filename: string;
-  sizeBytes: number;
-  status: "completed" | "failed" | "running";
-  createdAt: string;
-  triggeredBy: string;
+  backup_type: string;
+  status: string;
+  size_bytes: number | null;
+  storage_url: string | null;
+  triggered_by: string | null;
+  started_at: string;
+  completed_at: string | null;
+  error_message: string | null;
 };
 
 export default function BackupPage() {
@@ -34,50 +38,64 @@ export default function BackupPage() {
   const [running, setRunning] = React.useState(false);
   const [backups, setBackups] = React.useState<BackupRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
+
+  // Fetch real backup records on mount
+  const fetchBackups = React.useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await fetch("/api/v1/backup?pageSize=20", { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setBackups(data.data ?? []);
+    } catch {
+      setError(true);
+    }
+    setLoading(false);
+  }, []);
 
   React.useEffect(() => {
-    // Mock initial load — the /api/v1/backup endpoint will be wired in a follow-up.
-    setTimeout(() => {
-      setBackups([
-        {
-          id: "b1",
-          filename: "madrashaos_backup_2026-09-18.sql.gz",
-          sizeBytes: 45_200_000,
-          status: "completed",
-          createdAt: "2026-09-18T02:00:00Z",
-          triggeredBy: "System (scheduled)",
-        },
-        {
-          id: "b2",
-          filename: "madrashaos_backup_2026-09-17.sql.gz",
-          sizeBytes: 44_800_000,
-          status: "completed",
-          createdAt: "2026-09-17T02:00:00Z",
-          triggeredBy: "System (scheduled)",
-        },
-      ]);
-      setLoading(false);
-    }, 500);
-  }, []);
+    fetchBackups();
+  }, [fetchBackups]);
 
   const runBackup = async () => {
     setRunning(true);
-    setTimeout(() => {
-      const now = new Date().toISOString().slice(0, 10);
-      setBackups((prev) => [
-        {
-          id: `b-${Date.now()}`,
-          filename: `madrashaos_backup_${now}.sql.gz`,
-          sizeBytes: 45_500_000,
-          status: "completed",
-          createdAt: new Date().toISOString(),
-          triggeredBy: "Administrator Karim (manual)",
-        },
-        ...prev,
-      ]);
-      setRunning(false);
-      toast({ title: "Backup completed", description: `madrashaos_backup_${now}.sql.gz` });
-    }, 1500);
+    try {
+      const res = await fetch("/api/v1/backup", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Backup failed",
+          description: data?.error || `Server returned ${res.status}.`,
+          variant: "destructive",
+        });
+        setRunning(false);
+        return;
+      }
+      toast({
+        title: "Backup completed",
+        description: data?.message || data?.data?.message || "Backup created successfully.",
+      });
+      // Refetch the list
+      fetchBackups();
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setRunning(false);
+  };
+
+  const formatSize = (bytes: number | null) => {
+    if (!bytes) return "—";
+    if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(0)} KB`;
+    return `${(bytes / 1_000_000).toFixed(1)} MB`;
   };
 
   return (
@@ -100,6 +118,20 @@ export default function BackupPage() {
             </Button>
           </header>
 
+          <div className="flex items-start gap-3 rounded-lg border border-semantic-info/30 bg-blue-50 p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+            <div>
+              <p className="text-body font-medium text-blue-900">
+                Production backups
+              </p>
+              <p className="mt-1 text-caption text-blue-800">
+                For production, set up a daily cron job using <code className="font-mono">scripts/backup.sh</code>{" "}
+                (see DEPLOYMENT.md). This UI button runs an on-demand <code className="font-mono">pg_dump</code> —
+                suitable for manual backups but not for scheduled ones.
+              </p>
+            </div>
+          </div>
+
           <Card className="border-border-default shadow-elevation-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-subtitle">
@@ -110,37 +142,57 @@ export default function BackupPage() {
             <CardContent>
               {loading ? (
                 <LoadingState pattern="table" />
+              ) : error ? (
+                <ErrorState onRetry={fetchBackups} />
+              ) : backups.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border-default bg-surface-card p-8 text-center">
+                  <DatabaseBackup className="mx-auto mb-3 h-10 w-10 text-text-muted" />
+                  <p className="text-body text-text-secondary">
+                    No backups yet. Click &ldquo;Run Backup Now&rdquo; to create one.
+                  </p>
+                </div>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-border-default">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-neutral-50">
-                        <TableHead className="ps-4 text-caption font-semibold uppercase text-text-muted">Filename</TableHead>
+                        <TableHead className="ps-4 text-caption font-semibold uppercase text-text-muted">Type</TableHead>
                         <TableHead className="text-caption font-semibold uppercase text-text-muted">Size</TableHead>
                         <TableHead className="text-caption font-semibold uppercase text-text-muted">Status</TableHead>
-                        <TableHead className="text-caption font-semibold uppercase text-text-muted">Created</TableHead>
-                        <TableHead className="text-caption font-semibold uppercase text-text-muted">Triggered By</TableHead>
+                        <TableHead className="text-caption font-semibold uppercase text-text-muted">Started</TableHead>
+                        <TableHead className="text-caption font-semibold uppercase text-text-muted">Completed</TableHead>
                         <TableHead className="pe-4 text-end text-caption font-semibold uppercase text-text-muted">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {backups.map((b) => (
                         <TableRow key={b.id} className="hover:bg-surface-hover">
-                          <TableCell className="ps-4 font-mono text-caption text-text-primary">{b.filename}</TableCell>
-                          <TableCell className="text-body text-text-secondary">{(b.sizeBytes / 1_000_000).toFixed(1)} MB</TableCell>
+                          <TableCell className="ps-4 text-body text-text-primary">
+                            <Badge variant="outline" className="capitalize">{b.backup_type}</Badge>
+                          </TableCell>
+                          <TableCell className="text-body text-text-secondary">{formatSize(b.size_bytes)}</TableCell>
                           <TableCell>
-                            <Badge variant={b.status === "completed" ? "default" : "destructive"}>
+                            <Badge variant={b.status === "completed" ? "default" : "destructive"} className="capitalize">
                               {b.status}
                             </Badge>
+                            {b.error_message && (
+                              <p className="mt-1 text-caption text-semantic-danger">{b.error_message}</p>
+                            )}
                           </TableCell>
-                          <TableCell className="text-body text-text-secondary">{formatDate(new Date(b.createdAt), "en")}</TableCell>
-                          <TableCell className="text-body text-text-secondary">{b.triggeredBy}</TableCell>
+                          <TableCell className="text-body text-text-secondary">{formatDate(new Date(b.started_at), "en")}</TableCell>
+                          <TableCell className="text-body text-text-secondary">
+                            {b.completed_at ? formatDate(new Date(b.completed_at), "en") : "—"}
+                          </TableCell>
                           <TableCell className="pe-4 text-end">
                             <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="sm" aria-label="Download backup">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" aria-label="Restore backup">
+                              {b.storage_url && b.status === "completed" && (
+                                <a href={b.storage_url} target="_blank" rel="noopener noreferrer">
+                                  <Button variant="ghost" size="sm" aria-label="Download backup">
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                </a>
+                              )}
+                              <Button variant="ghost" size="sm" aria-label="Restore backup" disabled>
                                 <RotateCcw className="h-4 w-4" />
                               </Button>
                             </div>
