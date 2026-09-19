@@ -30,7 +30,7 @@ import {
   CheckCircle2, Clock, XCircle, FileArchive, Phone, Mail, Briefcase,
   AlertCircle, BookOpen, Hash, Download,
 } from "lucide-react";
-import { useStudent, useFeePlans, useAttendanceSessions, useGuardians, useClasses } from "@/lib/query/client";
+import { useStudent, useStudentHistory, useFeePlans, useAttendanceSessions, useGuardians, useClasses, useDocuments } from "@/lib/query/client";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { formatDate, formatCurrency } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
@@ -58,37 +58,9 @@ import {
 import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
 
 /* ---------------------------------------------------------------
- * Inline mock data — Risk R4 history + Academic subjects + Documents
- * (Per task spec: define inline, do NOT create new fixture files)
+ * Real data hooks: useStudentHistory + useDocuments (Session 5.4)
+ * Replaces the inline buildHistory() and MOCK_DOCUMENTS mocks.
  * --------------------------------------------------------------- */
-
-type PastAssignment = { classId: string; className: string; period: string; promotedOn: string };
-
-function buildHistory(studentCode: string): PastAssignment[] {
-  // Stable, deterministic mock history keyed off the student's code
-  const num = parseInt(studentCode.split("-").pop() ?? "0", 10) || 1;
-  const base: PastAssignment[] = [
-    { classId: "cls-1", className: "Class 1 · Section A", period: "2024 academic year", promotedOn: "2024-12-15" },
-    { classId: "cls-3", className: "Class 3 · Section A", period: "2025 academic year", promotedOn: "2025-12-10" },
-  ];
-  // Hide the most-recent one if the student is currently in it (since "past" means earlier)
-  return base.filter((_, i) => i !== num % 2 || base.length === 1);
-}
-
-const MOCK_SUBJECTS = [
-  { id: "sub-quran", name: "Quran & Tajweed", code: "QUR-101", teacher: "Teacher Bilal" },
-  { id: "sub-hadith", name: "Hadith Studies", code: "HAD-101", teacher: "Teacher Bilal" },
-  { id: "sub-fiqh", name: "Fiqh", code: "FIQ-101", teacher: "Principal Ahmad" },
-  { id: "sub-arabic", name: "Arabic Language", code: "ARA-101", teacher: "Teacher Bilal" },
-  { id: "sub-bangla", name: "Bangla Language", code: "BEN-101", teacher: "Teacher Bilal" },
-  { id: "sub-math", name: "Mathematics", code: "MAT-101", teacher: "Teacher Bilal" },
-];
-
-const MOCK_DOCUMENTS = [
-  { id: "doc-1", name: "Birth Certificate", type: "PDF", uploadedAt: "2026-01-15", size: "248 KB" },
-  { id: "doc-2", name: "Previous TC", type: "PDF", uploadedAt: "2026-01-15", size: "412 KB" },
-  { id: "doc-3", name: "Photo", type: "JPG", uploadedAt: "2026-01-16", size: "1.1 MB" },
-];
 
 /* ---------------------------------------------------------------
  * Component
@@ -126,10 +98,32 @@ export default function StudentProfilePage() {
   const {
     data: classes,
   } = useClasses();
+  const {
+    data: historyData,
+    refetch: refetchHistory,
+  } = useStudentHistory(studentId);
+  const {
+    data: documentsData,
+    refetch: refetchDocuments,
+  } = useDocuments();
 
   const feePlan = feePlans?.find((p) => p.studentId === studentId);
   const guardian = guardians?.find((g) => g.id === student?.guardianId);
   const cls = classes?.find((c) => c.id === student?.classId);
+
+  // Real promotion history from the API (camelCase after toCamel)
+  const pastAssignments = ((historyData ?? []) as Array<Record<string, unknown>>).map((h) => ({
+    id: h.id as string,
+    action: (h.action as string) ?? "promoted",
+    className: ((h.toClass as { name?: string } | null)?.name) ?? "—",
+    fromClassName: ((h.fromClass as { name?: string } | null)?.name) ?? null,
+    effectiveDate: (h.effectiveDate as string) ?? "",
+    reason: (h.reason as string) ?? "",
+    academicYear: (h.academicYear as number) ?? null,
+  }));
+
+  // Real documents from the API
+  const studentDocuments = ((documentsData ?? []) as Array<Record<string, unknown>>).slice(0, 10);
 
   const studentAttendance = (attendance ?? [])
     .filter((s) => s.classId === student?.classId && s.section === student?.section)
@@ -149,8 +143,14 @@ export default function StudentProfilePage() {
   const [promotionOpen, setPromotionOpen] = React.useState(false);
   const [targetClass, setTargetClass] = React.useState<string>("");
   const [targetSection, setTargetSection] = React.useState<string>("");
+  const [promotionReason, setPromotionReason] = React.useState<string>("");
+  const [promotionSubmitting, setPromotionSubmitting] = React.useState(false);
+  const [uploadOpen, setUploadOpen] = React.useState(false);
+  const [uploadFile, setUploadFile] = React.useState<File | null>(null);
+  const [uploadName, setUploadName] = React.useState<string>("");
+  const [uploadSubmitting, setUploadSubmitting] = React.useState(false);
 
-  const pastAssignments = student ? buildHistory(student.code) : [];
+  // pastAssignments is now derived from real API data (see above)
 
   // ----------------------------------------------------------------
   // States
@@ -203,39 +203,129 @@ export default function StudentProfilePage() {
 
   // Handlers
   const handleCollectPayment = (label: string, amount: number) => {
+    // Opens the CollectPaymentDialog — the dialog itself handles the real API call
+    // (wired in Session 5.2). This is just a fallback toast for the inline button.
     toast({
-      title: "Payment recorded",
-      description: `${label} installment · ${formatCurrency(amount, locale)} collected.`,
+      title: "Opening payment dialog",
+      description: `${label} · ${formatCurrency(amount, locale)}`,
     });
   };
 
   const handleUploadDoc = () => {
-    toast({
-      title: "Upload dialog",
-      description: "Document upload flow would open here (mock).",
-    });
+    setUploadOpen(true);
   };
 
-  const handleConfirmPromotion = () => {
-    if (!targetClass || !targetSection) {
+  const handleUploadSubmit = async () => {
+    if (!uploadFile) {
       toast({
-        title: "Missing selection",
-        description: "Please choose a target class and section.",
+        title: "No file selected",
+        description: "Please choose a file to upload.",
         variant: "destructive",
       });
       return;
     }
-    const clsName = classes?.find((c) => c.id === targetClass)?.name ?? "Unknown";
-    toast({
-      title: "Student promoted",
-      description: `${student.name} → ${clsName} · Section ${targetSection}. Previous assignment archived to history.`,
-    });
-    setPromotionOpen(false);
-    setTargetClass("");
-    setTargetSection("");
+    setUploadSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", uploadFile);
+      formData.append("name", uploadName || uploadFile.name);
+      formData.append("visibility", "staff");
+
+      const res = await fetch("/api/v1/documents", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Upload failed",
+          description: data?.error || `Server returned ${res.status}.`,
+          variant: "destructive",
+        });
+        setUploadSubmitting(false);
+        return;
+      }
+      toast({
+        title: "Document uploaded",
+        description: `${data?.name || uploadFile.name} (${data?.size_display || "?"})`,
+      });
+      setUploadOpen(false);
+      setUploadFile(null);
+      setUploadName("");
+      // Refetch documents list
+      refetchDocuments();
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setUploadSubmitting(false);
   };
 
-  const availableSectionsForPromotion = classes?.find((c) => c.id === targetClass)?.sections ?? [];
+  const handleConfirmPromotion = async () => {
+    if (!targetClass) {
+      toast({
+        title: "Missing selection",
+        description: "Please choose a target class.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!promotionReason.trim()) {
+      toast({
+        title: "Missing reason",
+        description: "Please provide a reason for the promotion.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPromotionSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/students/${studentId}/promote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to_class_id: targetClass,
+          to_section_id: targetSection || undefined,
+          effective_date: new Date().toISOString().slice(0, 10),
+          reason: promotionReason,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Promotion failed",
+          description: data?.error || `Server returned ${res.status}.`,
+          variant: "destructive",
+        });
+        setPromotionSubmitting(false);
+        return;
+      }
+      const clsName = classes?.find((c) => c.id === targetClass)?.name ?? "Unknown";
+      toast({
+        title: "Student promoted",
+        description: `${student?.name} → ${clsName}. Previous assignment archived to history.`,
+      });
+      setPromotionOpen(false);
+      setTargetClass("");
+      setTargetSection("");
+      setPromotionReason("");
+      // Refetch student + history so the UI reflects the change
+      refetchStudent();
+      refetchHistory();
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setPromotionSubmitting(false);
+  };
+
+  const availableSectionsForPromotion = (classes?.find((c) => c.id === targetClass) as { sectionsWithIds?: Array<{ id: string; name: string }> } | undefined)?.sectionsWithIds ?? [];
 
   return (
     <div className="px-4 py-8 md:px-8 md:py-12">
@@ -372,26 +462,11 @@ export default function StudentProfilePage() {
                 <div>
                   <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-text-primary">
                     <BookOpen className="h-4 w-4 text-primary-500" />
-                    Subjects ({MOCK_SUBJECTS.length})
+                    Subjects
                   </h3>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {MOCK_SUBJECTS.map((sub) => (
-                      <div
-                        key={sub.id}
-                        className="flex items-center justify-between rounded-lg border border-border-default bg-surface-card p-3"
-                      >
-                        <div>
-                          <p className="text-body font-medium text-text-primary">
-                            {sub.name}
-                          </p>
-                          <p className="text-caption text-text-muted">
-                            <span className="font-mono">{sub.code}</span> · {sub.teacher}
-                          </p>
-                        </div>
-                        <Hash className="h-4 w-4 text-text-muted" aria-hidden />
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-caption text-text-muted">
+                    Subject assignment is managed via the Academic Structure page.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -489,31 +564,39 @@ export default function StudentProfilePage() {
                 </IfPermission>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
-                  {MOCK_DOCUMENTS.map((doc) => (
-                    <li
-                      key={doc.id}
-                      className="flex items-center justify-between rounded-lg border border-border-default bg-surface-card p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-9 items-center justify-center rounded-md bg-primary-50 text-primary-700">
-                          <FileArchive className="h-4 w-4" />
+                {studentDocuments.length === 0 ? (
+                  <p className="py-6 text-center text-body text-text-secondary">
+                    No documents uploaded yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {studentDocuments.map((doc) => (
+                      <li
+                        key={doc.id as string}
+                        className="flex items-center justify-between rounded-lg border border-border-default bg-surface-card p-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-9 items-center justify-center rounded-md bg-primary-50 text-primary-700">
+                            <FileArchive className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-body font-medium text-text-primary">
+                              {(doc.name as string) ?? "Unnamed"}
+                            </p>
+                            <p className="text-caption text-text-muted">
+                              {(doc.type as string) ?? "—"} · {(doc.sizeDisplay as string) ?? "—"} · uploaded {formatDate(new Date((doc.uploadedAt as string) ?? Date.now()), locale)}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-body font-medium text-text-primary">
-                            {doc.name}
-                          </p>
-                          <p className="text-caption text-text-muted">
-                            {doc.type} · {doc.size} · uploaded {formatDate(new Date(doc.uploadedAt), locale)}
-                          </p>
-                        </div>
-                      </div>
-                      <IfPermission code="documents.download" fallback={null}>
-                        <Button variant="ghost" size="sm">Download</Button>
-                      </IfPermission>
-                    </li>
-                  ))}
-                </ul>
+                        <IfPermission code="documents.download" fallback={null}>
+                          <a href={(doc.storageUrl as string) ?? "#"} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm">Download</Button>
+                          </a>
+                        </IfPermission>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -710,10 +793,15 @@ export default function StudentProfilePage() {
                     ) : (
                       <ul className="space-y-2">
                         {pastAssignments.map((past, idx) => (
-                          <li key={`${past.classId}-${idx}`}>
-                            <PastClassChip label={past.className} period={past.period} />
+                          <li key={past.id ?? idx}>
+                            <PastClassChip
+                              label={past.className}
+                              period={past.reason || `${past.academicYear ?? ""} academic year`}
+                            />
                             <p className="ms-1 mt-1 text-caption text-text-muted">
-                              Promoted on {formatDate(new Date(past.promotedOn), locale)}
+                              {past.effectiveDate
+                                ? `Effective ${formatDate(new Date(past.effectiveDate), locale)}`
+                                : ""}
                             </p>
                           </li>
                         ))}
@@ -824,12 +912,25 @@ export default function StudentProfilePage() {
                   </SelectTrigger>
                   <SelectContent>
                     {availableSectionsForPromotion.map((sec) => (
-                      <SelectItem key={sec} value={sec}>
-                        Section {sec}
+                      <SelectItem key={sec.id} value={sec.id}>
+                        Section {sec.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-caption font-medium text-text-secondary" htmlFor="promote-reason">
+                  Reason
+                </label>
+                <textarea
+                  id="promote-reason"
+                  className="flex min-h-[60px] w-full rounded-md border border-border-default bg-surface-card p-3 text-body text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  placeholder="e.g. Passed final exam, promoted to next class"
+                  value={promotionReason}
+                  onChange={(e) => setPromotionReason(e.target.value)}
+                />
               </div>
 
               <div className="rounded-md border border-dashed border-border-default bg-neutral-50 p-3 text-caption text-text-secondary">
@@ -870,10 +971,10 @@ export default function StudentProfilePage() {
                 />
                 {pastAssignments.map((past, idx) => (
                   <TimelineItem
-                    key={idx}
+                    key={past.id ?? idx}
                     label={past.className}
-                    detail={past.period}
-                    date={formatDate(new Date(past.promotedOn), locale)}
+                    detail={past.reason || `${past.academicYear ?? ""} academic year`}
+                    date={past.effectiveDate ? formatDate(new Date(past.effectiveDate), locale) : "—"}
                     tone="past"
                   />
                 ))}
@@ -885,9 +986,58 @@ export default function StudentProfilePage() {
             <Button variant="outline" onClick={() => setPromotionOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmPromotion}>
+            <Button onClick={handleConfirmPromotion} disabled={promotionSubmitting}>
               <ArrowUpCircle className="h-4 w-4" />
-              Confirm Promotion
+              {promotionSubmitting ? "Promoting…" : "Confirm Promotion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Document Dialog */}
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-primary-500" />
+              Upload Document
+            </DialogTitle>
+            <DialogDescription>
+              Upload a document for this student. Max file size: 60MB.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1.5 block text-caption font-medium text-text-secondary">
+                File
+              </label>
+              <input
+                type="file"
+                className="flex w-full rounded-md border border-border-default bg-surface-card px-3 py-2 text-body text-text-primary file:mr-3 file:rounded file:border-0 file:bg-primary-500 file:px-3 file:py-1 file:text-primary-foreground hover:file:bg-primary-700"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-caption font-medium text-text-secondary" htmlFor="doc-name">
+                Display name (optional)
+              </label>
+              <input
+                id="doc-name"
+                type="text"
+                className="flex w-full rounded-md border border-border-default bg-surface-card px-3 py-2 text-body text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                placeholder={uploadFile?.name ?? "Document name"}
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUploadSubmit} disabled={!uploadFile || uploadSubmitting}>
+              <Upload className="h-4 w-4" />
+              {uploadSubmitting ? "Uploading…" : "Upload"}
             </Button>
           </DialogFooter>
         </DialogContent>

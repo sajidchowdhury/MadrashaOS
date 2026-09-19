@@ -252,6 +252,16 @@ export const api = {
     } as never;
   },
 
+  async getStudentHistory(id: string) {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>(`/students/${id}/history`);
+    return res.data as never;
+  },
+
+  async getDocuments() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/documents?pageSize=100");
+    return res.data as never;
+  },
+
   async getStudentsByClass(classId: string, section?: string) {
     const params = new URLSearchParams({ class_id: classId });
     // The API expects `section` to be a section UUID (section_id), not the

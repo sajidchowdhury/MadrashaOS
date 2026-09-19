@@ -116,6 +116,28 @@ export function useStudent(
   });
 }
 
+export function useStudentHistory(
+  id: string,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["student-history", id, ...sessionKey()],
+    queryFn: () => api.getStudentHistory(id),
+    enabled: !!id,
+    ...options,
+  });
+}
+
+export function useDocuments(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["documents", ...sessionKey()],
+    queryFn: () => api.getDocuments(),
+    ...options,
+  });
+}
+
 export function useStudentsByClass(
   classId: string,
   section?: string,
