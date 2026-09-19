@@ -25,6 +25,7 @@ import { getTenantContext } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
 import { jsonResponse, errorResponse, successResponse, parsePagination } from "@/lib/api/helpers";
 import { z } from "zod";
+import { notifyEntity } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -311,6 +312,59 @@ export const POST = withPermission("fees.payment.create", async (req) => {
       user_agent: req.headers.get("user-agent") || null,
     } as never,
   });
+
+  // --- Phase 4: Send payment confirmation to guardian (fire-and-forget) ---
+  // A notification delivery failure must NEVER roll back the successful payment.
+  const org = await db.organization.findFirst({
+    where: { id: ctx.organization_id },
+    select: { name: true },
+  });
+  const orgName = org?.name ?? "MadrashaOS";
+  const installmentLabel = installment?.label ?? "N/A";
+
+  const guardian = await db.studentGuardian.findFirst({
+    where: { student_id: data.student_id, is_primary: true, deleted_at: null },
+    include: { guardian: { select: { name: true, phone: true, email: true } } },
+  });
+
+  if (guardian?.guardian.email) {
+    notifyEntity("email", {
+      to: guardian.guardian.email,
+      subject: `Fee Payment Confirmation — ${receiptNo}`,
+      templateId: "fee-payment-confirmation",
+      templateVars: {
+        receiptNo,
+        studentName: student.name,
+        amount: data.amount,
+        installmentLabel,
+        orgName,
+      },
+      metadata: {
+        organization_id: ctx.organization_id,
+        entity_type: "fee_payments",
+        entity_id: result.id,
+      },
+    }).catch(() => {});
+  }
+  if (guardian?.guardian.phone) {
+    notifyEntity("sms", {
+      to: guardian.guardian.phone,
+      body: `${orgName}: Payment of ৳${data.amount} received for ${student.name}. Receipt ${receiptNo}. Thank you.`,
+      templateId: "fee-payment-confirmation",
+      templateVars: {
+        receiptNo,
+        studentName: student.name,
+        amount: data.amount,
+        installmentLabel,
+        orgName,
+      },
+      metadata: {
+        organization_id: ctx.organization_id,
+        entity_type: "fee_payments",
+        entity_id: result.id,
+      },
+    }).catch(() => {});
+  }
 
   return jsonResponse(
     {

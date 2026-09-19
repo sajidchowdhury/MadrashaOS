@@ -36,7 +36,7 @@
  * Note: otplib is a Node.js library — these helpers are server-only.
  */
 
-import { authenticator } from "otplib";
+import { generateSecret, generateURI, verify } from "otplib";
 import QRCode from "qrcode";
 
 /** Issuer string shown in the authenticator app (e.g. "MadrashaOS (abdul@…)"). */
@@ -67,11 +67,15 @@ export async function generateMfaSecret(
   qrDataUrl: string;
 }> {
   // Generate a fresh 32-byte base32 secret on each call.
-  const secret = authenticator.generateSecret();
+  const secret = generateSecret();
 
   // Build the otpauth:// URL — this is what the QR encoder needs.
   // Format: otpauth://totp/<issuer>:<label>?secret=<secret>&issuer=<issuer>&algorithm=SHA1&digits=6&period=30
-  const otpauthUrl = authenticator.keyuri(email, ISSUER, secret);
+  const otpauthUrl = await generateURI({
+    secret,
+    accountName: email,
+    issuer: ISSUER,
+  });
 
   // Encode as a base64 PNG so the client can drop it straight into <img>.
   const qrDataUrl = await QRCode.toDataURL(otpauthUrl, {
@@ -103,10 +107,11 @@ export async function generateMfaSecret(
  * @param secret  Base32-encoded secret stored on the user row
  * @param token   6-digit code from the user's authenticator app
  */
-export function verifyMfaToken(secret: string, token: string): boolean {
+export async function verifyMfaToken(secret: string, token: string): Promise<boolean> {
   if (!secret || !token) return false;
   try {
-    return authenticator.verify({ token, secret });
+    const result = await verify({ token, secret });
+    return result.valid;
   } catch {
     return false;
   }
@@ -118,8 +123,8 @@ export function verifyMfaToken(secret: string, token: string): boolean {
  * Useful when the client wants to render a fresh QR (e.g. for re-scan
  * after the user misplaced the original).
  */
-export function generateQrCodeUrl(secret: string, email: string): string {
-  return authenticator.keyuri(email, ISSUER, secret);
+export async function generateQrCodeUrl(secret: string, email: string): Promise<string> {
+  return generateURI({ secret, accountName: email, issuer: ISSUER });
 }
 
 /**

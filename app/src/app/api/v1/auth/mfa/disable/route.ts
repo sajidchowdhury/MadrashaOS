@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!verifyMfaToken(user.mfa_secret, token)) {
+  if (!(await verifyMfaToken(user.mfa_secret, token))) {
     return NextResponse.json(
       { error: "Invalid token", message: "The 6-digit code did not match." },
       { status: 400 },

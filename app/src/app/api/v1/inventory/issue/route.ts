@@ -15,6 +15,7 @@ import { getTenantContext } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
 import { jsonResponse, errorResponse, successResponse } from "@/lib/api/helpers";
 import { z } from "zod";
+import { notifyEntity } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export const POST = withPermission("inventory.issue", async (req) => {
 
   const item = await db.inventoryItem.findFirst({
     where: { id: parsed.data.item_id, organization_id: ctx.organization_id, deleted_at: null },
-    select: { id: true, name: true, code: true, qty_in_stock: true, unit: true },
+    select: { id: true, name: true, code: true, qty_in_stock: true, reorder_level: true, unit: true },
   });
   if (!item) return errorResponse("Item not found", 404);
 
@@ -70,6 +71,37 @@ export const POST = withPermission("inventory.issue", async (req) => {
       actor_user_id: ctx.user_id,
     } as never,
   });
+
+  // --- Phase 4: Send low-stock alert if newQty dropped at or below reorder_level (fire-and-forget) ---
+  // A notification delivery failure must NEVER roll back the issue.
+  const reorderLevel = Number(item.reorder_level);
+  if (reorderLevel > 0 && newQty <= reorderLevel) {
+    const org = await db.organization.findFirst({
+      where: { id: ctx.organization_id },
+      select: { name: true, email: true },
+    });
+    const orgName = org?.name ?? "MadrashaOS";
+    if (org?.email) {
+      notifyEntity("email", {
+        to: org.email,
+        subject: `Low Stock Alert — ${item.name} (${item.code})`,
+        templateId: "low-stock-alert",
+        templateVars: {
+          itemCode: item.code,
+          itemName: item.name,
+          currentQty: newQty,
+          reorderLevel,
+          unit: item.unit,
+          orgName,
+        },
+        metadata: {
+          organization_id: ctx.organization_id,
+          entity_type: "inventory_items",
+          entity_id: parsed.data.item_id,
+        },
+      }).catch(() => {});
+    }
+  }
 
   return successResponse(
     { item_id: parsed.data.item_id, item_code: item.code, item_name: item.name, new_qty: newQty, is_low_stock: isLowStock },

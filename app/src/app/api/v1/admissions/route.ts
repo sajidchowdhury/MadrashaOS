@@ -52,6 +52,7 @@ import {
   paginatedResponse,
   parsePagination,
 } from "@/lib/api/helpers";
+import { notifyEntity } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -264,6 +265,50 @@ export async function POST(req: Request) {
       form_source: true,
     },
   });
+
+  // --- Phase 4: Send admission-confirmation notification (fire-and-forget) ---
+  // A notification delivery failure must NEVER roll back the admission record.
+  const org = await db.organization.findFirst({
+    where: { id: orgId },
+    select: { name: true },
+  });
+  const orgName = org?.name ?? "MadrashaOS";
+  const referenceId = admission.id.slice(0, 8).toUpperCase();
+
+  if (data.email) {
+    notifyEntity("email", {
+      to: data.email,
+      subject: `Admission Application Received — ${referenceId}`,
+      templateId: "admission-confirmation",
+      templateVars: {
+        referenceId,
+        applicantName: admission.applicant_name,
+        orgName,
+      },
+      metadata: {
+        organization_id: orgId,
+        entity_type: "admissions",
+        entity_id: admission.id,
+      },
+    }).catch(() => {});
+  }
+  if (data.guardian_phone) {
+    notifyEntity("sms", {
+      to: data.guardian_phone,
+      body: `${orgName}: Application received for ${admission.applicant_name}. Reference ${referenceId}. We'll contact you within 3 days.`,
+      templateId: "admission-confirmation",
+      templateVars: {
+        referenceId,
+        applicantName: admission.applicant_name,
+        orgName,
+      },
+      metadata: {
+        organization_id: orgId,
+        entity_type: "admissions",
+        entity_id: admission.id,
+      },
+    }).catch(() => {});
+  }
 
   return successResponse(
     {

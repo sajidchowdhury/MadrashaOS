@@ -1,3 +1,7 @@
+// Every page in MadrashaOS is database-driven (auth, RBAC, tenant scoping)
+// so no page can be statically prerendered at build time.
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
 import { Inter, Hind_Siliguri, Noto_Naskh_Arabic, JetBrains_Mono } from "next/font/google";
 import "./globals.css";

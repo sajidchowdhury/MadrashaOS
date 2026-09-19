@@ -100,7 +100,7 @@ export async function POST(req: Request) {
   // ---- Flow A: enable MFA (pending secret in cache) ------------------
   const pending = consumePendingSecret(session.user.id);
   if (pending) {
-    if (!verifyMfaToken(pending.secret, token)) {
+    if (!(await verifyMfaToken(pending.secret, token))) {
       return NextResponse.json(
         { error: "Invalid token", message: "The 6-digit code did not match." },
         { status: 400 },
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!verifyMfaToken(user.mfa_secret, token)) {
+  if (!(await verifyMfaToken(user.mfa_secret, token))) {
     return NextResponse.json(
       { error: "Invalid token", message: "The 6-digit code did not match." },
       { status: 400 },

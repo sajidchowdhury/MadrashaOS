@@ -26,6 +26,7 @@ import { getTenantContext } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
 import { jsonResponse, errorResponse, successResponse, parsePagination } from "@/lib/api/helpers";
 import { z } from "zod";
+import { notifyEntity } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -377,6 +378,46 @@ export async function POST(req: Request) {
         actor_user_id: userId,
       } as never,
     });
+  }
+
+  // --- Phase 4: Send receipt notification to donor (non-blocking) ---
+  // Fire-and-forget — a notification failure must NOT roll back the donation.
+  const org = await db.organization.findFirst({
+    where: { id: orgId },
+    select: { name: true },
+  });
+  const orgName = org?.name ?? "MadrashaOS";
+  if (data.donor_email || data.donor_phone) {
+    notifyEntity("email", {
+      to: data.donor_email || "",
+      subject: `Donation Receipt — ${receiptNo}`,
+      templateId: "donation-receipt",
+      templateVars: {
+        receiptNo,
+        amount: data.amount,
+        donationType: data.donation_type,
+        donorName: donorName ?? "Anonymous",
+        orgName,
+      },
+      metadata: {
+        organization_id: orgId,
+        entity_type: "donations",
+        entity_id: result.id,
+      },
+    }).catch(() => {});
+    if (data.donor_phone) {
+      notifyEntity("sms", {
+        to: data.donor_phone,
+        body: `${orgName}: Donation of ৳${data.amount} received. Receipt ${receiptNo}. Thank you for your generosity.`,
+        templateId: "donation-receipt",
+        templateVars: { receiptNo, amount: data.amount, orgName },
+        metadata: {
+          organization_id: orgId,
+          entity_type: "donations",
+          entity_id: result.id,
+        },
+      }).catch(() => {});
+    }
   }
 
   // Build the success response

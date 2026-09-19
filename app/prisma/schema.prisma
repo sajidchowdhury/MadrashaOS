@@ -2269,3 +2269,28 @@ model Approval {
   @@index([deleted_at])
   @@map("approvals")
 }
+
+// ============================================================
+// Platform Layer — Idempotency Records (Phase 4)
+// ============================================================
+// Replaces the in-memory Map in src/lib/auth/with-idempotency.ts
+// with a Postgres-backed table so idempotency survives server
+// restarts and works across multiple instances (serverless-safe).
+// TTL: 24 hours per SRS §6.5. Expired rows are lazily swept.
+
+model IdempotencyRecord {
+  id            String   @id @default(uuid()) @db.Uuid
+  key           String   @unique // the Idempotency-Key header value
+  organization_id String? @db.Uuid
+  method        String   // POST | PUT | PATCH | DELETE
+  path          String   // the API route path
+  status_code   Int      // HTTP status of the original response
+  response_body Json     // the JSON body to replay
+  content_type  String   @default("application/json")
+  expires_at    DateTime @db.Timestamptz
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  @@index([expires_at])
+  @@index([organization_id])
+  @@map("idempotency_records")
+}
