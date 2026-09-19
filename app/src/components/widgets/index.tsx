@@ -303,9 +303,10 @@ export function ClassPerformanceWidget() {
     acc[key].total++;
     return acc;
   }, {} as Record<string, { total: number; present: number }>);
-  (attendance ?? []).forEach((s) => {
-    s.records.forEach((r) => {
-      const student = students?.find((st) => st.id === r.studentId);
+  (attendance ?? []).forEach((s: { records?: Array<{ student_id?: string; studentId?: string; status?: string }> }) => {
+    (s.records ?? []).forEach((r) => {
+      const studentId = r.student_id ?? r.studentId;
+      const student = students?.find((st) => st.id === studentId);
       if (student && classStats[student.classId]) {
         if (r.status === "present") classStats[student.classId].present++;
       }

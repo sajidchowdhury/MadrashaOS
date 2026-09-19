@@ -35,8 +35,8 @@ const createLedgerEntrySchema = z.object({
   notes: z.string().optional(),
 });
 
-/** GET /api/v1/ledger — list entries with running balance */
-export async function GET(req: Request) {
+/** GET /api/v1/ledger — list entries (perm: accounting.ledger.view) */
+export const GET = withPermission("accounting.ledger.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -146,7 +146,7 @@ export async function GET(req: Request) {
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     ...(accountId ? { running_balance_final: Math.round(runningBalance * 100) / 100 } : {}),
   });
-}
+});
 
 /** POST /api/v1/ledger — post balanced entry (Golden Flow §3.6) */
 export const POST = withPermission("accounting.ledger.post", async (req) => {

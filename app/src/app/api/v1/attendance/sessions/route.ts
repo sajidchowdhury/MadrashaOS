@@ -83,6 +83,7 @@ export async function GET(req: Request) {
         class: { select: { id: true, name: true, name_bn: true } },
         section: { select: { id: true, name: true } },
         taken_by_user: { select: { id: true, name: true, name_bn: true } },
+        attendance_records: { select: { student_id: true, status: true } },
         _count: { select: { attendance_records: true } },
       },
     }),
@@ -108,6 +109,10 @@ export async function GET(req: Request) {
       total_present: s.total_present,
       total_absent: s.total_absent,
       record_count: s._count.attendance_records,
+      records: s.attendance_records.map((r) => ({
+        student_id: r.student_id,
+        status: r.status,
+      })),
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });

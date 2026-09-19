@@ -156,7 +156,7 @@ export const updateAdmissionStatusSchema = z.object({
  */
 export const registerStudentSchema = z.object({
   gender: z.enum(["male", "female"]).optional(),
-  dob: z.string().iso().optional(),
+  dob: z.iso.datetime().optional(),
   roll: z.number().int().min(1).max(999).optional(),
 });
 

@@ -31,8 +31,8 @@ const createFeePlanSchema = z.object({
   ).optional(),
 });
 
-/** GET /api/v1/fees/plans — list fee plans */
-export async function GET(req: Request) {
+/** GET /api/v1/fees/plans — list fee plans (perm: fees.view) */
+export const GET = withPermission("fees.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -106,7 +106,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/fees/plans — create fee plan */
 export const POST = withPermission("fees.plan.edit", async (req) => {

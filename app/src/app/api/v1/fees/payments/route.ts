@@ -38,8 +38,8 @@ const collectPaymentSchema = z.object({
   notes: z.string().optional(),
 });
 
-/** GET /api/v1/fees/payments — list payments */
-export async function GET(req: Request) {
+/** GET /api/v1/fees/payments — list payments (perm: fees.view) */
+export const GET = withPermission("fees.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/fees/payments — collect payment (Golden Flow) */
 export const POST = withPermission("fees.payment.create", async (req) => {

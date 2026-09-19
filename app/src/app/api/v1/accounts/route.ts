@@ -30,8 +30,8 @@ const createAccountSchema = z.object({
   opening_balance: z.number().optional(),
 });
 
-/** GET /api/v1/accounts — chart of accounts */
-export async function GET(req: Request) {
+/** GET /api/v1/accounts — list accounts (perm: accounting.ledger.view) */
+export const GET = withPermission("accounting.ledger.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -92,7 +92,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/accounts — create account */
 export const POST = withPermission("accounting.ledger.post", async (req) => {

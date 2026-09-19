@@ -34,6 +34,32 @@ export class ApiError extends Error {
 /** Base URL for all API calls (relative — same origin) */
 const BASE_URL = "/api/v1";
 
+/**
+ * Deeply converts snake_case keys to camelCase.
+ *
+ * The backend API returns snake_case (e.g. `name_bn`, `student_id`,
+ * `is_paid`). The frontend was designed against a mock API that used
+ * camelCase (`nameBn`, `studentId`, `isPaid`). This transformer bridges
+ * the gap so components don't need to change.
+ */
+function toCamel<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(toCamel) as unknown as T;
+  }
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    const source = value as Record<string, unknown>;
+    for (const key of Object.keys(source)) {
+      const camelKey = key.replace(/_([a-z0-9])/g, (_, c) =>
+        c.toUpperCase(),
+      );
+      result[camelKey] = toCamel(source[key]);
+    }
+    return result as T;
+  }
+  return value;
+}
+
 /** Fetch wrapper with error handling */
 async function apiFetch<T>(
   endpoint: string,
@@ -64,7 +90,10 @@ async function apiFetch<T>(
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  const json = await response.json();
+  // Transform snake_case → camelCase so frontend components (designed
+  // against the camelCase mock API) consume real backend data unchanged.
+  return toCamel(json) as T;
 }
 
 /** Upload with multipart form data */
@@ -89,7 +118,7 @@ async function apiUpload<T>(
     throw new ApiError(response.status, body, endpoint);
   }
 
-  return response.json() as Promise<T>;
+  return toCamel(await response.json()) as T;
 }
 
 // ============================================================
@@ -132,23 +161,23 @@ export const api = {
       user: {
         id: string;
         name: string;
-        name_bn: string | null;
+        nameBn: string | null;
         email: string;
         role: string;
-        organization_id: string;
-        branch_id: string | null;
+        organizationId: string;
+        branchId: string | null;
       };
       permissions: string[];
     }>("/auth/session").then((res) => ({
       id: res.user.id,
       role: res.user.role,
       name: res.user.name,
-      name_bn: res.user.name_bn ?? "",
+      nameBn: res.user.nameBn ?? "",
       email: res.user.email,
       phone: "",
-      branchId: res.user.branch_id ?? "",
+      branchId: res.user.branchId ?? "",
       avatarInitial: res.user.name.charAt(0).toUpperCase(),
-      organization_id: res.user.organization_id,
+      organization_id: res.user.organizationId,
     }));
   },
 
@@ -159,11 +188,11 @@ export const api = {
 
   // --- Classes ---
   async getClasses() {
-    const res = await apiFetch<{ data: Array<{ id: string; name: string; name_bn: string; level: number; sections: Array<{ id: string; name: string }> }> }>("/classes");
+    const res = await apiFetch<{ data: Array<{ id: string; name: string; nameBn: string; level: number; sections: Array<{ id: string; name: string }> }> }>("/classes");
     return res.data.map((c) => ({
       id: c.id,
       name: c.name,
-      nameBn: c.name_bn,
+      nameBn: c.nameBn,
       level: c.level,
       branchId: "",
       sections: c.sections.map((s) => s.name),
@@ -171,20 +200,73 @@ export const api = {
   },
 
   // --- Students ---
+  // Frontend expects flat camelCase fields: classId (string), section (name
+  // string), guardianId (string), nameBn, nameAr. The API returns nested
+  // objects (class: {id,name}, section: {id,name}, primary_guardian: {...}).
+  // Flatten here so components don't change.
   async getStudents() {
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/students");
-    return res.data as never;
+    return res.data.map((s) => ({
+      id: s.id,
+      code: s.code,
+      name: s.name,
+      nameBn: (s.nameBn as string) ?? "",
+      nameAr: (s.nameAr as string) ?? "",
+      roll: s.roll,
+      gender: s.gender,
+      dob: s.dob,
+      status: s.status,
+      classId: (s.class as { id?: string } | null)?.id ?? "",
+      className: (s.class as { name?: string } | null)?.name ?? "",
+      section: (s.section as { name?: string } | null)?.name ?? "",
+      sectionId: (s.section as { id?: string } | null)?.id ?? "",
+      guardianId: (s.primaryGuardian as { id?: string } | null)?.id ?? "",
+      guardianName: (s.primaryGuardian as { name?: string } | null)?.name ?? "",
+      guardianPhone: (s.primaryGuardian as { phone?: string } | null)?.phone ?? "",
+    })) as never;
   },
 
   async getStudentById(id: string) {
-    return apiFetch<Record<string, unknown>>(`/students/${id}`) as never;
+    const s = await apiFetch<Record<string, unknown>>(`/students/${id}`);
+    return {
+      id: s.id,
+      code: s.code,
+      name: s.name,
+      nameBn: (s.nameBn as string) ?? "",
+      nameAr: (s.nameAr as string) ?? "",
+      roll: s.roll,
+      gender: s.gender,
+      dob: s.dob,
+      status: s.status,
+      classId: (s.class as { id?: string } | null)?.id ?? "",
+      className: (s.class as { name?: string } | null)?.name ?? "",
+      section: (s.section as { name?: string } | null)?.name ?? "",
+      sectionId: (s.section as { id?: string } | null)?.id ?? "",
+      guardianId: (s.primaryGuardian as { id?: string } | null)?.id ?? "",
+      guardianName: (s.primaryGuardian as { name?: string } | null)?.name ?? "",
+    } as never;
   },
 
   async getStudentsByClass(classId: string, section?: string) {
     const params = new URLSearchParams({ class_id: classId });
     if (section) params.set("section", section);
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>(`/students?${params}`);
-    return res.data as never;
+    return (res.data as Array<Record<string, unknown>>).map((s) => ({
+      id: s.id,
+      code: s.code,
+      name: s.name,
+      nameBn: (s.nameBn as string) ?? "",
+      nameAr: (s.nameAr as string) ?? "",
+      roll: s.roll,
+      gender: s.gender,
+      dob: s.dob,
+      status: s.status,
+      classId: (s.class as { id?: string } | null)?.id ?? "",
+      className: (s.class as { name?: string } | null)?.name ?? "",
+      section: (s.section as { name?: string } | null)?.name ?? "",
+      sectionId: (s.section as { id?: string } | null)?.id ?? "",
+      guardianId: (s.primaryGuardian as { id?: string } | null)?.id ?? "",
+    })) as never;
   },
 
   // --- Guardians ---
@@ -210,9 +292,32 @@ export const api = {
     return res.data as never;
   },
 
+  // Frontend expects flat ID strings: debitAccount, creditAccount,
+  // postedBy (all used as keys to look up account/user names). The API
+  // returns nested objects: debitAccount: {id,name,code,type}. Flatten
+  // the .id out so the component's accountMap.get(e.debitAccount) works.
   async getLedgerEntries() {
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/ledger");
-    return res.data as never;
+    return res.data.map((e) => ({
+      id: e.id,
+      voucherNo: e.voucherNo,
+      date: e.date,
+      narration: e.narration,
+      debitAccount: (e.debitAccount as { id?: string } | null)?.id ?? "",
+      debitAccountName: (e.debitAccount as { name?: string } | null)?.name ?? "",
+      creditAccount: (e.creditAccount as { id?: string } | null)?.id ?? "",
+      creditAccountName: (e.creditAccount as { name?: string } | null)?.name ?? "",
+      amount: e.amount,
+      fund: e.fund,
+      status: e.status,
+      // postedBy may already be a name string from the API; keep it as-is
+      // so the component's postedBy(id) lookup falls through to ?? id → name.
+      postedBy: e.postedBy ?? "",
+      postedAt: e.postedAt,
+      sourceType: e.sourceType,
+      isReversed: e.isReversed,
+      runningBalance: e.runningBalance,
+    })) as never;
   },
 
   // --- Attendance ---

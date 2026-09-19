@@ -37,18 +37,49 @@ const results: FlowResult[] = [];
 // --- Helpers ---
 
 async function login(email: string, password: string): Promise<{ token: string; cookies: string }> {
+  // NextAuth v4 requires a CSRF token in the POST body of the credentials
+  // callback. Fetch it from /api/auth/csrf first, then include both the
+  // token (in the body) and the csrf cookie (in the headers).
+  const csrfRes = await fetch(`${AUTH_URL}/csrf`);
+  const { csrfToken } = (await csrfRes.json()) as { csrfToken: string };
+  const csrfCookie = csrfRes.headers.get("set-cookie") || "";
+  // Extract just the name=value pair from the csrf set-cookie
+  const csrfCookiePair = (csrfCookie.match(/next-auth\.csrf-token=[^;]+/) || [""])[0];
+
   const res = await fetch(`${AUTH_URL}/callback/credentials`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ email, password, redirect: "false", json: "true" }),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(csrfCookiePair ? { Cookie: csrfCookiePair } : {}),
+    },
+    body: new URLSearchParams({
+      email,
+      password,
+      csrfToken,
+      redirect: "false",
+      json: "true",
+    }),
     redirect: "manual",
   });
 
-  const setCookie = res.headers.get("set-cookie") || "";
-  const tokenMatch = setCookie.match(/next-auth\.session-token=([^;]+)/);
+  // Extract session-token from the Set-Cookie header.
+  const rawSetCookie = res.headers.get("set-cookie") || "";
+  const tokenMatch = rawSetCookie.match(/next-auth\.session-token=([^;]+)/);
   const token = tokenMatch ? tokenMatch[1] : "";
 
-  return { token, cookies: setCookie };
+  // Build a clean Cookie header with all NextAuth cookies.
+  const cookiePairs: string[] = [];
+  const cookieRegex = /(next-auth\.[^=,\s]+)=([^;,]*(?:,[^;]*)?)/g;
+  let match: RegExpExecArray | null;
+  while ((match = cookieRegex.exec(rawSetCookie)) !== null) {
+    cookiePairs.push(`${match[1]}=${match[2].trim()}`);
+  }
+  // Also include the original csrf cookie (for subsequent requests)
+  if (csrfCookiePair && !cookiePairs.some((p) => p.startsWith("next-auth.csrf-token="))) {
+    cookiePairs.push(csrfCookiePair);
+  }
+
+  return { token, cookies: cookiePairs.join("; ") };
 }
 
 function authHeaders(cookies: string): Record<string, string> {
@@ -82,8 +113,8 @@ async function flow1_LoginAsTeacher(): Promise<FlowResult> {
 
   try {
     // Login as teacher
-    const login = await login("bilal@madrashaos.org", "password123");
-    if (login.cookies) {
+    const auth = await login("bilal@madrashaos.org", "password123");
+    if (auth.cookies) {
       steps.push({ name: "Login as Teacher", status: "pass" });
     } else {
       steps.push({ name: "Login as Teacher", status: "fail", detail: "No session cookie" });
@@ -91,7 +122,7 @@ async function flow1_LoginAsTeacher(): Promise<FlowResult> {
     }
 
     // Get session
-    const session = await apiGet("/auth/session", login.cookies);
+    const session = await apiGet("/auth/session", auth.cookies);
     if (session.status === 200 && session.body?.user?.role === "teacher") {
       steps.push({ name: "Session shows teacher role", status: "pass" });
     } else {
@@ -99,7 +130,7 @@ async function flow1_LoginAsTeacher(): Promise<FlowResult> {
     }
 
     // Verify teacher CANNOT access fees (D3)
-    const feesAccess = await apiGet("/fees/plans", login.cookies);
+    const feesAccess = await apiGet("/fees/plans", auth.cookies);
     if (feesAccess.status === 403) {
       steps.push({ name: "D3: Teacher blocked from fees", status: "pass" });
     } else {
@@ -107,7 +138,7 @@ async function flow1_LoginAsTeacher(): Promise<FlowResult> {
     }
 
     // Verify teacher CAN access attendance
-    const attAccess = await apiGet("/attendance/sessions", login.cookies);
+    const attAccess = await apiGet("/attendance/sessions", auth.cookies);
     if (attAccess.status === 200) {
       steps.push({ name: "Teacher can access attendance", status: "pass" });
     } else {
@@ -126,8 +157,8 @@ async function flow2_LoginAsAccountant(): Promise<FlowResult> {
   const steps: FlowResult["steps"] = [];
 
   try {
-    const login = await login("accounts@madrashaos.org", "password123");
-    if (login.cookies) {
+    const auth = await login("accounts@madrashaos.org", "password123");
+    if (auth.cookies) {
       steps.push({ name: "Login as Accountant", status: "pass" });
     } else {
       steps.push({ name: "Login as Accountant", status: "fail" });
@@ -135,7 +166,7 @@ async function flow2_LoginAsAccountant(): Promise<FlowResult> {
     }
 
     // Verify accountant CAN access fees
-    const feesAccess = await apiGet("/fees/plans", login.cookies);
+    const feesAccess = await apiGet("/fees/plans", auth.cookies);
     if (feesAccess.status === 200) {
       steps.push({ name: "Accountant can access fees", status: "pass" });
     } else {
@@ -143,7 +174,7 @@ async function flow2_LoginAsAccountant(): Promise<FlowResult> {
     }
 
     // Verify accountant CAN access ledger
-    const ledgerAccess = await apiGet("/ledger", login.cookies);
+    const ledgerAccess = await apiGet("/ledger", auth.cookies);
     if (ledgerAccess.status === 200) {
       steps.push({ name: "Accountant can access ledger", status: "pass" });
     } else {
@@ -151,7 +182,7 @@ async function flow2_LoginAsAccountant(): Promise<FlowResult> {
     }
 
     // Verify accountant CANNOT approve own request (D16 — check approvals)
-    const approvals = await apiGet("/approvals/pending", login.cookies);
+    const approvals = await apiGet("/approvals/pending", auth.cookies);
     if (approvals.status === 200) {
       const hasOwnRequests = approvals.body?.data?.some((a: { is_self_request?: boolean }) => a.is_self_request);
       steps.push({ name: "D16: Pending list excludes self-requests", status: hasOwnRequests ? "fail" : "pass" });
@@ -171,8 +202,8 @@ async function flow3_LoginAsAuthority(): Promise<FlowResult> {
   const steps: FlowResult["steps"] = [];
 
   try {
-    const login = await login("principal@madrashaos.org", "password123");
-    if (login.cookies) {
+    const auth = await login("principal@madrashaos.org", "password123");
+    if (auth.cookies) {
       steps.push({ name: "Login as Authority", status: "pass" });
     } else {
       steps.push({ name: "Login as Authority", status: "fail" });
@@ -180,7 +211,7 @@ async function flow3_LoginAsAuthority(): Promise<FlowResult> {
     }
 
     // Verify authority CAN see audit trail
-    const auditAccess = await apiGet("/audit", login.cookies);
+    const auditAccess = await apiGet("/audit", auth.cookies);
     if (auditAccess.status === 200) {
       steps.push({ name: "Authority can access audit trail", status: "pass" });
     } else {
@@ -188,7 +219,7 @@ async function flow3_LoginAsAuthority(): Promise<FlowResult> {
     }
 
     // Verify authority CAN see pending approvals
-    const approvals = await apiGet("/approvals/pending", login.cookies);
+    const approvals = await apiGet("/approvals/pending", auth.cookies);
     if (approvals.status === 200) {
       steps.push({ name: "Authority can see pending approvals", status: "pass" });
     } else {
@@ -207,8 +238,8 @@ async function flow4_LoginAsAdministrator(): Promise<FlowResult> {
   const steps: FlowResult["steps"] = [];
 
   try {
-    const login = await login("admin@madrashaos.org", "password123");
-    if (login.cookies) {
+    const auth = await login("admin@madrashaos.org", "password123");
+    if (auth.cookies) {
       steps.push({ name: "Login as Administrator", status: "pass" });
     } else {
       steps.push({ name: "Login as Administrator", status: "fail" });
@@ -216,7 +247,7 @@ async function flow4_LoginAsAdministrator(): Promise<FlowResult> {
     }
 
     // Verify admin CAN access students
-    const students = await apiGet("/students", login.cookies);
+    const students = await apiGet("/students", auth.cookies);
     if (students.status === 200) {
       steps.push({ name: "Admin can access students", status: "pass" });
     } else {
@@ -224,7 +255,7 @@ async function flow4_LoginAsAdministrator(): Promise<FlowResult> {
     }
 
     // Verify admin CAN access modules
-    const modules = await apiGet("/modules", login.cookies);
+    const modules = await apiGet("/modules", auth.cookies);
     if (modules.status === 200) {
       steps.push({ name: "Admin can access modules", status: "pass" });
     } else {
@@ -232,7 +263,7 @@ async function flow4_LoginAsAdministrator(): Promise<FlowResult> {
     }
 
     // Verify admin CAN access RBAC
-    const roles = await apiGet("/roles", login.cookies);
+    const roles = await apiGet("/roles", auth.cookies);
     if (roles.status === 200) {
       steps.push({ name: "Admin can access RBAC", status: "pass" });
     } else {
@@ -251,8 +282,8 @@ async function flow5_LoginAsGuardian(): Promise<FlowResult> {
   const steps: FlowResult["steps"] = [];
 
   try {
-    const login = await login("omar.parent@example.com", "password123");
-    if (login.cookies) {
+    const auth = await login("omar.parent@example.com", "password123");
+    if (auth.cookies) {
       steps.push({ name: "Login as Guardian", status: "pass" });
     } else {
       steps.push({ name: "Login as Guardian", status: "fail" });
@@ -260,7 +291,7 @@ async function flow5_LoginAsGuardian(): Promise<FlowResult> {
     }
 
     // Verify guardian CAN access notices
-    const notices = await apiGet("/notices", login.cookies);
+    const notices = await apiGet("/notices", auth.cookies);
     if (notices.status === 200) {
       steps.push({ name: "Guardian can access notices", status: "pass" });
     } else {
@@ -268,7 +299,7 @@ async function flow5_LoginAsGuardian(): Promise<FlowResult> {
     }
 
     // Verify guardian CANNOT access all students (only own children)
-    const allStudents = await apiGet("/students", login.cookies);
+    const allStudents = await apiGet("/students", auth.cookies);
     if (allStudents.status === 403) {
       steps.push({ name: "D3: Guardian blocked from all students", status: "pass" });
     } else {
@@ -287,8 +318,8 @@ async function flow6_LoginAsStorekeeper(): Promise<FlowResult> {
   const steps: FlowResult["steps"] = [];
 
   try {
-    const login = await login("store@madrashaos.org", "password123");
-    if (login.cookies) {
+    const auth = await login("store@madrashaos.org", "password123");
+    if (auth.cookies) {
       steps.push({ name: "Login as Storekeeper", status: "pass" });
     } else {
       steps.push({ name: "Login as Storekeeper", status: "fail" });
@@ -296,7 +327,7 @@ async function flow6_LoginAsStorekeeper(): Promise<FlowResult> {
     }
 
     // Verify storekeeper CAN access inventory
-    const inv = await apiGet("/inventory", login.cookies);
+    const inv = await apiGet("/inventory", auth.cookies);
     if (inv.status === 200) {
       steps.push({ name: "Storekeeper can access inventory", status: "pass" });
     } else {
@@ -304,7 +335,7 @@ async function flow6_LoginAsStorekeeper(): Promise<FlowResult> {
     }
 
     // Verify storekeeper CANNOT access fees (D3)
-    const fees = await apiGet("/fees/plans", login.cookies);
+    const fees = await apiGet("/fees/plans", auth.cookies);
     if (fees.status === 403) {
       steps.push({ name: "D3: Storekeeper blocked from fees", status: "pass" });
     } else {
