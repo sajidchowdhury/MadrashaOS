@@ -1,7 +1,5 @@
 # MadrashaOS — PostgreSQL Database (Docker Compose)
 #
-# Session B0.1 — PostgreSQL Setup + Connection
-#
 # Usage:
 #   docker compose up -d          # start PostgreSQL
 #   docker compose logs -f db     # view logs
@@ -9,7 +7,10 @@
 #   docker compose down -v        # stop + DELETE all data
 #
 # Connection string (matches .env):
-#   postgresql://madrashaos:secret@localhost:5432/madrashaos?schema=public
+#   postgresql://madrasha:madrasha@localhost:5433/madrashaos?schema=public
+#
+# The POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB below MUST match
+# the DATABASE_URL in your .env file. If you change them here, update .env too.
 
 services:
   db:
@@ -19,8 +20,8 @@ services:
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_USER: madrashaos
-      POSTGRES_PASSWORD: secret
+      POSTGRES_USER: madrasha
+      POSTGRES_PASSWORD: madrasha
       POSTGRES_DB: madrashaos
       # Optional: tune for development
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
@@ -28,7 +29,7 @@ services:
       # Persistent data storage (survives container restarts)
       - madrashaos_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U madrashaos -d madrashaos"]
+      test: ["CMD-SHELL", "pg_isready -U madrasha -d madrashaos"]
       interval: 5s
       timeout: 5s
       retries: 5

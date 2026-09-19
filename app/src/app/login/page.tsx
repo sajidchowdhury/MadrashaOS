@@ -493,7 +493,7 @@ export default function LoginPage() {
                 <span className="font-medium">Dev hint:</span> the seed script
                 creates 8 demo users — e.g.{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-caption text-foreground">
-                  administrator@madrasha.local
+                  admin@madrashaos.org
                 </code>{" "}
                 /{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-caption text-foreground">
