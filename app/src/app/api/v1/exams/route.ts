@@ -18,8 +18,8 @@ export const dynamic = "force-dynamic";
 const createExamSchema = z.object({
   name: z.string().min(1).max(255),
   name_bn: z.string().optional(),
-  class_id: z.string().uuid(),
-  subject_id: z.string().uuid().optional(),
+  class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  subject_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
   academic_year: z.number().int().optional(),
   term: z.enum(["first", "second", "final", "test", "quiz"]).optional(),
   exam_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

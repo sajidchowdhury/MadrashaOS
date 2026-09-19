@@ -203,6 +203,40 @@ export function useFeePayments(
   });
 }
 
+export function useExams(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["exams", ...sessionKey()],
+    queryFn: () => api.getExams(),
+    ...options,
+  });
+}
+
+export function useExam(
+  id: string,
+  options?: Omit<UseQueryOptions<unknown>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["exam", id, ...sessionKey()],
+    queryFn: () => api.getExamById(id),
+    enabled: !!id,
+    ...options,
+  });
+}
+
+export function useExamMarks(
+  examId: string,
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["exam-marks", examId, ...sessionKey()],
+    queryFn: () => api.getExamMarks(examId),
+    enabled: !!examId,
+    ...options,
+  });
+}
+
 export function useAccounts(
   options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {

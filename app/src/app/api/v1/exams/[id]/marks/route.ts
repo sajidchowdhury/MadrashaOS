@@ -20,8 +20,8 @@ export const dynamic = "force-dynamic";
 const enterMarksSchema = z.object({
   marks: z.array(
     z.object({
-      student_id: z.string().uuid(),
-      subject_id: z.string().uuid(),
+      student_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+      subject_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
       marks_obtained: z.number().min(0),
       is_absent: z.boolean().optional(),
       remark: z.string().optional(),
@@ -117,39 +117,56 @@ export const PUT = withPermission("exams.enter-marks", async (req: Request, ctx:
   // Use the exam's subject_id if not provided per mark
   const subjectId = exam.subject_id;
 
-  // Upsert each mark in a transaction
-  const result = await db.$transaction(
-    parsed.data.marks.map((mark) =>
-      db.mark.upsert({
+  // Save marks in a transaction using findFirst + update-or-create.
+  // The Mark model has @@unique([exam_id, student_id, subject_id]) — a
+  // 3-field compound key — but since subject_id may vary, we use
+  // findFirst (by exam_id + student_id) to detect existing marks and
+  // update them, or create new ones.
+  const result = await db.$transaction(async (tx) => {
+    const saved: unknown[] = [];
+    for (const mark of parsed.data.marks) {
+      const effectiveSubjectId = mark.subject_id || subjectId || mark.subject_id;
+      const existing = await tx.mark.findFirst({
         where: {
-          exam_id_student_id: {
-            exam_id: id,
-            student_id: mark.student_id,
-          } as never,
-        },
-        update: {
-          marks_obtained: mark.marks_obtained,
-          is_absent: mark.is_absent ?? false,
-          remark: mark.remark ?? null,
-          subject_id: mark.subject_id || subjectId || mark.subject_id,
-          entered_by: tenantCtx.user_id,
-          updated_by: tenantCtx.user_id,
-        } as never,
-        create: {
-          organization_id: tenantCtx.organization_id,
-          branch_id: tenantCtx.branch_id ?? null,
           exam_id: id,
           student_id: mark.student_id,
-          subject_id: mark.subject_id || subjectId || mark.subject_id,
-          marks_obtained: mark.marks_obtained,
-          is_absent: mark.is_absent ?? false,
-          remark: mark.remark ?? null,
-          entered_by: tenantCtx.user_id,
-          created_by: tenantCtx.user_id,
-        } as never,
-      }),
-    ),
-  );
+          deleted_at: null,
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        const updated = await tx.mark.update({
+          where: { id: existing.id },
+          data: {
+            marks_obtained: mark.marks_obtained,
+            is_absent: mark.is_absent ?? false,
+            remark: mark.remark ?? null,
+            subject_id: effectiveSubjectId,
+            entered_by: tenantCtx.user_id,
+            updated_by: tenantCtx.user_id,
+          } as never,
+        });
+        saved.push(updated);
+      } else {
+        const created = await tx.mark.create({
+          data: {
+            organization_id: tenantCtx.organization_id,
+            branch_id: tenantCtx.branch_id ?? null,
+            exam_id: id,
+            student_id: mark.student_id,
+            subject_id: effectiveSubjectId,
+            marks_obtained: mark.marks_obtained,
+            is_absent: mark.is_absent ?? false,
+            remark: mark.remark ?? null,
+            entered_by: tenantCtx.user_id,
+            created_by: tenantCtx.user_id,
+          } as never,
+        });
+        saved.push(created);
+      }
+    }
+    return saved;
+  });
 
   return successResponse(
     { entered: result.length, exam_id: id },

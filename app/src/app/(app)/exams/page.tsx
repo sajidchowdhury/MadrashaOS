@@ -41,54 +41,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { IfPermission } from "@/components/auth/IfPermission";
 import { ExamRow, type Exam } from "@/components/academic/ExamRow";
+import { useExams } from "@/lib/query/client";
 
-// Inline mock data — per task spec, "create inline: Mid-term, Final, Quiz 1, Quiz 2".
-const INITIAL_EXAMS: Exam[] = [
-  {
-    id: "exam-mt-1",
-    name: "Mid-term Examination",
-    date: "2026-09-25",
-    classId: "cls-5",
-    className: "Class 5",
-    section: "A",
-    subject: "Quran & Tajweed",
-    fullMarks: 100,
-    status: "active",
-  },
-  {
-    id: "exam-final-1",
-    name: "Final Examination",
-    date: "2026-11-20",
-    classId: "cls-5",
-    className: "Class 5",
-    section: "A",
-    subject: "Arabic Grammar",
-    fullMarks: 100,
-    status: "draft",
-  },
-  {
-    id: "exam-quiz-1",
-    name: "Quiz 1 — Hadith",
-    date: "2026-09-10",
-    classId: "cls-5",
-    className: "Class 5",
-    section: "A",
-    subject: "Hadith Studies",
-    fullMarks: 25,
-    status: "published",
-  },
-  {
-    id: "exam-quiz-2",
-    name: "Quiz 2 — Fiqh",
-    date: "2026-09-18",
-    classId: "cls-5",
-    className: "Class 5",
-    section: "A",
-    subject: "Fiqh (Jurisprudence)",
-    fullMarks: 25,
-    status: "draft",
-  },
-];
+// Real exams are fetched from the API via useExams() hook.
+// The Exam type is retained for the ExamRow component compatibility.
 
 export default function ExamsListPage() {
   const router = useRouter();
@@ -102,7 +58,19 @@ export default function ExamsListPage() {
     s.permissions.includes("exams.publish"),
   );
 
-  const [exams, setExams] = useState<Exam[]>(INITIAL_EXAMS);
+  const examsQuery = useExams();
+  // Map API response (camelCase) to the Exam shape ExamRow expects
+  const exams: Exam[] = ((examsQuery.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
+    id: e.id as string,
+    name: (e.name as string) ?? "Unnamed",
+    date: (e.examDate as string) ?? "",
+    classId: (e.classId as string) ?? "",
+    className: (e.className as string) ?? "—",
+    section: "",
+    subject: (e.subjectName as string) ?? "—",
+    fullMarks: (e.fullMarks as number) ?? 100,
+    status: ((e.status as string) ?? "draft") as Exam["status"],
+  }));
   const [publishTarget, setPublishTarget] = useState<Exam | null>(null);
 
   function handleEnterMarks(exam: Exam) {
@@ -113,15 +81,38 @@ export default function ExamsListPage() {
     setPublishTarget(exam);
   }
 
-  function confirmPublish() {
+  async function confirmPublish() {
     if (!publishTarget) return;
-    setExams((prev) =>
-      prev.map((e) => (e.id === publishTarget.id ? { ...e, status: "published" } : e)),
-    );
-    toast({
-      title: "Exam published",
-      description: `${publishTarget.name} is now locked. Marks can no longer be edited.`,
-    });
+    // Call the real publish API
+    try {
+      const res = await fetch(`/api/v1/exams/${publishTarget.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({
+          title: "Publish failed",
+          description: data?.error || `Server returned ${res.status}.`,
+          variant: "destructive",
+        });
+        setPublishTarget(null);
+        return;
+      }
+      toast({
+        title: "Exam published",
+        description: `${publishTarget.name} is now locked. Marks can no longer be edited.`,
+      });
+      // Refetch the exams list
+      const { queryClient } = await import("@/lib/query/client");
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
     setPublishTarget(null);
   }
 
@@ -131,6 +122,29 @@ export default function ExamsListPage() {
         title="Examinations"
         subtitle="Manage exam papers · enter marks · publish results."
       />
+
+      {examsQuery.isLoading && (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 animate-pulse rounded-lg border border-border-default bg-surface-card" />
+          ))}
+        </div>
+      )}
+
+      {examsQuery.isError && (
+        <div className="rounded-lg border border-semantic-danger/30 bg-danger-50 p-4 text-body text-text-primary">
+          Failed to load exams.{" "}
+          <button onClick={() => examsQuery.refetch()} className="font-semibold text-primary-600 underline">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!examsQuery.isLoading && !examsQuery.isError && exams.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border-default bg-surface-card p-8 text-center">
+          <p className="text-body text-text-secondary">No exams configured yet.</p>
+        </div>
+      )}
 
       <ul className="space-y-2">
         {exams.map((exam) => (

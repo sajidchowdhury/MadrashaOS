@@ -358,6 +358,21 @@ export const api = {
     return res.data as never;
   },
 
+  // --- Exams + Marks ---
+  async getExams() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/exams?pageSize=100");
+    return res.data as never;
+  },
+
+  async getExamById(id: string) {
+    return apiFetch<Record<string, unknown>>(`/exams/${id}`) as never;
+  },
+
+  async getExamMarks(examId: string) {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>(`/exams/${examId}/marks`);
+    return res.data as never;
+  },
+
   // --- Accounts + Ledger ---
   async getAccounts() {
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/accounts");
