@@ -155,6 +155,30 @@ export const api = {
     return res.data;
   },
 
+  /**
+   * POST /api/v1/branches/switch — switch the current session's active branch.
+   *
+   * Risk R1 (Session 0.4): the server updates `User.branch_id` in the DB
+   * but the NextAuth JWT is stateless and still carries the OLD branch_id
+   * until the session is refreshed. The caller is responsible for forcing
+   * a session refresh after this resolves — the simplest reliable way is
+   * `window.location.reload()`, which triggers a fresh `useCurrentUser()`
+   * fetch (reads the updated DB row via `/api/v1/auth/session`) and the
+   * `(app)/layout.tsx` sync effect then propagates the new branch into
+   * the sessionStore.
+   */
+  async switchBranch(branchId: string) {
+    return apiFetch<{
+      id: string;
+      code: string;
+      name: string;
+      nameBn: string | null;
+    }>(`/branches/switch`, {
+      method: "POST",
+      body: JSON.stringify({ branch_id: branchId }),
+    });
+  },
+
   // --- Current User ---
   async getCurrentUser() {
     return apiFetch<{

@@ -356,29 +356,31 @@ export async function POST(req: Request) {
     return donation;
   });
 
-  // Audit log (only if authenticated)
-  if (userId) {
-    await db.auditLog.create({
-      data: {
-        organization_id: orgId,
-        branch_id: branchId,
-        entity_type: "donations",
-        entity_id: result.id,
-        action: "create",
-        old_values: null,
-        new_values: {
-          receipt_no: receiptNo,
-          amount: data.amount,
-          donation_type: data.donation_type,
-          fund: fundType,
-          donor: donorName ?? "Anonymous",
-          is_anonymous: data.is_anonymous,
-          ledger_voucher: ledgerVoucherNo,
-        },
-        actor_user_id: userId,
-      } as never,
-    });
-  }
+  // Audit log — ALWAYS written, even for public (unauthenticated) donations.
+  // Per prisma/schema.prisma: `actor_user_id String? @db.Uuid` is nullable,
+  // so `null` is recorded for public donations (Risk R10 — public donations
+  // must leave a complete audit trail, just without an actor user reference).
+  await db.auditLog.create({
+    data: {
+      organization_id: orgId,
+      branch_id: branchId,
+      entity_type: "donations",
+      entity_id: result.id,
+      action: "create",
+      old_values: null,
+      new_values: {
+        receipt_no: receiptNo,
+        amount: data.amount,
+        donation_type: data.donation_type,
+        fund: fundType,
+        donor: donorName ?? "Anonymous",
+        is_anonymous: data.is_anonymous,
+        ledger_voucher: ledgerVoucherNo,
+        is_public: userId === null,
+      },
+      actor_user_id: userId,
+    } as never,
+  });
 
   // --- Phase 4: Send receipt notification to donor (non-blocking) ---
   // Fire-and-forget — a notification failure must NOT roll back the donation.

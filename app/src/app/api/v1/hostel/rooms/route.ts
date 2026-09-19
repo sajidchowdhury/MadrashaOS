@@ -28,7 +28,7 @@ const createRoomSchema = z.object({
 });
 
 /** GET /api/v1/hostel/rooms — list with occupancy */
-export async function GET(req: Request) {
+export const GET = withPermission("hostel.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
     },
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/hostel/rooms — create room (+ optional auto-create beds) */
 export const POST = withPermission("hostel.allocate", async (req) => {

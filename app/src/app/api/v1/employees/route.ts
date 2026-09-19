@@ -78,7 +78,7 @@ async function nextEmployeeCode(organization_id: string): Promise<string> {
 }
 
 /** GET /api/v1/employees — list */
-export async function GET(req: Request) {
+export const GET = withPermission("employees.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) {
     return errorResponse("Unauthorized", 401);
@@ -188,7 +188,7 @@ export async function GET(req: Request) {
   }));
 
   return paginatedResponse(data, total, page, pageSize);
-}
+});
 
 /** POST /api/v1/employees — create employee + linked user */
 export const POST = withPermission("employees.create", async (req) => {

@@ -31,7 +31,7 @@ const createSupplierSchema = z.object({
 });
 
 /** GET /api/v1/suppliers */
-export async function GET(req: Request) {
+export const GET = withPermission("suppliers.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -76,7 +76,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/suppliers */
 export const POST = withPermission("suppliers.view", async (req) => {

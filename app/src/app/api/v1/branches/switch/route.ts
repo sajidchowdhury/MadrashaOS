@@ -2,6 +2,7 @@
  * MadrashaOS — Branch Switch API
  *
  * Phase B3.1 — Organization & Multi-Branch API
+ * P6.2 — JWT refresh fix (Session 6.2)
  *
  * POST /api/v1/branches/switch
  *   Switches the user's active branch.
@@ -12,13 +13,25 @@
  *   This endpoint updates the session's branch_id on the server side.
  *   The frontend is responsible for the fresh-tab behavior.
  *
+ * P6.2 JWT refresh:
+ *   The NextAuth JWT (stateless, 15-min TTL) caches `branch_id` at sign-in.
+ *   Without intervention, the JWT keeps the OLD branch_id until it expires
+ *   — so all `tenantWhere(ctx)` calls scope to the old branch.
+ *   Fix: after `User.branch_id` is updated, this route calls
+ *   `invalidateUserBranchCache(user_id)` so the `jwt` callback in
+ *   `src/lib/auth/config.ts` re-reads the new branch_id from the DB on the
+ *   very next request. The client (`src/components/shell/TopBar.tsx`)
+ *   also calls `window.location.reload()` after success to force a fresh
+ *   session fetch + TanStack cache reset.
+ *
  * Body: { branch_id: string (uuid) }
- * Response: { success: true, branch: { id, code, name } }
+ * Response: { success: true, message, data: { id, code, name, name_bn } }
  */
 
 import { db } from "@/lib/db";
 import { getTenantContext } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
+import { invalidateUserBranchCache } from "@/lib/auth/config";
 import { switchBranchSchema } from "@/lib/validation/schemas";
 import { errorResponse, successResponse } from "@/lib/api/helpers";
 
@@ -65,6 +78,13 @@ export const POST = withPermission("organization.branch.switch", async (req) => 
     data: { branch_id: branch_id, updated_by: ctx.user_id },
   });
 
+  // P6.2: Invalidate the in-memory branch cache so the very next request
+  // from this user picks up the new branch_id from the DB. The `jwt`
+  // callback in src/lib/auth/config.ts re-reads branch_id on every call,
+  // but coalesces parallel requests via a 5s cache — this invalidation
+  // ensures the cache doesn't serve the stale old branch_id after a switch.
+  invalidateUserBranchCache(ctx.user_id);
+
   // Log to audit trail (Risk R1: branch switch must be audited)
   await db.auditLog.create({
     data: {
@@ -88,6 +108,6 @@ export const POST = withPermission("organization.branch.switch", async (req) => 
       name: branch.name,
       name_bn: branch.name_bn,
     },
-    "Branch switched successfully",
+    "Branch switched successfully. Your session will refresh on the next request.",
   );
 });

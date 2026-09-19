@@ -30,7 +30,7 @@ const createVehicleSchema = z.object({
 });
 
 /** GET /api/v1/transport/vehicles */
-export async function GET(req: Request) {
+export const GET = withPermission("transport.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -87,7 +87,7 @@ export async function GET(req: Request) {
     summary: { total_vehicles: total, total_fuel_cost: totalFuelCost },
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/transport/vehicles */
 export const POST = withPermission("transport.record-expense", async (req) => {

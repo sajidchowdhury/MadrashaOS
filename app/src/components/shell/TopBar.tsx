@@ -5,7 +5,9 @@
  *
  * Sticky top bar in brand Deep Teal (primary-700) with all control slots:
  *   - Logo + brand name
- *   - Branch switcher (placeholder — wired in C2.1 with R1 fresh-tab lock-in)
+ *   - Branch switcher (P6.2 — functional DropdownMenu calling
+ *     POST /api/v1/branches/switch; on success reloads the page so the
+ *     NextAuth JWT refreshes via the Session 5.1 layout.tsx sync effect)
  *   - Academic year switcher (placeholder — wired in C2.1)
  *   - Search (placeholder)
  *   - Language switcher (functional — variant="onPrimary")
@@ -29,6 +31,9 @@ import {
   Settings,
   LogOut,
   BellOff,
+  Check,
+  Building2,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -42,12 +47,18 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { LanguageSwitcher } from "@/components/dev/language-switcher";
 import { ThemeToggle } from "@/components/dev/theme-toggle";
-import { useNotices, useCurrentUser } from "@/lib/query/client";
+import {
+  useNotices,
+  useCurrentUser,
+  useBranches,
+} from "@/lib/query/client";
+import { api, ApiError } from "@/lib/api/client";
 import { useSessionStore } from "@/stores/sessionStore";
 import { ROLE_LABELS, type Role } from "@/stores/types";
 import { formatDate } from "@/lib/i18n/format";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 /** Audience badge tone + label map (uses FROZEN token utilities). */
 const AUDIENCE_TONE: Record<
@@ -58,6 +69,20 @@ const AUDIENCE_TONE: Record<
   staff: { label: "Staff", className: "border-primary-200 bg-primary-50 text-primary-700" },
   guardians: { label: "Guardians", className: "border-accent-100 bg-accent-50 text-accent-700" },
   class: { label: "Class", className: "border-info/30 bg-info-50 text-info" },
+};
+
+/**
+ * Shape of a branch option in the switcher dropdown.
+ * The `useBranches()` hook is typed as `unknown[]` (the codebase-wide
+ * pattern for TanStack Query hooks in `src/lib/query/client.ts`), so we
+ * cast the data to this shape before iterating.
+ */
+type BranchOption = {
+  id: string;
+  code: string;
+  name: string;
+  nameBn: string | null;
+  isActive: boolean;
 };
 
 export function TopBar({
@@ -73,6 +98,8 @@ export function TopBar({
 
   const { data: notices } = useNotices();
   const { data: currentUser } = useCurrentUser();
+  const { data: branches } = useBranches();
+  const [isSwitching, setIsSwitching] = useState(false);
 
   // 5 most recent notices — newest first by sentAt.
   const recentNotices = (notices ?? [])
@@ -95,6 +122,80 @@ export function TopBar({
   const userLabel = currentUser?.name ?? ROLE_LABELS[role].native;
   const userInitial = currentUser?.avatarInitial ?? userLabel.charAt(0).toUpperCase();
   const roleLabel = ROLE_LABELS[role].english;
+
+  // Active branches for the switcher dropdown. Sorted by name for stable UX.
+  // Cast through `unknown` because `useBranches()` is typed `unknown[]`
+  // (codebase-wide TanStack Query pattern — see src/lib/query/client.ts).
+  const activeBranches = ((branches as unknown as BranchOption[] | undefined) ?? [])
+    .filter((b) => b.isActive !== false)
+    .slice()
+    .sort((a, b) => (a.name < b.name ? -1 : 1));
+
+  // Current branch (matched by id from the server session) — drives both
+  // the button label and the "Current" check in the dropdown.
+  const currentBranchId =
+    (currentUser as { branchId?: string } | undefined)?.branchId ?? "";
+  const currentBranch = activeBranches.find((b) => b.id === currentBranchId);
+  const currentBranchLabel = currentBranch
+    ? locale === "bn"
+      ? currentBranch.nameBn ?? currentBranch.name
+      : currentBranch.name
+    : t("shell.topbar.branch");
+
+  /**
+   * Switch the active branch via POST /api/v1/branches/switch, then force
+   * a full page reload so the new branch_id propagates everywhere.
+   *
+   * Why reload (and not `useSession().update()`): NextAuth v4's JWT
+   * strategy stores `branch_id` in the encrypted cookie on sign-in. The
+   * `jwt({ token, user })` callback historically only seeded the token
+   * when `user` was present (initial sign-in) and left it untouched on
+   * subsequent requests — so the JWT kept the OLD branch_id until it
+   * expired (15 min) or the user re-authenticated.
+   *
+   * P6.2 server-side fix (src/lib/auth/config.ts): the `jwt` callback
+   * now re-reads `branch_id` from the DB on every call where `user` is
+   * undefined. The switch route calls `invalidateUserBranchCache(user_id)`
+   * after the UPDATE, so the very next request from this user picks up
+   * the new branch_id.
+   *
+   * Client-side: after the switch API succeeds, we toast the user and
+   * force `window.location.reload()`. The reload tears down the in-memory
+   * TanStack query cache (which held branch-scoped lists from the old
+   * branch) and re-mounts the app — the layout.tsx Session 5.1 sync
+   * effect re-fetches `/api/v1/auth/session`, which now returns the new
+   * branch_id, and the sessionStore is updated. All subsequent API
+   * requests (e.g. GET /api/v1/students) hit the server with the new
+   * branch_id via the refreshed JWT.
+   */
+  async function handleSwitchBranch(branchId: string, branchName: string) {
+    if (isSwitching) return;
+    if (branchId === currentBranchId) return; // no-op
+
+    setIsSwitching(true);
+    try {
+      await api.switchBranch(branchId);
+      toast({
+        title: "Branch switched",
+        description: `Branch switched to ${branchName}. Refreshing session…`,
+      });
+      // Give the toast a beat to paint before the page tears down.
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    } catch (err) {
+      setIsSwitching(false);
+      const message =
+        err instanceof ApiError
+          ? err.body.error || "Failed to switch branch"
+          : "Failed to switch branch";
+      toast({
+        title: "Switch failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }
 
   function handleLogout() {
     toast({
@@ -130,15 +231,106 @@ export function TopBar({
       {/* Divider */}
       <div className="h-6 w-px bg-primary-600" />
 
-      {/* Branch switcher (placeholder) */}
-      <button
-        type="button"
-        className="hidden items-center gap-1.5 rounded-md bg-primary-600 px-3 py-1.5 text-subtitle transition-colors hover:bg-primary-500 focus-visible:bg-primary-500 lg:flex"
-        aria-label={t("shell.topbar.branch")}
-      >
-        <span>{t("shell.topbar.branch.dhaka")}</span>
-        <ChevronDown className="h-4 w-4" data-directional="true" />
-      </button>
+      {/* Branch switcher — functional dropdown (P6.2 — JWT refresh fix) */}
+      <div className="hidden lg:block">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              disabled={isSwitching || activeBranches.length === 0}
+              className="flex items-center gap-1.5 rounded-md bg-primary-600 px-3 py-1.5 text-subtitle transition-colors hover:bg-primary-500 focus-visible:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label={t("shell.topbar.branch")}
+              aria-haspopup="menu"
+            >
+              {isSwitching ? (
+                <Loader2 className="h-4 w-4 animate-spin" data-directional="true" />
+              ) : (
+                <Building2 className="h-4 w-4" />
+              )}
+              <span className="max-w-[12rem] truncate">{currentBranchLabel}</span>
+              <ChevronDown className="h-4 w-4" data-directional="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            className="w-64 p-0"
+            sideOffset={8}
+          >
+            <div className="flex items-center justify-between border-b border-border-default px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary-500" />
+                <span className="text-subtitle font-semibold text-text-primary">
+                  {t("shell.topbar.branch")}
+                </span>
+              </div>
+              {isSwitching && (
+                <Badge
+                  variant="outline"
+                  className="border-primary-200 bg-primary-50 text-primary-700"
+                >
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Switching…
+                </Badge>
+              )}
+            </div>
+            <ul role="menu" className="max-h-72 overflow-y-auto py-1">
+              {activeBranches.length === 0 && (
+                <li className="px-3 py-3 text-body text-text-muted">
+                  No branches available.
+                </li>
+              )}
+              {activeBranches.map((b) => {
+                const isCurrent = b.id === currentBranchId;
+                const label = locale === "bn" ? b.nameBn ?? b.name : b.name;
+                const altLabel = locale === "bn" ? b.name : b.nameBn ?? b.name;
+                return (
+                  <li key={b.id} role="none">
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isCurrent}
+                      disabled={isSwitching || isCurrent}
+                      onClick={() => handleSwitchBranch(b.id, label)}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-start transition-colors hover:bg-surface-hover focus:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                          isCurrent
+                            ? "bg-primary-500 text-primary-foreground"
+                            : "bg-primary-50 text-primary-500"
+                        }`}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-body font-medium text-text-primary">
+                          {label}
+                        </p>
+                        <p
+                          className="truncate text-caption text-text-muted"
+                          lang={locale === "bn" ? "en" : "bn"}
+                        >
+                          {altLabel} · {b.code}
+                        </p>
+                      </div>
+                      {isCurrent && (
+                        <Check
+                          className="h-4 w-4 shrink-0 text-primary-500"
+                          aria-label="Current branch"
+                        />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <DropdownMenuSeparator className="m-0" />
+            <p className="px-3 py-2 text-caption text-text-muted">
+              Switching reloads the page to refresh your session.
+            </p>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Academic year switcher (placeholder) */}
       <button

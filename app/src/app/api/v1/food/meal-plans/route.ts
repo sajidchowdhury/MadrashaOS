@@ -28,7 +28,7 @@ const createMealPlanSchema = z.object({
 });
 
 /** GET /api/v1/food/meal-plans */
-export async function GET(req: Request) {
+export const GET = withPermission("food.meal-plan", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
     summary: { total_meals: total, total_cost: totalCost },
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/food/meal-plans */
 export const POST = withPermission("food.meal-plan", async (req) => {

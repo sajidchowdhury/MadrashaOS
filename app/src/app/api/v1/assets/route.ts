@@ -29,7 +29,7 @@ const createAssetSchema = z.object({
 });
 
 /** GET /api/v1/assets */
-export async function GET(req: Request) {
+export const GET = withPermission("assets.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
     },
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/assets */
 export const POST = withPermission("assets.view", async (req) => {

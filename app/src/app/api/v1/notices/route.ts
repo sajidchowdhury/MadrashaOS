@@ -2,6 +2,7 @@
  * MadrashaOS — Notices API
  *
  * Phase B8.1 — Notices API (audience + recipient count)
+ * Phase P6.5 — GET gated with withPermission("notices.view")
  *
  * GET  /api/v1/notices — list notices (perm: notices.view)
  * POST /api/v1/notices — compose + send notice (perm: notices.compose + notices.send)
@@ -37,7 +38,7 @@ const createNoticeSchema = z.object({
 });
 
 /** GET /api/v1/notices — list notices */
-export async function GET(req: Request) {
+export const GET = withPermission("notices.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -92,7 +93,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/notices — compose + send notice */
 export const POST = withPermission("notices.compose", async (req) => {
@@ -205,10 +206,12 @@ export const POST = withPermission("notices.compose", async (req) => {
   }
 
   // Check if user has notices.send permission for status='sent'
+  // NOTE: `ctx.permissions` is the JWT permission array surfaced by getTenantContext()
+  // (the NextAuth session object does NOT expose `session.permissions` at its top
+  // level — it lives at `session.user.permissions`). Always read permissions from
+  // the tenant context here, NOT from `getServerSession()` directly.
   if (data.status === "sent") {
-    // Verify the user has notices.send permission
-    const session = await getServerSession(authConfig);
-    if (!session?.permissions?.includes("notices.send")) {
+    if (!ctx.permissions.includes("notices.send")) {
       return errorResponse("You don't have permission to send notices. Save as draft instead.", 403);
     }
   }
@@ -271,7 +274,3 @@ export const POST = withPermission("notices.compose", async (req) => {
     201,
   );
 });
-
-// Import needed for permission check
-import { getServerSession } from "next-auth";
-import { authConfig } from "@/lib/auth/config";

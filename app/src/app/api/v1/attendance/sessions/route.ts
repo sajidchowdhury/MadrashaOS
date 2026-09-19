@@ -42,14 +42,6 @@ const submitAttendanceSchema = z.object({
   ).min(1, "At least one attendance record is required"),
 });
 
-/** In-memory idempotency cache (per-process; Redis in production) */
-const idempotencyCache = new Map<
-  string,
-  { status: number; body: unknown; expiry: number }
->();
-
-const IDEMPOTENCY_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
 /** GET /api/v1/attendance/sessions — list sessions */
 export async function GET(req: Request) {
   const ctx = await getTenantContext();
@@ -124,13 +116,17 @@ export const POST = withPermission("attendance.take", async (req) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
-  // --- Idempotency check ---
+  // --- Session 6.4: DB-backed idempotency (replaces in-memory Map) ---
+  // Uses the IdempotencyRecord table (built in Phase 4) so idempotency
+  // survives server restarts and works across multiple instances.
   const idempotencyKey = req.headers.get("idempotency-key");
   if (idempotencyKey) {
-    const cached = idempotencyCache.get(idempotencyKey);
-    if (cached && cached.expiry > Date.now()) {
+    const cached = await db.idempotencyRecord.findUnique({
+      where: { key: idempotencyKey },
+    });
+    if (cached && cached.expires_at.getTime() > Date.now()) {
       // Return cached response (200, not 201 — this is a replay)
-      return jsonResponse(cached.body, 200, {
+      return jsonResponse(cached.response_body, 200, {
         "X-Idempotent-Replay": "true",
         "X-Idempotency-Key": idempotencyKey,
       });
@@ -186,13 +182,29 @@ export const POST = withPermission("attendance.take", async (req) => {
       message: "Attendance already submitted for this class/date/period",
     };
 
-    // Cache if idempotency key provided
+    // --- Session 6.4: Cache in DB for idempotency ---
     if (idempotencyKey) {
-      idempotencyCache.set(idempotencyKey, {
-        status: 200,
-        body: responseBody,
-        expiry: Date.now() + IDEMPOTENCY_TTL,
-      });
+      try {
+        await db.idempotencyRecord.upsert({
+          where: { key: idempotencyKey },
+          create: {
+            key: idempotencyKey,
+            organization_id: ctx.organization_id,
+            method: "POST",
+            path: "/api/v1/attendance/sessions",
+            status_code: 200,
+            response_body: responseBody as never,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+          update: {
+            status_code: 200,
+            response_body: responseBody as never,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        });
+      } catch {
+        // Non-critical — the response still goes through
+      }
     }
 
     return jsonResponse(responseBody, 200, {
@@ -324,13 +336,29 @@ export const POST = withPermission("attendance.take", async (req) => {
     message: `Attendance submitted — ${totalPresent} Present, ${totalAbsent} Absent`,
   };
 
-  // --- Cache for idempotency ---
+  // --- Session 6.4: Cache in DB for idempotency ---
   if (idempotencyKey) {
-    idempotencyCache.set(idempotencyKey, {
-      status: 201,
-      body: responseBody,
-      expiry: Date.now() + IDEMPOTENCY_TTL,
-    });
+    try {
+      await db.idempotencyRecord.upsert({
+        where: { key: idempotencyKey },
+        create: {
+          key: idempotencyKey,
+          organization_id: ctx.organization_id,
+          method: "POST",
+          path: "/api/v1/attendance/sessions",
+          status_code: 201,
+          response_body: responseBody as never,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+        update: {
+          status_code: 201,
+          response_body: responseBody as never,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+    } catch {
+      // Non-critical — the response still goes through
+    }
   }
 
   return jsonResponse(responseBody, 201);

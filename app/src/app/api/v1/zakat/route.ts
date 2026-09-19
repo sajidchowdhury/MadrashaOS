@@ -17,12 +17,13 @@
 
 import { db } from "@/lib/db";
 import { getTenantContext } from "@/lib/auth/with-tenant";
+import { withPermission } from "@/lib/auth/with-permission";
 import { jsonResponse, errorResponse, parsePagination } from "@/lib/api/helpers";
 
 export const dynamic = "force-dynamic";
 
 /** GET /api/v1/zakat — Zakat dashboard */
-export async function GET(req: Request) {
+export const GET = withPermission("zakat.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -144,4 +145,4 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});

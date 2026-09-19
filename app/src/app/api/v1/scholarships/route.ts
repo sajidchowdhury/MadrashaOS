@@ -27,7 +27,7 @@ const DISCOUNT_THRESHOLD_PERCENTAGE = 50;
 const DISCOUNT_THRESHOLD_AMOUNT = 10000;
 
 const createScholarshipSchema = z.object({
-  student_id: z.string().uuid(),
+  student_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   name: z.string().min(1).max(255),
   type: z.enum(["full", "partial"]).default("partial"),
   percentage: z.number().min(0).max(100).optional(),
@@ -39,7 +39,7 @@ const createScholarshipSchema = z.object({
 });
 
 /** GET /api/v1/scholarships — list scholarships */
-export async function GET(req: Request) {
+export const GET = withPermission("scholarship.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -101,7 +101,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/scholarships — create scholarship (Risk R8: auto-route to approval) */
 export const POST = withPermission("scholarship.view", async (req) => {

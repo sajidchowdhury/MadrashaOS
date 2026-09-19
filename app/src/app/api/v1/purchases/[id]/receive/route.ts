@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 const receiveSchema = z.object({
   received_items: z.array(z.object({
-    purchase_item_id: z.string().uuid(),
+    purchase_item_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
     qty_received: z.number().min(0.01),
   })).min(1, "At least one item to receive is required"),
   received_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -72,7 +72,7 @@ export const POST = withPermission("purchase.create", async (req: Request, ctx: 
     }
   }
 
-  // Update items + inventory in transaction
+  // Update items + inventory + post balanced ledger in transaction
   const result = await db.$transaction(async (tx) => {
     let totalReceivedValue = 0;
 
@@ -97,6 +97,98 @@ export const POST = withPermission("purchase.create", async (req: Request, ctx: 
           updated_by: tenantCtx.user_id,
         } as never,
       });
+    }
+
+    // --- Session 6.1: Post balanced ledger entry ---
+    // Debit: Inventory (asset) — value of goods received
+    // Credit: Cash (if paid immediately) or Accounts Payable (if on credit)
+    // The supplier's payment_terms determines which account to credit.
+    if (totalReceivedValue > 0) {
+      // Find the Inventory asset account (or use a generic "Inventory" account)
+      const inventoryAccount = await tx.account.findFirst({
+        where: {
+          organization_id: tenantCtx.organization_id,
+          type: "asset",
+          deleted_at: null,
+          OR: [
+            { name: { contains: "Inventory", mode: "insensitive" } },
+            { name: { contains: "Stock", mode: "insensitive" } },
+            { code: { contains: "INV", mode: "insensitive" } },
+          ],
+        },
+      });
+
+      // Determine the credit account based on payment method
+      // If the purchase has payment_method="cash" → credit Cash account
+      // Otherwise → credit Accounts Payable
+      const isCashPurchase = (purchase as { payment_method?: string }).payment_method === "cash";
+      const creditAccount = isCashPurchase
+        ? await tx.account.findFirst({
+            where: {
+              organization_id: tenantCtx.organization_id,
+              type: "asset",
+              deleted_at: null,
+              OR: [
+                { name: { contains: "Cash", mode: "insensitive" } },
+                { code: { contains: "CASH", mode: "insensitive" } },
+              ],
+            },
+          })
+        : await tx.account.findFirst({
+            where: {
+              organization_id: tenantCtx.organization_id,
+              OR: [
+                { type: "liability", name: { contains: "Payable", mode: "insensitive" } },
+                { type: "liability", name: { contains: "Supplier", mode: "insensitive" } },
+                { name: { contains: "Accounts Payable", mode: "insensitive" } },
+              ],
+              deleted_at: null,
+            },
+          });
+
+      if (inventoryAccount && creditAccount) {
+        const voucherNo = `PO-RCV-${purchase.po_number}-${Date.now().toString().slice(-6)}`;
+
+        await tx.ledgerEntry.create({
+          data: {
+            organization_id: tenantCtx.organization_id,
+            branch_id: tenantCtx.branch_id ?? null,
+            voucher_no: voucherNo,
+            date: receiveDate,
+            narration: `PO ${purchase.po_number} received — ${data.received_items.length} items from ${purchase.supplier.name}`,
+            debit_account_id: inventoryAccount.id,
+            credit_account_id: creditAccount.id,
+            amount: totalReceivedValue,
+            fund: "general",
+            status: "posted",
+            posted_by: tenantCtx.user_id ?? null,
+            source_type: "purchase_receive",
+            source_id: id,
+            created_by: tenantCtx.user_id ?? null,
+          } as never,
+        });
+
+        // Update account balances
+        // Debit account (asset/expense): balance increases
+        await tx.account.update({
+          where: { id: inventoryAccount.id },
+          data: { balance: { increment: totalReceivedValue } } as never,
+        });
+        // Credit account:
+        // - If Cash (asset): balance decreases
+        // - If Accounts Payable (liability): balance increases
+        if (isCashPurchase) {
+          await tx.account.update({
+            where: { id: creditAccount.id },
+            data: { balance: { decrement: totalReceivedValue } } as never,
+          });
+        } else {
+          await tx.account.update({
+            where: { id: creditAccount.id },
+            data: { balance: { increment: totalReceivedValue } } as never,
+          });
+        }
+      }
     }
 
     // Check if all items are fully received

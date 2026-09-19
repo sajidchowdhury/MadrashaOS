@@ -41,6 +41,76 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 
+/* --- P6.2 Branch-switch JWT refresh cache ----------------------------------
+ *
+ * The `jwt` callback re-reads `branch_id` from the DB on every authenticated
+ * request (so a branch switch takes effect immediately without requiring
+ * re-auth). To avoid hammering the DB on pages that fire many parallel API
+ * calls (e.g. the dashboard hits 6-10 endpoints at once), we cache the
+ * branch_id per-user for a short window.
+ *
+ * The switch route (`/api/v1/branches/switch`) calls
+ * `invalidateUserBranchCache(user_id)` after the UPDATE so the very next
+ * request picks up the new branch_id without waiting for the TTL.
+ *
+ * The cache lives on the module-level `globalThis` so it survives Next.js
+ * HMR in dev and is shared across hot-reloaded module instances. In a
+ * multi-process deployment (e.g. serverless), each process has its own
+ * cache — but the short TTL (5s) bounds staleness.
+ */
+const USER_BRANCH_CACHE_TTL_MS = 5_000;
+
+type BranchCacheEntry = {
+  branchId: string | null;
+  expiresAt: number;
+};
+
+const globalForBranchCache = globalThis as unknown as {
+  __madrashaUserBranchCache?: Map<string, BranchCacheEntry>;
+};
+
+const userBranchCache: Map<string, BranchCacheEntry> =
+  globalForBranchCache.__madrashaUserBranchCache ??
+  new Map<string, BranchCacheEntry>();
+
+if (!globalForBranchCache.__madrashaUserBranchCache) {
+  globalForBranchCache.__madrashaUserBranchCache = userBranchCache;
+}
+
+/**
+ * Returns the user's current `branch_id`, using a short-TTL in-memory cache
+ * to coalesce parallel API requests within the same window. On cache miss
+ * (or expired entry), performs a single indexed `findUnique` on the users
+ * table (PK lookup — <5ms in SQLite/Postgres).
+ */
+async function getCachedUserBranchId(userId: string): Promise<string | null> {
+  const now = Date.now();
+  const cached = userBranchCache.get(userId);
+  if (cached && cached.expiresAt > now) {
+    return cached.branchId;
+  }
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { branch_id: true },
+  });
+  const branchId = user?.branch_id ?? null;
+  userBranchCache.set(userId, {
+    branchId,
+    expiresAt: now + USER_BRANCH_CACHE_TTL_MS,
+  });
+  return branchId;
+}
+
+/**
+ * Invalidates the cached `branch_id` for a user. Called by the
+ * `branches/switch` route after `UPDATE users SET branch_id = ?` so the
+ * very next request from this user picks up the new branch without
+ * waiting for the TTL to expire.
+ */
+export function invalidateUserBranchCache(userId: string): void {
+  userBranchCache.delete(userId);
+}
+
 /**
  * NextAuth config — exported as a function-less object so both the
  * `/api/auth/[...nextauth]` route handler AND the middleware can import
@@ -201,14 +271,31 @@ export const authConfig: NextAuthOptions = {
   // ---- Callbacks ---------------------------------------------------------
   callbacks: {
     /**
-     * `jwt({ user, token })` is called:
-     *   - On initial sign-in (user is the object returned by `authorize`)
-     *   - On every subsequent request (user is undefined — token carries
+     * `jwt({ token, user, trigger })` is called:
+     *   - On initial sign-in (`user` is the object returned by `authorize`)
+     *   - On every subsequent request (`user` is undefined — token carries
      *     forward from the encrypted cookie)
+     *   - When the client calls `useSession().update(...)` (`trigger === "update"`)
      *
      * We seed the JWT with role + tenant + permissions on sign-in, and
-     * preserve them across requests. The callback must be synchronous
-     * about its return value (no await on the hot path).
+     * preserve them across requests.
+     *
+     * --- P6.2 Branch-switch JWT refresh ---
+     * BUG: After `POST /api/v1/branches/switch` updates `User.branch_id` in
+     * the DB, the JWT cookie still carries the OLD branch_id until it
+     * expires (15 min) or the user re-authenticates. All downstream
+     * `tenantWhere(ctx)` calls scope to the old branch.
+     *
+     * FIX: On every call where `user` is undefined (i.e. NOT initial
+     * sign-in), re-read `branch_id` from the DB. This is a single indexed
+     * `findUnique` on the users table (PK lookup, <5ms in SQLite/Postgres),
+     * so the per-request overhead is negligible. The in-memory cache below
+     * coalesces parallel API calls within a 5-second window so a page that
+     * fires 10 API requests in parallel only triggers ONE DB lookup.
+     *
+     * The switch route calls `invalidateUserBranchCache(user_id)` after the
+     * UPDATE so the very next request picks up the new branch_id without
+     * waiting for the TTL to expire.
      */
     async jwt({ token, user }) {
       if (user) {
@@ -219,6 +306,18 @@ export const authConfig: NextAuthOptions = {
         token.branch_id = user.branch_id;
         token.permissions = user.permissions;
         token.mfa_pending = user.mfa_pending;
+        // Seed the cache so the first subsequent request doesn't re-query.
+        if (user.id) {
+          userBranchCache.set(user.id, {
+            branchId: user.branch_id ?? null,
+            expiresAt: Date.now() + USER_BRANCH_CACHE_TTL_MS,
+          });
+        }
+      } else if (token.id) {
+        // Subsequent request — re-read branch_id from the DB so a branch
+        // switch (via POST /api/v1/branches/switch) takes effect on the
+        // very next request, without requiring the user to re-authenticate.
+        token.branch_id = await getCachedUserBranchId(token.id);
       }
       return token;
     },

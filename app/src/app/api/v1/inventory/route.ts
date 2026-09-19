@@ -2,6 +2,7 @@
  * MadrashaOS — Inventory API
  *
  * Phase B7.1 — Inventory + Purchase API
+ * Phase P6.5 — GET gated with withPermission("inventory.view")
  *
  * GET  /api/v1/inventory — list items (perm: inventory.view)
  * POST /api/v1/inventory — create item (perm: inventory.receive)
@@ -29,7 +30,7 @@ const createItemSchema = z.object({
 });
 
 /** GET /api/v1/inventory */
-export async function GET(req: Request) {
+export const GET = withPermission("inventory.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -79,7 +80,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total: filtered.length, totalPages: Math.ceil(filtered.length / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/inventory */
 export const POST = withPermission("inventory.receive", async (req) => {

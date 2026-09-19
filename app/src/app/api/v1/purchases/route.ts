@@ -22,18 +22,18 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const createPurchaseSchema = z.object({
-  supplier_id: z.string().uuid(),
+  supplier_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   order_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   note: z.string().max(500).optional(),
   items: z.array(z.object({
-    inventory_item_id: z.string().uuid(),
+    inventory_item_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
     qty_ordered: z.number().min(0.01),
     unit_cost: z.number().min(0),
   })).min(1, "At least one item is required"),
 });
 
 /** GET /api/v1/purchases */
-export async function GET(req: Request) {
+export const GET = withPermission("purchase.view", async (req: Request) => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
 
@@ -92,7 +92,7 @@ export async function GET(req: Request) {
     })),
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
-}
+});
 
 /** POST /api/v1/purchases */
 export const POST = withPermission("purchase.create", async (req) => {
