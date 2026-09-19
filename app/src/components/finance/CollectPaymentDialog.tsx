@@ -74,8 +74,10 @@ export function CollectPaymentDialog({
   const [amount, setAmount] = React.useState<number>(0);
   const [method, setMethod] = React.useState<Method>("cash");
   const [accountId, setAccountId] = React.useState<string | undefined>();
-  const [receipt, setReceipt] = React.useState<string>("");
-  const [confirmedAt, setConfirmedAt] = React.useState<string>("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [realReceipt, setRealReceipt] = React.useState<string | null>(null);
+  const [realPaymentId, setRealPaymentId] = React.useState<string | null>(null);
+  const idempotencyKeyRef = React.useRef<string>(crypto.randomUUID());
 
   // Sync the preselected student whenever the dialog opens or the prop changes.
   React.useEffect(() => {
@@ -85,8 +87,10 @@ export function CollectPaymentDialog({
       setAmount(0);
       setMethod("cash");
       setAccountId(undefined);
-      setReceipt("");
-      setConfirmedAt("");
+      setSubmitting(false);
+      setRealReceipt(null);
+      setRealPaymentId(null);
+      idempotencyKeyRef.current = crypto.randomUUID();
       setStep(preselectedStudentId ? 2 : 1);
       setSearch("");
     }
@@ -98,7 +102,7 @@ export function CollectPaymentDialog({
   );
   const selectedPlan = feePlans?.find((p) => p.studentId === selectedStudentId);
   const outstandingInstallments: FeeInstallment[] = (selectedPlan?.installments ?? [])
-    .filter((i) => !i.paid);
+    .filter((i) => !i.isPaid);
   const selectedInstallment = outstandingInstallments
     .find((i) => i.id === selectedInstallmentId);
 
@@ -153,20 +157,71 @@ export function CollectPaymentDialog({
   const canProceed1 = !!selectedStudentId && outstandingInstallments.length > 0;
   const canProceed2 = !!selectedInstallmentId && amount > 0 && !!accountId;
 
+  // Preview Receipt — moves to step 3 WITHOUT calling the API.
+  // The real receipt_no is generated server-side on confirm.
   const handleConfirm = () => {
-    const num = 2000 + Math.floor(Math.random() * 8000);
-    const rcp = `RCP-2026-${num}`;
-    setReceipt(rcp);
-    setConfirmedAt(new Date().toISOString());
     setStep(3);
   };
 
-  const handleFinish = () => {
-    toast({
-      title: "Payment collected",
-      description: `Receipt ${receipt} — ${formatCurrency(amount, locale)}`,
-    });
-    onOpenChange(false);
+  // Confirm Payment — calls POST /api/v1/fees/payments (the Golden Flow:
+  // validates installment → generates receipt → posts balanced LedgerEntry
+  // → updates installment + account balances, all in a transaction).
+  const handleFinish = async () => {
+    if (!selectedStudentId || !accountId || amount <= 0) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/fees/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKeyRef.current,
+        },
+        body: JSON.stringify({
+          student_id: selectedStudentId,
+          installment_id: selectedInstallmentId || undefined,
+          amount,
+          method,
+          account_id: accountId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Payment failed",
+          description:
+            data?.error ||
+            data?.details?.formErrors?.[0] ||
+            `Server returned ${res.status}. Please try again.`,
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+      // Success — extract the real receipt_no from the response.
+      const rcp = data?.receipt_no || data?.data?.receipt_no || `RCP-UNKNOWN`;
+      const paymentId = data?.id || data?.data?.id || null;
+      setRealReceipt(rcp);
+      setRealPaymentId(paymentId);
+      toast({
+        title: "Payment collected",
+        description: `${rcp} — ${formatCurrency(amount, locale)} via ${method}`,
+      });
+      // Refetch so the installment shows as paid + the ledger entry appears.
+      const { queryClient } = await import("@/lib/query/client");
+      queryClient.invalidateQueries({ queryKey: ["fee-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["fee-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      // Close after a brief delay so the user sees the receipt update.
+      setTimeout(() => onOpenChange(false), 1500);
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -277,7 +332,7 @@ export function CollectPaymentDialog({
                 {filteredStudents.slice(0, 30).map((s) => {
                   const plan = feePlans?.find((p) => p.studentId === s.id);
                   const outstanding = (plan?.installments ?? [])
-                    .filter((i) => !i.paid)
+                    .filter((i) => !i.isPaid)
                     .reduce((sum, i) => sum + i.amount, 0);
                   const isSelected = s.id === selectedStudentId;
                   return (
@@ -443,12 +498,14 @@ export function CollectPaymentDialog({
               <dl className="space-y-2 text-body">
                 <div className="flex justify-between">
                   <dt className="text-text-secondary">Receipt No.</dt>
-                  <dd className="font-mono font-medium text-text-primary">{receipt}</dd>
+                  <dd className="font-mono font-medium text-text-primary">
+                    {realReceipt ?? "— to be generated —"}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-text-secondary">Date</dt>
                   <dd className="text-text-primary">
-                    {formatDate(confirmedAt ? new Date(confirmedAt) : new Date(), locale)}
+                    {formatDate(new Date(), locale)}
                   </dd>
                 </div>
                 <div className="flex justify-between">
@@ -523,9 +580,9 @@ export function CollectPaymentDialog({
               </Button>
             )}
             {step === 3 && (
-              <Button onClick={handleFinish}>
+              <Button onClick={handleFinish} disabled={submitting}>
                 <CheckCircle2 className="h-4 w-4" />
-                Confirm Payment
+                {submitting ? "Processing…" : realReceipt ? "Done" : "Confirm Payment"}
               </Button>
             )}
           </div>

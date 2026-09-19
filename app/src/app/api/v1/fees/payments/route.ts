@@ -30,11 +30,11 @@ import { notifyEntity } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 const collectPaymentSchema = z.object({
-  student_id: z.string().uuid(),
-  installment_id: z.string().uuid().optional(),
+  student_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  installment_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
   amount: z.number().min(0.01),
   method: z.enum(["cash", "bank", "mobile"]),
-  account_id: z.string().uuid(),
+  account_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   transaction_ref: z.string().optional(),
   notes: z.string().optional(),
 });

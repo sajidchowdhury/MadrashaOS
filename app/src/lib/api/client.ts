@@ -348,7 +348,8 @@ export const api = {
 
   // --- Fee Plans + Payments ---
   async getFeePlans() {
-    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/fees/plans");
+    // Fetch all plans (pageSize=100) so the dialog can match any student.
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/fees/plans?pageSize=100");
     return res.data as never;
   },
 

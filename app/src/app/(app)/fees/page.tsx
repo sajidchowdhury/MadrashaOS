@@ -76,7 +76,7 @@ export default function FeesPage() {
     if (!students || !feePlans) return [];
     return students.map((s) => {
       const plan = feePlans.find((p) => p.studentId === s.id);
-      const unpaid = (plan?.installments ?? []).filter((i) => !i.paid);
+      const unpaid = (plan?.installments ?? []).filter((i) => !i.isPaid);
       const outstanding = unpaid.reduce((sum, i) => sum + i.amount, 0);
       const pendingApproval = approvals?.find(
         (a) => a.type === "discount" && a.status === "pending" && a.title.includes(s.code),
