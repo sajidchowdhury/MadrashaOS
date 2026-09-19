@@ -68,7 +68,7 @@ export async function GET() {
 }
 
 /** PATCH /api/v1/organizations — update org */
-export const PATCH = withPermission("organization.config.view", async (req) => {
+export const PATCH = withPermission("organization.config.edit", async (req) => {
   const ctx = await getTenantContext();
   if (!ctx) {
     return errorResponse("Unauthorized", 401);

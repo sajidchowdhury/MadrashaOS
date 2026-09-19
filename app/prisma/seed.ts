@@ -97,7 +97,7 @@ section8A: "00000000-0000-0000-0005-000000000006",
 
 const PERMISSION_CODES = [
   // Foundation
-  "organization.branch.switch", "organization.branch.create", "organization.config.view",
+  "organization.branch.switch", "organization.branch.create", "organization.config.view", "organization.config.edit",
   "organization.module.toggle", "rbac.role.view", "rbac.role.create", "rbac.role.update",
   "rbac.permission.assign", "audit.view", "audit.export", "security.policy.edit",
   "backup.run", "backup.restore",
@@ -141,7 +141,7 @@ const PERM_CODES = PERMISSION_CODES.map((c) => c.replace(/^fees_/, "fees."));
 
 const ROLE_PERMS: Record<string, string[]> = {
   "super-admin": [
-    "organization.branch.switch", "organization.branch.create", "organization.config.view",
+    "organization.branch.switch", "organization.branch.create", "organization.config.view", "organization.config.edit",
     "organization.module.toggle", "rbac.role.view", "rbac.role.create", "rbac.role.update",
     "rbac.permission.assign", "audit.view", "audit.export", "security.policy.edit",
     "backup.run", "backup.restore", "tenant.provision", "tenant.manage",
@@ -165,7 +165,7 @@ const ROLE_PERMS: Record<string, string[]> = {
     "approval.reject", "approval.delegate",
   ],
   administrator: [
-    "organization.branch.switch", "organization.config.view", "organization.module.toggle",
+    "organization.branch.switch", "organization.config.view", "organization.config.edit", "organization.module.toggle",
     "rbac.role.view", "rbac.role.create", "rbac.role.update", "rbac.permission.assign",
     "audit.view", "backup.run", "students.view", "students.create", "students.update",
     "students.promote", "students.notes.view", "students.notes.edit", "admission.view",

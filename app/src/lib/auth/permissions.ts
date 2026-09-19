@@ -27,6 +27,7 @@ export const PERMISSION_CODES = [
   "organization.branch.switch",
   "organization.branch.create",
   "organization.config.view",
+  "organization.config.edit",
   "organization.module.toggle",
   "rbac.role.view",
   "rbac.role.create",
