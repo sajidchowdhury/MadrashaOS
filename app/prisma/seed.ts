@@ -518,13 +518,16 @@ for (const secName of c.sections) {
     const g = guardianData[i];
     const gid = `00000000-0000-0000-0005-${(i + 1).toString().padStart(12, "0")}`;
     guardianIds.push(gid);
+    // Link the first guardian (Omar Faruq) to the guardian user account
+    // so the guardian role can log in and see their children's data.
+    const userId = i === 0 ? IDS.userGuardian : null;
     await prisma.guardian.upsert({
       where: { id: gid },
-      update: {},
+      update: { user_id: userId },
       create: {
         id: gid, organization_id: org.id, branch_id: IDS.branchDhaka,
         name: g.name, name_bn: g.name_bn, phone: g.phone, email: g.email,
-        occupation: g.occupation,
+        occupation: g.occupation, user_id: userId,
       } as any,
     });
   }

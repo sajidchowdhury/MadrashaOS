@@ -41,16 +41,58 @@ export const GET = withAnyPermission(
         class_id: true, section_id: true, gender: true, dob: true,
         class: { select: { id: true, name: true, name_bn: true } },
         section: { select: { id: true, name: true } },
-        guardian: { select: { id: true, name: true, name_bn: true, phone: true } },
+        // Guardian info via the student_guardians junction (the Student
+        // model has no direct `guardian` field — it links through the
+        // StudentGuardian junction table).
+        student_guardians: {
+          where: { is_primary: true, deleted_at: null },
+          take: 1,
+          select: {
+            relation: true,
+            guardian: { select: { id: true, name: true, name_bn: true, phone: true } },
+          },
+        },
       },
     });
 
     if (!student) return errorResponse("Student not found", 404);
 
-    // --- For results.view.own scope: verify the student is linked to the current user ---
-    // (Guardian role: check via student_guardians junction; Student role: check user_id)
-    // For simplicity in this mock, we trust the permission middleware to have checked.
-    // A full implementation would verify the guardian_id link here.
+    // Flatten the primary guardian for the response shape
+    const primaryGuardian = student.student_guardians[0]?.guardian;
+
+    // --- Session 5.5: Guardian/Student scope check (security fix) ---
+    // If the user has results.view.own but NOT results.view, they can only
+    // see results for students linked to their own Guardian row.
+    // This prevents a guardian from passing any studentId UUID and viewing
+    // another family's results — a data-leak security gap.
+    const isOwnOnly =
+      !tenantCtx.permissions.includes("results.view") &&
+      tenantCtx.permissions.includes("results.view.own");
+
+    if (isOwnOnly) {
+      // Find the Guardian row linked to the current user, then check if
+      // this student is one of their children via the student_guardians junction.
+      const guardian = await db.guardian.findFirst({
+        where: {
+          user_id: tenantCtx.user_id,
+          deleted_at: null,
+        },
+        select: {
+          id: true,
+          student_guardians: {
+            where: { student_id: studentId, deleted_at: null },
+            select: { id: true },
+          },
+        },
+      });
+
+      // If no guardian row exists for this user, OR the student is not
+      // linked to this guardian's children → deny (404, not 403, so
+      // attackers can't enumerate student IDs).
+      if (!guardian || guardian.student_guardians.length === 0) {
+        return errorResponse("Student not found", 404);
+      }
+    }
 
     // Get all results for this student
     const results = await db.result.findMany({
@@ -119,7 +161,7 @@ export const GET = withAnyPermission(
         class_name: student.class.name,
         class_name_bn: student.class.name_bn,
         section_name: student.section?.name ?? null,
-        guardian_name: student.guardian?.name ?? null,
+        guardian_name: primaryGuardian?.name ?? null,
       },
       results: results.map((r) => {
         const base: Record<string, unknown> = {
