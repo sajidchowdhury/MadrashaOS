@@ -187,6 +187,10 @@ export const api = {
   },
 
   // --- Classes ---
+  // Returns `sections` as string[] (name-only, backward-compatible with
+  // existing callers) AND `sectionsWithIds` as {id, name}[] for callers
+  // that need the section UUID (e.g. attendance/take → POST /attendance/sessions
+  // requires section_id as a UUID).
   async getClasses() {
     const res = await apiFetch<{ data: Array<{ id: string; name: string; nameBn: string; level: number; sections: Array<{ id: string; name: string }> }> }>("/classes");
     return res.data.map((c) => ({
@@ -196,6 +200,7 @@ export const api = {
       level: c.level,
       branchId: "",
       sections: c.sections.map((s) => s.name),
+      sectionsWithIds: c.sections.map((s) => ({ id: s.id, name: s.name })),
     }));
   },
 
@@ -249,6 +254,11 @@ export const api = {
 
   async getStudentsByClass(classId: string, section?: string) {
     const params = new URLSearchParams({ class_id: classId });
+    // The API expects `section` to be a section UUID (section_id), not the
+    // section name. If the caller passes a UUID (36 chars with dashes),
+    // send it as-is. If they pass a section name, we still send it but the
+    // API will interpret it as a section_id (and return no results if it's
+    // not a valid UUID). Callers should pass the sectionId UUID.
     if (section) params.set("section", section);
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>(`/students?${params}`);
     return (res.data as Array<Record<string, unknown>>).map((s) => ({

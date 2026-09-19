@@ -22,9 +22,11 @@
  * from the root `src/app/layout.tsx`.
  */
 
+import React from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { DevToolbar } from "@/components/dev/DevToolbar";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useCurrentUser } from "@/lib/query/client";
 import { ROLE_LABELS } from "@/stores/types";
 import { ShieldCheck } from "lucide-react";
 
@@ -34,6 +36,19 @@ export default function AppGroupLayout({
   children: React.ReactNode;
 }) {
   const role = useSessionStore((s) => s.role);
+  const setRole = useSessionStore((s) => s.setRole);
+  const userQuery = useCurrentUser();
+
+  // Sync the client-side sessionStore with the real server session.
+  // The store is persisted in localStorage and may be stale (e.g. the
+  // user logged in as a different role since the last visit). We read
+  // the real role + permissions from /api/v1/auth/session on mount and
+  // update the store so IfPermission checks reflect the actual session.
+  React.useEffect(() => {
+    if (userQuery.data?.role && userQuery.data.role !== role) {
+      setRole(userQuery.data.role as never);
+    }
+  }, [userQuery.data?.role, role, setRole]);
 
   return (
     <>

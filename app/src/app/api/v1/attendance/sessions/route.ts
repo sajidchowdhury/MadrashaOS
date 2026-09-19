@@ -27,15 +27,15 @@ const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 /** Zod schema for creating an attendance session with records */
 const submitAttendanceSchema = z.object({
-  class_id: z.string().uuid(),
-  section_id: z.string().uuid().optional(),
+  class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  section_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
   academic_year: z.number().int().optional(),
   period: z.string().optional(), // morning | afternoon | full
   device_id: z.string().optional(), // offline device ID (Risk R6)
   records: z.array(
     z.object({
-      student_id: z.string().uuid(),
+      student_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
       status: z.enum(["present", "absent", "late", "leave"]).default("present"),
       note: z.string().optional(),
     }),
