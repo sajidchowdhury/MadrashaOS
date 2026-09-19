@@ -35,7 +35,7 @@ import {
   ChevronUp, ChevronDown, Image as ImageIcon, Type, Palette,
   Phone, Mail, Menu, Sparkles, BarChart3, BookOpen, Heart,
   Megaphone, Settings2, LayoutDashboard, Users, GraduationCap,
-  CalendarDays, ArrowRight, CheckCircle2,
+  CalendarDays, ArrowRight, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1406,6 +1406,21 @@ export default function CmsContentPage() {
     >
       <div className="px-4 py-8 md:px-8 md:py-12">
         <div className="mx-auto max-w-[var(--grid-max-width)] space-y-6">
+          {/* v1 limitation warning */}
+          <div className="flex items-start gap-3 rounded-lg border border-semantic-warning/40 bg-warning-50 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-semantic-warning" />
+            <div>
+              <p className="text-subtitle font-semibold text-semantic-warning">
+                v1 Limitation: Content is browser-local only
+              </p>
+              <p className="mt-1 text-body text-text-secondary">
+                This CMS editor saves changes to your browser&apos;s localStorage — edits are
+                visible only on this browser. Other users and public visitors will see the
+                default content. A server-backed CMS with database persistence is planned for v2.
+                For v1, public website content is code-defined in <code className="font-mono">src/stores/cms-defaults.ts</code>.
+              </p>
+            </div>
+          </div>
           {/* Header */}
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
