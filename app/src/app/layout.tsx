@@ -84,6 +84,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${hindSiliguri.variable} ${notoNaskhArabic.variable} ${jetbrainsMono.variable} antialiased bg-background text-foreground`}
+        suppressHydrationWarning
       >
         <ThemeProvider
           attribute="class"

@@ -1,18 +1,17 @@
 "use client";
 
 /**
- * MadrashaOS — Theme Toggle (C0.3 upgrade)
+ * MadrashaOS — Theme Toggle (Session 10.4 fix)
  *
- * Now uses next-themes useTheme() for proper SSR + system preference
- * support. Adds a `variant` prop for use on colored surfaces:
- *   - "default": light background (border + card surface)
- *   - "onPrimary": transparent on the teal TopBar (primary-600 bg, white text)
+ * Uses next-themes useTheme() for proper SSR + system preference support.
  *
- * Hydration-safe: `resolvedTheme` is undefined during SSR and resolves on
- * the client — we render a same-sized placeholder while undefined to
- * avoid layout shift and hydration mismatch (no useEffect + setState needed).
+ * Hydration-safe: Uses a `mounted` state pattern (standard for next-themes)
+ * to ensure the server and client render the same element type. Before
+ * mount, the button renders with empty content (same element, no mismatch).
+ * After mount, the resolved theme determines the icon/label.
  */
 
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 
@@ -25,13 +24,11 @@ export function ThemeToggle({
 }) {
   const { t } = useI18n();
   const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const isDark = resolvedTheme === "dark";
-
-  // SSR: resolvedTheme is undefined — render placeholder to avoid mismatch.
-  if (resolvedTheme === undefined) {
-    return <div className="h-9 w-[72px] rounded-full" aria-hidden />;
-  }
 
   const variantClass =
     variant === "onPrimary"
@@ -46,7 +43,7 @@ export function ThemeToggle({
       aria-pressed={isDark}
       aria-label={t("theme.label")}
     >
-      {isDark ? t("theme.dark") : t("theme.light")}
+      {mounted ? (isDark ? t("theme.dark") : t("theme.light")) : ""}
     </button>
   );
 }
