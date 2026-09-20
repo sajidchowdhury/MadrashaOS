@@ -510,10 +510,10 @@ async function flow10_CollectFeePayment(): Promise<FlowResult> {
     }
     steps.push({ name: "Login as Accountant", status: "pass" });
 
-    // POST a fee payment — use student 1's June 2026 installment (unpaid)
+    // POST a fee payment — use student 2's June 2026 installment (unpaid)
     const paymentBody = {
-      student_id: "00000000-0000-0000-0006-000000000001",
-      installment_id: "00000000-0000-0000-0009-000000000003",
+      student_id: "00000000-0000-0000-0006-000000000002",
+      installment_id: "00000000-0000-0000-0009-000000000006",
       amount: 1500,
       method: "cash",
       account_id: "00000000-0000-0000-0004-000000000001",
