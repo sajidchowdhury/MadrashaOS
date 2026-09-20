@@ -345,17 +345,21 @@ export function TopBar({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Search (placeholder, md+) */}
-      <div className="hidden items-center gap-2 rounded-md bg-primary-600 px-3 py-1.5 text-subtitle text-primary-100 md:flex">
+      {/* Search (placeholder, xl+) */}
+      <div className="hidden items-center gap-2 rounded-md bg-primary-600 px-3 py-1.5 text-subtitle text-primary-100 xl:flex">
         <Search className="h-4 w-4" />
         <span className="text-caption">{t("shell.topbar.search.placeholder")}</span>
       </div>
 
-      {/* Language switcher — variant for primary surface */}
-      <LanguageSwitcher variant="onPrimary" />
+      {/* Language switcher — hidden on very small screens to prevent overlap */}
+      <div className="hidden sm:block">
+        <LanguageSwitcher variant="onPrimary" />
+      </div>
 
-      {/* Theme toggle — variant for primary surface */}
-      <ThemeToggle variant="onPrimary" />
+      {/* Theme toggle — hidden on very small screens to prevent overlap */}
+      <div className="hidden sm:block">
+        <ThemeToggle variant="onPrimary" />
+      </div>
 
       {/* Notifications flyout (C4.1) */}
       <DropdownMenu>

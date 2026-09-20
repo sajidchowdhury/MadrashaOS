@@ -38,6 +38,7 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
+  style: ["normal", "italic"],
 });
 
 const hindSiliguri = Hind_Siliguri({
