@@ -52,6 +52,12 @@ export const GET = withPermission(
 
     const { id } = await params;
 
+    // Guard: invalid UUID → 404 (prevents Prisma 500)
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(id)) {
+      return errorResponse("Student not found", 404);
+    }
+
     // First verify the student exists in the current tenant — without
     // this, an attacker could probe arbitrary UUIDs and learn whether
     // a student with that ID exists by inspecting whether history is

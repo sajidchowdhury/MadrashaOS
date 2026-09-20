@@ -58,6 +58,12 @@ export const POST = withPermission(
 
     const { id } = await params;
 
+    // Guard: invalid UUID → 404 (prevents Prisma 500)
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(id)) {
+      return errorResponse("Student not found", 404);
+    }
+
     let body: unknown;
     try {
       body = await req.json();

@@ -49,6 +49,13 @@ export const GET = withPermission(
 
     const { id } = await params;
 
+    // Guard: if the ID is not a valid UUID, Prisma would throw a 500 error.
+    // Return 404 instead so the frontend shows a clean "not found" state.
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(id)) {
+      return errorResponse("Student not found", 404);
+    }
+
     const student = await db.student.findFirst({
       where: scopedWhere(ctx, id),
       include: {
@@ -191,6 +198,12 @@ export const PATCH = withPermission(
 
     const { id } = await params;
 
+    // Guard: invalid UUID → 404 (prevents Prisma 500)
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(id)) {
+      return errorResponse("Student not found", 404);
+    }
+
     let body: unknown;
     try {
       body = await req.json();
@@ -322,6 +335,12 @@ export const DELETE = withPermission(
     }
 
     const { id } = await params;
+
+    // Guard: invalid UUID → 404 (prevents Prisma 500)
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(id)) {
+      return errorResponse("Student not found", 404);
+    }
 
     const existing = await db.student.findFirst({
       where: scopedWhere(ctx, id),
