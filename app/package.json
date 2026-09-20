@@ -22,7 +22,8 @@
     "db:seed": "bun run prisma/seed.ts",
     "db:setup": "docker compose up -d && sleep 3 && prisma migrate dev && prisma db seed && prisma generate",
     "db:verify": "bun run scripts/verify-db.ts",
-    "load:test": "bun run scripts/load-test.ts"
+    "load:test": "bun run scripts/load-test.ts",
+    "healthcheck": "bun run scripts/healthcheck.ts"
   },
   "prisma": {
     "seed": "bun run prisma/seed.ts"
