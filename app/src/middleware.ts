@@ -79,6 +79,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 2c) Public notices — no login required (Session 8.5).
+  //     Public visitors can read sent+public notices from the website.
+  //     Only GET is exempt; POST (compose) still requires login.
+  if (
+    path === "/api/v1/public/notices" &&
+    req.method.toUpperCase() === "GET"
+  ) {
+    return NextResponse.next();
+  }
+
   // 3) All other /api/v1/* routes require a session.
   if (path.startsWith("/api/v1/")) {
     const token = await getToken({

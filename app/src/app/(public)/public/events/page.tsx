@@ -14,7 +14,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   CalendarDays, Clock, MapPin, Trophy, BookOpen, Users,
-  GraduationCap, CalendarPlus, Info, Home,
+  GraduationCap, CalendarPlus, Info, Home, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -196,6 +196,21 @@ export default function PublicEventsPage() {
 
   return (
     <div className="mx-auto max-w-[var(--grid-max-width)] px-4 py-12 md:px-6 md:py-16">
+      {/* v1 limitation banner */}
+      <div className="mb-6 flex items-start gap-3 rounded-lg border border-semantic-warning/40 bg-warning-50 p-4">
+        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-semantic-warning" />
+        <div>
+          <p className="text-subtitle font-semibold text-semantic-warning">
+            v1 Limitation: Events are sample data
+          </p>
+          <p className="mt-1 text-body text-text-secondary">
+            These events are examples for demonstration. A server-backed events system
+            with database persistence is planned for v2. For v1, events are managed as
+            notices (use the Notices module with category &ldquo;Event&rdquo;).
+          </p>
+        </div>
+      </div>
+
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="mb-6">
         <ol className="flex flex-wrap items-center gap-1.5 text-caption text-text-muted">

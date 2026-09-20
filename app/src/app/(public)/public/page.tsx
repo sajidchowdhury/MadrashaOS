@@ -17,6 +17,7 @@
  * FROZEN tokens only — no raw hex / px in component code.
  */
 
+import * as React from "react";
 import Link from "next/link";
 import {
   ArrowRight, Sparkles, ChevronRight, Megaphone, CalendarDays,
@@ -73,6 +74,31 @@ export default function PublicHomePage() {
   const about = useCmsStore((s) => s.about);
   const programs = useCmsStore((s) => s.programs).slice(0, 3);
   const alumni = useCmsStore((s) => s.alumni);
+
+  // Session 8.5: Fetch real public notices from the API
+  const [recentNotices, setRecentNotices] = React.useState<
+    Array<{ id: string; title: string; date: string; category: string; excerpt: string }>
+  >([]);
+  React.useEffect(() => {
+    fetch("/api/v1/public/notices?pageSize=3")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.data) {
+          setRecentNotices(
+            data.data.map((n: Record<string, unknown>) => ({
+              id: n.id as string,
+              title: (n.title as string) ?? "Untitled",
+              date: (n.date as string) ?? new Date().toISOString(),
+              category: (n.category as string) ?? "General",
+              excerpt: ((n.body as string) ?? "").slice(0, 150) + "…",
+            })),
+          );
+        }
+      })
+      .catch(() => {
+        // Non-critical — the section just won't show
+      });
+  }, []);
 
   const heroTitle = isBn ? hero.titleBn : hero.title;
   const heroSubtitle = isBn ? hero.subtitleBn : hero.subtitle;
@@ -404,18 +430,23 @@ export default function PublicHomePage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          {RECENT_NOTICES.map((notice) => (
+          {recentNotices.length === 0 ? (
+            <p className="col-span-3 py-8 text-center text-body text-text-secondary">
+              No public notices at this time.
+            </p>
+          ) : (
+            recentNotices.map((notice) => (
             <Card
               key={notice.id}
               className="group flex flex-col transition-shadow hover:shadow-elevation-3"
             >
               <CardContent className="flex flex-1 flex-col p-5">
                 <div className="mb-3 flex items-center gap-2">
-                  <Badge variant="outline" className={CATEGORY_TONE[notice.category]}>
+                  <Badge variant="outline" className={CATEGORY_TONE[notice.category] || CATEGORY_TONE.General}>
                     {notice.category}
                   </Badge>
                   <span className="text-caption text-text-muted">
-                    {formatDate(notice.date, locale)}
+                    {formatDate(new Date(notice.date), locale)}
                   </span>
                 </div>
                 <h3 className="text-subtitle font-semibold leading-snug text-text-primary">
@@ -433,7 +464,8 @@ export default function PublicHomePage() {
                 </Link>
               </CardContent>
             </Card>
-          ))}
+            ))
+          )}
         </div>
 
         <div className="mt-8 text-center md:hidden">
