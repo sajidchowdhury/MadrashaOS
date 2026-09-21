@@ -34,7 +34,7 @@ export function Footer({ className = "" }: { className?: string }) {
             v{tokenVersion} · {cfg.bcp47} · {cfg.dir.toUpperCase()}
           </span>
           <span className="font-mono text-text-muted">·</span>
-          <span className="text-text-muted">Phase C0.3</span>
+          <span className="text-text-muted">MadrashaOS v1.0.0</span>
         </div>
       </div>
     </footer>

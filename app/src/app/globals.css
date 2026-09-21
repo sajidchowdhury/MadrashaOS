@@ -52,6 +52,21 @@
   --color-neutral-900: var(--color-neutral-900);
   --color-neutral-950: var(--color-neutral-950);
 
+  /* Surface tokens — enable bg-surface-card, bg-surface-canvas, bg-surface-hover */
+  --color-surface-canvas: var(--color-surface-canvas);
+  --color-surface-card: var(--color-surface-card);
+  --color-surface-hover: var(--color-surface-hover);
+
+  /* Text tokens — enable text-text-primary, text-text-secondary, text-text-muted */
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+
+  /* Border tokens — enable border-border-default, border-border-strong */
+  --color-border-default: var(--color-border-default);
+  --color-border-strong: var(--color-border-strong);
+  --color-border-focus: var(--color-border-focus);
+
   --color-success: var(--color-semantic-success);
   --color-success-foreground: var(--color-semantic-success-foreground);
   --color-success-50: var(--color-semantic-success-50);
