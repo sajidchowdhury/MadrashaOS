@@ -411,6 +411,12 @@ export const api = {
     return res as never;
   },
 
+  // --- Subjects ---
+  async getSubjects() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/subjects?pageSize=100");
+    return res.data as never;
+  },
+
   // --- Exams + Marks ---
   async getExams() {
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/exams?pageSize=100");

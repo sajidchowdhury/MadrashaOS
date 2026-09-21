@@ -225,6 +225,16 @@ export function useFeePayments(
   });
 }
 
+export function useSubjects(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["subjects", ...sessionKey()],
+    queryFn: () => api.getSubjects(),
+    ...options,
+  });
+}
+
 export function useExams(
   options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {

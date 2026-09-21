@@ -28,8 +28,8 @@ import {
   UserCheck, Briefcase, Mail, Phone, Plus, XCircle,
   AlertCircle, BookOpen, GraduationCap, Trash2,
 } from "lucide-react";
-import { useClasses } from "@/lib/query/client";
-import { users } from "@/lib/mock/fixtures/users";
+import { useClasses, useTeachers, useSubjects, useEmployees } from "@/lib/query/client";
+// Real data: useTeachers + useSubjects (replaces mock fixtures)
 import { ROLE_LABELS, type Role } from "@/stores/types";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { Button } from "@/components/ui/button";
@@ -60,16 +60,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 
 type Subject = { id: string; name: string; code: string };
 
-const SUBJECTS: Subject[] = [
-  { id: "sub-quran", name: "Quran & Tajweed", code: "QUR-101" },
-  { id: "sub-hadith", name: "Hadith Studies", code: "HAD-101" },
-  { id: "sub-fiqh", name: "Fiqh", code: "FIQ-101" },
-  { id: "sub-arabic", name: "Arabic Language", code: "ARA-101" },
-  { id: "sub-bangla", name: "Bangla Language", code: "BEN-101" },
-  { id: "sub-math", name: "Mathematics", code: "MAT-101" },
-  { id: "sub-english", name: "English", code: "ENG-101" },
-  { id: "sub-science", name: "General Science", code: "SCI-101" },
-];
+// Subjects now fetched from real API via useSubjects()
 
 type Assignment = {
   id: string;
@@ -109,7 +100,7 @@ export default function TeachersPage() {
   void _t;
   const { hasPermission } = useSessionStore();
   const { toast } = useToast();
-  const { data: classes, isLoading, isError, refetch } = useClasses();
+  const { data: classes, isLoading, isError, refetch } = useClasses() as { data: Array<{ id: string; name: string; sections: string[] }> | undefined; isLoading: boolean; isError: boolean; refetch: () => void };
 
   // Permission: page-level gate (D4 lock-in — never raw 403)
   if (!hasPermission("teachers.view")) {
@@ -146,6 +137,9 @@ type TeachersContentProps = {
 function TeachersContent({
   classes, isLoading, isError, refetch, toast,
 }: TeachersContentProps) {
+  const { data: teachers } = useTeachers();
+  const { data: subjects } = useSubjects();
+  const { data: employees } = useEmployees();
   const [assignments, setAssignments] = React.useState<Assignment[]>(INITIAL_ASSIGNMENTS);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [newTeacher, setNewTeacher] = React.useState<string>("");
@@ -155,30 +149,50 @@ function TeachersContent({
   const [duplicateError, setDuplicateError] = React.useState<string | null>(null);
 
   // Lookups
+  // Combine Teacher records + Employee records for the staff directory + dropdown
+  const teacherList = React.useMemo(() => {
+    const tList = (teachers ?? []) as Array<{
+      id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
+      designation?: string; status?: string; userId?: string;
+    }>;
+    const eList = (employees ?? []) as Array<{
+      id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
+      designation?: string; status?: string;
+    }>;
+    // Merge: teachers first, then employees not already in the list
+    const ids = new Set(tList.map((t) => t.id));
+    const merged = [...tList, ...eList.filter((e) => !ids.has(e.id))];
+    return merged;
+  }, [teachers, employees]);
+
+  const subjectList = (subjects ?? []) as Array<{
+    id: string; name: string; code?: string;
+  }>;
+
   const classMap = React.useMemo(() => {
     const m = new Map<string, { name: string; sections: string[] }>();
     classes?.forEach((c) => m.set(c.id, { name: c.name, sections: c.sections }));
     return m;
   }, [classes]);
   const subjectMap = React.useMemo(() => {
-    const m = new Map<string, Subject>();
-    SUBJECTS.forEach((s) => m.set(s.id, s));
+    const m = new Map<string, { id: string; name: string; code?: string }>();
+    subjectList.forEach((s) => m.set(s.id, s));
     return m;
-  }, []);
+  }, [subjectList]);
   const userMap = React.useMemo(() => {
-    const m = new Map<string, typeof users[number]>();
-    users.forEach((u) => m.set(u.id, u));
+    const m = new Map<string, { id: string; name: string; role?: string; nameBn?: string; email?: string; phone?: string }>();
+    teacherList.forEach((t) => m.set(t.id, { id: t.id, name: t.name, role: "teacher", nameBn: t.nameBn, email: t.email, phone: t.phone }));
     return m;
-  }, []);
+  }, [teacherList]);
 
   // Filtered staff (search by name or email)
   const filteredStaff = React.useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) => `${u.name} ${u.nameBn} ${u.email} ${u.role}`.toLowerCase().includes(q),
+    if (!q) return teacherList;
+    return teacherList.filter((t) =>
+      `${t.name} ${t.designation ?? ""}`.toLowerCase().includes(q),
     );
-  }, [search]);
+  }, [search, teacherList]);
 
   const filteredAssignments = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -244,7 +258,7 @@ function TeachersContent({
       };
       setAssignments((prev) => [...prev, next]);
       setDialogOpen(false);
-      const u = userMap.get(newTeacher);
+      const u = userMap.get(newTeacher) as { id: string; name: string; role?: string; nameBn?: string } | undefined;
       const c = classMap.get(newClass);
       const s = subjectMap.get(newSubject);
       toast({
@@ -314,7 +328,7 @@ function TeachersContent({
           {!isError && !isLoading && (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {filteredStaff.map((u) => {
-                const roleLabel = ROLE_LABELS[u.role as Role] ?? { native: u.role, english: u.role };
+                const roleLabel = { native: u.designation ?? u.status ?? "Staff", english: u.designation ?? u.status ?? "Staff" };
                 const assignmentCount = assignments.filter((a) => a.teacherId === u.id).length;
                 return (
                   <Card key={u.id} className="shadow-elevation-1">
@@ -331,7 +345,7 @@ function TeachersContent({
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className={ROLE_TONE[u.role as Role] ?? "bg-neutral-100"}>
+                        <Badge variant="outline" className={"bg-neutral-100"}>
                           <Briefcase className="h-3 w-3" />
                           {roleLabel.english}
                         </Badge>
@@ -496,9 +510,14 @@ function TeachersContent({
                   <SelectValue placeholder="Select teacher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name} · {ROLE_LABELS[u.role as Role]?.english ?? u.role}
+                  {teacherList.length === 0 && (
+                    <div className="px-3 py-2 text-caption text-text-muted">
+                      No teachers found. Add teachers first.
+                    </div>
+                  )}
+                  {teacherList.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} {t.designation ? `· ${t.designation}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -528,9 +547,14 @@ function TeachersContent({
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  {SUBJECTS.map((s) => (
+                  {subjectList.length === 0 && (
+                    <div className="px-3 py-2 text-caption text-text-muted">
+                      No subjects found. Add subjects first.
+                    </div>
+                  )}
+                  {subjectList.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name} · <span className="font-mono text-caption">{s.code}</span>
+                      {s.name} {s.code ? `· ${s.code}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
