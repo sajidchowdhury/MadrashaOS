@@ -1,79 +1,150 @@
 /**
- * MadrashaOS — Onboarding Workflow Steps
+ * MadrashaOS — Setup Checklist (one-time configuration)
  *
- * Sequential setup checklist for new users.
- * Each step links to a real page where the user performs a real action.
+ * This is NOT about daily tasks. This is about whether the SOFTWARE ITSELF
+ * is ready to use — has the admin configured all the foundational pieces?
+ *
+ * Each step checks if a specific configuration entity exists in the DB.
+ * Steps must be done in order — you can't set up attendance before classes.
+ *
+ * When all steps are ✅, the software is fully configured and ready
+ * for daily operations.
  */
 
-export type OnboardingStep = {
+export type SetupStep = {
   id: string;
   title: string;
   instruction: string;
   route: string;
   buttonLabel: string;
-  checkType:
-    | "students"
-    | "attendance"
-    | "fees"
-    | "exams"
-    | "notices"
-    | "rbac";
+  /** API endpoint to check if this step is done */
+  checkEndpoint: string;
+  /** Field in the response to check (supports nested: "data.length") */
+  checkField: string;
+  /** Minimum value to consider "done" */
+  checkMin: number;
   icon: string;
 };
 
-export const ONBOARDING_STEPS: OnboardingStep[] = [
+export const SETUP_STEPS: SetupStep[] = [
   {
-    id: "step-1",
-    title: "১. শিক্ষার্থী যোগ করুন",
-    instruction: "মাদ্রাসার শিক্ষার্থীদের তালিকায় গিয়ে Add Student বোতামে ক্লিক করুন। অন্তত একজন শিক্ষার্থীর তথ্য দিন।",
+    id: "setup-1",
+    title: "১. প্রতিষ্ঠানের তথ্য যাচাই করুন",
+    instruction:
+      "মাদ্রাসার নাম, ঠিকানা, ফোন, ইমেইল ঠিকানা ঠিক আছে কিনা দেখুন। প্রয়োজনে পরিবর্তন করুন।",
+    route: "/organization",
+    buttonLabel: "প্রতিষ্ঠান পেজে যান",
+    checkEndpoint: "/api/v1/organizations",
+    checkField: "id",
+    checkMin: 1,
+    icon: "🏛️",
+  },
+  {
+    id: "setup-2",
+    title: "২. শাখা যাচাই করুন",
+    instruction:
+      "মাদ্রাসার শাখাগুলো (যেমন: ঢাকা, চট্টগ্রাম, সিলেট) ঠিক আছে কিনা দেখুন। প্রতিটি শাখার নাম ও কোড যাচাই করুন।",
+    route: "/organization",
+    buttonLabel: "শাখা দেখতে যান",
+    checkEndpoint: "/api/v1/branches?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
+    icon: "🏢",
+  },
+  {
+    id: "setup-3",
+    title: "৩. ক্লাস ও সেকশন তৈরি করুন",
+    instruction:
+      "মাদ্রাসায় কোন কোন ক্লাস আছে তা নির্ধারণ করুন। প্রতিটি ক্লাসের জন্য সেকশন (ক, খ, গ) তৈরি করুন। যেমন: ক্লাস ১ - সেকশন ক, ক্লাস ৫ - সেকশন ক ও খ।",
+    route: "/academic/structure",
+    buttonLabel: "ক্লাস সেটআপে যান",
+    checkEndpoint: "/api/v1/classes?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
+    icon: "📚",
+  },
+  {
+    id: "setup-4",
+    title: "৪. ব্যবহারকারী ও ভূমিকা সেট করুন",
+    instruction:
+      "প্রিন্সিপাল, অ্যাডমিনিস্ট্রেটর, হিসাবরক্ষক, শিক্ষক, স্টোরকিপার — প্রত্যেকের জন্য একটি ইউজার অ্যাকাউন্ট তৈরি করুন। কে কী করতে পারবে তা নির্ধারণ করতে ভূমিকা ও অনুমতি পেজে যান।",
+    route: "/rbac",
+    buttonLabel: "অনুমতি সেট করতে যান",
+    checkEndpoint: "/api/v1/roles?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
+    icon: "👤",
+  },
+  {
+    id: "setup-5",
+    title: "৫. শিক্ষক যোগ করুন",
+    instruction:
+      "প্রতিটি ক্লাসের জন্য শিক্ষক নিযুক্ত করুন। কোন শিক্ষক কোন ক্লাসে পড়াবেন তা নির্ধারণ করুন।",
+    route: "/teachers",
+    buttonLabel: "শিক্ষক পেজে যান",
+    checkEndpoint: "/api/v1/teachers?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
+    icon: "👨‍🏫",
+  },
+  {
+    id: "setup-6",
+    title: "৬. শিক্ষার্থী ভর্তি করুন",
+    instruction:
+      "বিদ্যমান শিক্ষার্থীদের তালিকায় যোগ করুন বা নতুন ভর্তি গ্রহণ করুন। প্রতিটি শিক্ষার্থীর নাম, ক্লাস, সেকশন, রোল, অভিভাবকের তথ্য দিন।",
     route: "/students",
-    buttonLabel: "শিক্ষার্থী তালিকায় যান",
-    checkType: "students",
+    buttonLabel: "শিক্ষার্থী পেজে যান",
+    checkEndpoint: "/api/v1/students?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
     icon: "🎓",
   },
   {
-    id: "step-2",
-    title: "২. উপস্থিতি নিন",
-    instruction: "Take Attendance পেজে গিয়ে একটি ক্লাসের উপস্থিতি নিন। প্রতিটি শিক্ষার্থীর নামের পাশে ট্যাপ করে উপস্থিত/অনুপস্থিত চিহ্নিত করুন, তারপর Submit করুন।",
-    route: "/attendance/take",
-    buttonLabel: "উপস্থিতি নিতে যান",
-    checkType: "attendance",
-    icon: "✅",
-  },
-  {
-    id: "step-3",
-    title: "৩. ফি আদায় করুন",
-    instruction: "ফি পেজে গিয়ে Collect Payment বোতামে ক্লিক করুন। একজন শিক্ষার্থীর কিস্তি নির্বাচন করে পরিমাণ ও পদ্ধতি দিন, তারপর Confirm করুন।",
+    id: "setup-7",
+    title: "৭. ফি পরিকল্পনা তৈরি করুন",
+    instruction:
+      "প্রতিটি ক্লাসের জন্য বার্ষিক ফি নির্ধারণ করুন। কয়টি কিস্তিতে পরিশোধ করতে হবে তা নির্ধারণ করুন। যেমন: বার্ষিক ১২,০০০ টাকা, ৩ কিস্তিতে।",
     route: "/fees",
-    buttonLabel: "ফি আদায়ে যান",
-    checkType: "fees",
+    buttonLabel: "ফি পেজে যান",
+    checkEndpoint: "/api/v1/fees/plans?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
     icon: "💰",
   },
   {
-    id: "step-4",
-    title: "৪. পরীক্ষার নম্বর দিন",
-    instruction: "পরীক্ষা পেজে গিয়ে Enter Marks বোতামে ক্লিক করুন। শিক্ষার্থীদের নম্বর দিন এবং Save & Submit করুন।",
-    route: "/exams",
-    buttonLabel: "নম্বর দিতে যান",
-    checkType: "exams",
-    icon: "📝",
+    id: "setup-8",
+    title: "৮. হিসাব খাতা সেট করুন",
+    instruction:
+      "আয়-ব্যয়ের জন্য অ্যাকাউন্ট তৈরি করুন। অন্তত একটি নগদ অ্যাকাউন্ট, একটি ব্যাংক অ্যাকাউন্ট, এবং একটি যাকাত তহবিল অ্যাকাউন্ট রাখুন।",
+    route: "/accounting",
+    buttonLabel: "হিসাব খাতায় যান",
+    checkEndpoint: "/api/v1/accounts?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
+    icon: "📊",
   },
   {
-    id: "step-5",
-    title: "৫. নোটিশ পাঠান",
-    instruction: "নোটিশ পেজে গিয়ে Compose বোতামে ক্লিক করুন। একটি নোটিশ লিখুন এবং অভিভাবকদের জন্য পাঠান।",
-    route: "/notices",
-    buttonLabel: "নোটিশ পেজে যান",
-    checkType: "notices",
-    icon: "📢",
+    id: "setup-9",
+    title: "৯. নিরাপত্তা নীতি নির্ধারণ করুন",
+    instruction:
+      "পাসওয়ার্ড কত দিন পর পরিবর্তন করতে হবে, কতবার ভুল লগইনে অ্যাকাউন্ট লক হবে — এই নিয়মগুলো নির্ধারণ করুন। দ্বি-স্তরীয় প্রমাণীকরণ (MFA) চালু করা আছে কিনা দেখুন।",
+    route: "/security",
+    buttonLabel: "নিরাপত্তা পেজে যান",
+    checkEndpoint: "/api/v1/security/policy",
+    checkField: "id",
+    checkMin: 1,
+    icon: "🔒",
   },
   {
-    id: "step-6",
-    title: "৬. ভূমিকা ও অনুমতি সেট করুন",
-    instruction: "কে কী করতে পারবে তা নির্ধারণ করুন। প্রতিটি ভূমিকার জন্য অনুমতি চালু/বন্ধ করে Save Matrix বোতামে সংরক্ষণ করুন।",
-    route: "/rbac",
-    buttonLabel: "অনুমতি সেট করতে যান",
-    checkType: "rbac",
-    icon: "🔐",
+    id: "setup-10",
+    title: "১০. ব্যাকআপ নিন",
+    instruction:
+      "একবার ব্যাকআপ নিন যাতে সব তথ্য সুরক্ষিত থাকে। ভবিষ্যতে নিয়মিত ব্যাকআপের জন্য cron job সেট করুন (DEPLOYMENT.md দেখুন)।",
+    route: "/backup",
+    buttonLabel: "ব্যাকআপ পেজে যান",
+    checkEndpoint: "/api/v1/backup?pageSize=1",
+    checkField: "data.length",
+    checkMin: 1,
+    icon: "💾",
   },
 ];

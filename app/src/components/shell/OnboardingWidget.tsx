@@ -1,95 +1,89 @@
 "use client";
 
 /**
- * MadrashaOS — Onboarding Widget
+ * MadrashaOS — Setup Checklist Widget
  *
- * Shows on the dashboard as a guided setup checklist.
- * Each step links to a real page where the user performs an action.
- * When the user returns to the dashboard, the step is checked via API.
+ * One-time configuration checklist that appears on the dashboard.
+ * Asks: "Is the SOFTWARE ready to use?" — not daily tasks.
  *
- * Completion state is persisted to localStorage.
+ * Checks if each foundational piece is configured:
+ *   1. Organization profile
+ *   2. Branches
+ *   3. Classes + sections
+ *   4. Users + roles (RBAC)
+ *   5. Teachers
+ *   6. Students
+ *   7. Fee plans
+ *   8. Chart of accounts
+ *   9. Security policy
+ *  10. First backup taken
+ *
+ * Each step auto-checks via API. When all 10 are ✅, the system is ready.
  */
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Circle, ChevronRight, X, Sparkles, PartyPopper } from "lucide-react";
+import {
+  CheckCircle2, Circle, ChevronRight, X, Sparkles, PartyPopper, Loader2,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ONBOARDING_STEPS, type OnboardingStep } from "@/lib/onboarding/steps";
+import { SETUP_STEPS, type SetupStep } from "@/lib/onboarding/steps";
 
-const STORAGE_KEY = "madrasha-onboarding-completed";
-const DISMISS_KEY = "madrasha-onboarding-dismissed";
+const STORAGE_KEY = "madrasha-setup-dismissed";
 
 export function OnboardingWidget() {
   const router = useRouter();
   const [completed, setCompleted] = useState<Set<string>>(new Set());
-  const [dismissed, setDismissed] = useState(false);
   const [checking, setChecking] = useState<Record<string, boolean>>({});
+  const [dismissed, setDismissed] = useState(false);
 
-  // Load state from localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setCompleted(new Set(JSON.parse(saved)));
-      const dis = localStorage.getItem(DISMISS_KEY);
-      if (dis === "true") setDismissed(true);
+      if (localStorage.getItem(STORAGE_KEY) === "true") {
+        setDismissed(true);
+        return;
+      }
     } catch {
       // ignore
     }
+    checkAllSteps();
   }, []);
 
-  // Check completion status via API
-  useEffect(() => {
-    if (dismissed) return;
-    checkAllSteps();
-  }, [dismissed]);
-
   async function checkAllSteps() {
-    const cookies = ""; // uses httpOnly cookie via credentials: include
-    for (const step of ONBOARDING_STEPS) {
-      if (completed.has(step.id)) continue;
+    for (const step of SETUP_STEPS) {
       setChecking((prev) => ({ ...prev, [step.id]: true }));
       try {
-        const done = await checkStep(step, cookies);
+        const done = await checkStep(step);
         if (done) {
           setCompleted((prev) => {
             const next = new Set(prev);
             next.add(step.id);
-            saveState(next);
             return next;
           });
         }
       } catch {
-        // ignore — non-blocking
+        // non-blocking
       }
       setChecking((prev) => ({ ...prev, [step.id]: false }));
-    }
-  }
-
-  function saveState(state: Set<string>) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(state)));
-    } catch {
-      // ignore
     }
   }
 
   function handleDismiss() {
     setDismissed(true);
     try {
-      localStorage.setItem(DISMISS_KEY, "true");
+      localStorage.setItem(STORAGE_KEY, "true");
     } catch {
       // ignore
     }
   }
 
   function handleReset() {
-    setCompleted(new Set());
     setDismissed(false);
+    setCompleted(new Set());
     try {
       localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(DISMISS_KEY);
     } catch {
       // ignore
     }
@@ -101,23 +95,21 @@ export function OnboardingWidget() {
       <Card className="border-border-default">
         <CardContent className="flex items-center justify-between p-4">
           <p className="text-body text-text-secondary" lang="bn">
-            🚀 সেটআপ গাইড বন্ধ আছে। আবার দেখতে চাইলে রিসেট করুন।
+            🚀 সেটআপ চেকলিস্ট বন্ধ আছে।
           </p>
           <Button variant="outline" size="sm" onClick={handleReset} lang="bn">
-            রিসেট করুন
+            আবার দেখুন
           </Button>
         </CardContent>
       </Card>
     );
   }
 
-  const totalSteps = ONBOARDING_STEPS.length;
+  const total = SETUP_STEPS.length;
   const doneCount = completed.size;
-  const allDone = doneCount === totalSteps;
-  const progressPct = Math.round((doneCount / totalSteps) * 100);
-
-  // Find the first incomplete step (the "current" step)
-  const currentStep = ONBOARDING_STEPS.find((s) => !completed.has(s.id));
+  const allDone = doneCount === total;
+  const progressPct = Math.round((doneCount / total) * 100);
+  const currentStep = SETUP_STEPS.find((s) => !completed.has(s.id));
 
   return (
     <Card className="border-primary-200 bg-primary-50/40 shadow-elevation-1">
@@ -125,50 +117,50 @@ export function OnboardingWidget() {
         <div>
           <CardTitle className="flex items-center gap-2 text-subtitle">
             <Sparkles className="h-5 w-5 text-primary-500" />
-            <span lang="bn">শুরু করুন — ধাপে ধাপে সেটআপ</span>
+            <span lang="bn">সিস্টেম প্রস্তুত করুন — একবারের সেটআপ</span>
           </CardTitle>
           <p className="mt-1 text-caption text-text-secondary" lang="bn">
-            নিচের ধাপগুলো অনুসরণ করে সিস্টেমটি সম্পূর্ণ প্রস্তুত করুন। প্রতিটি কাজ শেষ হলে স্বয়ংক্রিয়ভাবে টিক চিহ্নিত হবে।
+            সফটওয়্যারটি ব্যবহারের আগে নিচের ধাপগুলো সম্পন্ন করুন। প্রতিটি ধাপ সম্পন্ন হলে স্বয়ংক্রিয়ভাবে টিক চিহ্নিত হবে।
           </p>
         </div>
         <button
           type="button"
           onClick={handleDismiss}
           className="rounded-md p-1 text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
-          aria-label="গাইড বন্ধ করুন"
+          aria-label="বন্ধ করুন"
         >
           <X className="h-4 w-4" />
         </button>
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* Progress bar */}
+        {/* Progress */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-caption">
             <span className="text-text-secondary" lang="bn">
-              {doneCount} / {totalSteps} সম্পন্ন
+              {doneCount} / {total} সম্পন্ন
             </span>
             <span className="font-mono font-semibold text-primary-700">{progressPct}%</span>
           </div>
           <Progress value={progressPct} className="h-2" />
         </div>
 
-        {/* All done celebration */}
+        {/* All done */}
         {allDone ? (
           <div className="flex flex-col items-center gap-2 rounded-lg border border-semantic-success/30 bg-success-50 p-4 text-center">
             <PartyPopper className="h-8 w-8 text-semantic-success" />
             <p className="text-subtitle font-semibold text-semantic-success" lang="bn">
-              অভিনন্দন! সব ধাপ সম্পন্ন হয়েছে 🎉
+              সব প্রস্তুত! সিস্টেম ব্যবহারের জন্য তৈরি 🎉
             </p>
             <p className="text-body text-text-secondary" lang="bn">
-              আপনার মাদ্রাসা সিস্টেম এখন সম্পূর্ণ প্রস্তুত। নিয়মিত ব্যবহার শুরু করুন।
+              সকল কনফিগারেশন সম্পন্ন। এখন নিয়মিত কার্যক্রম শুরু করতে পারেন।
             </p>
           </div>
         ) : null}
 
-        {/* Steps list */}
+        {/* Steps */}
         <ul className="space-y-2">
-          {ONBOARDING_STEPS.map((step, idx) => {
+          {SETUP_STEPS.map((step) => {
             const isDone = completed.has(step.id);
             const isCurrent = currentStep?.id === step.id;
             const isChecking = checking[step.id];
@@ -184,12 +176,12 @@ export function OnboardingWidget() {
                       : "border-border-default bg-surface-card"
                 }`}
               >
-                {/* Status icon */}
+                {/* Icon */}
                 <div className="mt-0.5 shrink-0">
                   {isDone ? (
                     <CheckCircle2 className="h-5 w-5 text-semantic-success" />
                   ) : isChecking ? (
-                    <Circle className="h-5 w-5 animate-pulse text-primary-400" />
+                    <Loader2 className="h-5 w-5 animate-spin text-primary-400" />
                   ) : (
                     <Circle className="h-5 w-5 text-text-muted" />
                   )}
@@ -212,8 +204,8 @@ export function OnboardingWidget() {
                   )}
                 </div>
 
-                {/* Action button */}
-                {!isDone && (
+                {/* Action */}
+                {!isDone && !isChecking && (
                   <Button
                     size="sm"
                     variant={isCurrent ? "default" : "outline"}
@@ -229,7 +221,6 @@ export function OnboardingWidget() {
           })}
         </ul>
 
-        {/* Footer */}
         <p className="text-center text-caption text-text-muted" lang="bn">
           💡 প্রতিটি ধাপের কাজ শেষ করে ড্যাশবোর্ডে ফিরে আসলে স্বয়ংক্রিয়ভাবে টিক হবে
         </p>
@@ -239,47 +230,32 @@ export function OnboardingWidget() {
 }
 
 /**
- * Check if a step is completed by calling the relevant API.
- * Returns true if the step is done.
+ * Check if a setup step is completed by calling the relevant API.
  */
-async function checkStep(step: OnboardingStep, _cookies: string): Promise<boolean> {
-  const BASE = "/api/v1";
+async function checkStep(step: SetupStep): Promise<boolean> {
   try {
-    switch (step.checkType) {
-      case "students": {
-        const res = await fetch(`${BASE}/students?pageSize=1`, { credentials: "include" });
-        const data = await res.json();
-        return (data?.data?.length ?? 0) > 0;
-      }
-      case "attendance": {
-        const res = await fetch(`${BASE}/attendance/sessions?pageSize=1`, { credentials: "include" });
-        const data = await res.json();
-        return (data?.data?.length ?? 0) > 0;
-      }
-      case "fees": {
-        const res = await fetch(`${BASE}/fees/payments?pageSize=1`, { credentials: "include" });
-        const data = await res.json();
-        return (data?.data?.length ?? 0) > 0;
-      }
-      case "exams": {
-        const res = await fetch(`${BASE}/exams?pageSize=1`, { credentials: "include" });
-        const data = await res.json();
-        return (data?.data?.length ?? 0) > 0;
-      }
-      case "notices": {
-        const res = await fetch(`${BASE}/notices?pageSize=1`, { credentials: "include" });
-        const data = await res.json();
-        return (data?.data?.length ?? 0) > 0;
-      }
-      case "rbac": {
-        // RBAC is always "done" if roles exist (seeded by default)
-        const res = await fetch(`${BASE}/roles?pageSize=1`, { credentials: "include" });
-        const data = await res.json();
-        return (data?.data?.length ?? 0) > 0;
-      }
-      default:
-        return false;
+    const res = await fetch(step.checkEndpoint, { credentials: "include" });
+    if (!res.ok) return false;
+    const data = await res.json();
+
+    // Support nested field access: "data.length" or "id"
+    const parts = step.checkField.split(".");
+    let value: unknown = data;
+    for (const part of parts) {
+      if (value == null) return false;
+      value = (value as Record<string, unknown>)[part];
     }
+
+    if (typeof value === "number") {
+      return value >= step.checkMin;
+    }
+    if (typeof value === "string") {
+      return value.length > 0;
+    }
+    if (Array.isArray(value)) {
+      return value.length >= step.checkMin;
+    }
+    return !!value;
   } catch {
     return false;
   }
