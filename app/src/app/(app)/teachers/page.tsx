@@ -1,0 +1,865 @@
+"use client";
+
+/**
+ * MadrashaOS — Teachers List + Assignment Grid (Phase C3.2 — People)
+ *
+ * Route: /teachers
+ *
+ * Upper section: Staff directory — shows all 8 seeded users as "staff"
+ * with role badges (since fixtures only have 1 actual teacher, we show
+ * the full staff list, which is the realistic case for any madrasha).
+ *
+ * Lower section: Teacher Assignment grid — existing teacher × class ×
+ * subject assignments. "Assign Teacher" button opens a dialog with
+ * teacher/class/subject selects. Duplicate-active-assignment is blocked
+ * inline (same teacher + same class + same subject → inline error).
+ *
+ * Permissions:
+ *   - Page visible only to roles with `teachers.view`
+ *   - "Assign Teacher" action gated by `teachers.assign`
+ *
+ * Data hooks: useClasses() for the class dropdown.
+ * Staff list + assignments are inline mocks (per task spec — do NOT
+ * create new fixture files).
+ */
+
+import * as React from "react";
+import {
+  UserCheck, Briefcase, Mail, Phone, Plus, XCircle,
+  AlertCircle, BookOpen, GraduationCap, Trash2, ArrowRight, UserPlus, Save,
+} from "lucide-react";
+import Link from "next/link";
+import { useClasses, useTeachers, useSubjects, useEmployees, queryClient } from "@/lib/query/client";
+// Real data: useTeachers + useSubjects (replaces mock fixtures)
+import { ROLE_LABELS, type Role } from "@/stores/types";
+import { useI18n } from "@/lib/i18n/I18nProvider";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LoadingState, ErrorState, PermissionDenied } from "@/components/states";
+import { IfPermission } from "@/components/auth/IfPermission";
+import { StudentAvatar } from "@/components/people";
+import { useToast } from "@/hooks/use-toast";
+import { useSessionStore } from "@/stores/sessionStore";
+
+/* ---------------------------------------------------------------
+ * Inline mock data — subjects + initial assignments
+ * (Per task spec: define inline, do NOT create new fixture files)
+ * --------------------------------------------------------------- */
+
+type Subject = { id: string; name: string; code: string };
+
+// Subjects now fetched from real API via useSubjects()
+
+type Assignment = {
+  id: string;
+  teacherId: string;
+  classId: string;
+  subjectId: string;
+};
+
+const INITIAL_ASSIGNMENTS: Assignment[] = [
+  { id: "asg-1", teacherId: "usr-teacher", classId: "cls-5", subjectId: "sub-quran" },
+  { id: "asg-2", teacherId: "usr-teacher", classId: "cls-5", subjectId: "sub-arabic" },
+  { id: "asg-3", teacherId: "usr-teacher", classId: "cls-3", subjectId: "sub-bangla" },
+  { id: "asg-4", teacherId: "usr-authority", classId: "cls-8", subjectId: "sub-fiqh" },
+  { id: "asg-5", teacherId: "usr-authority", classId: "cls-5", subjectId: "sub-hadith" },
+  { id: "asg-6", teacherId: "usr-administrator", classId: "cls-1", subjectId: "sub-math" },
+  { id: "asg-7", teacherId: "usr-accountant", classId: "cls-3", subjectId: "sub-english" },
+  { id: "asg-8", teacherId: "usr-teacher", classId: "cls-8", subjectId: "sub-quran" },
+];
+
+const ROLE_TONE: Record<Role, string> = {
+  "super-admin": "bg-accent-50 text-accent-700",
+  authority: "bg-primary-50 text-primary-700",
+  administrator: "bg-primary-50 text-primary-700",
+  accountant: "bg-warning-50 text-semantic-warning",
+  teacher: "bg-success-50 text-semantic-success",
+  storekeeper: "bg-neutral-100 text-text-secondary",
+  guardian: "bg-neutral-100 text-text-secondary",
+  student: "bg-neutral-100 text-text-secondary",
+};
+
+/* ---------------------------------------------------------------
+ * Page
+ * --------------------------------------------------------------- */
+
+export default function TeachersPage() {
+  const { t: _t } = useI18n();
+  void _t;
+  const { hasPermission } = useSessionStore();
+  const { toast } = useToast();
+  const { data: classes, isLoading, isError, refetch } = useClasses() as { data: Array<{ id: string; name: string; sections: string[] }> | undefined; isLoading: boolean; isError: boolean; refetch: () => void };
+
+  // Permission: page-level gate (D4 lock-in — never raw 403)
+  if (!hasPermission("teachers.view")) {
+    return (
+      <div className="px-4 py-8 md:px-8 md:py-12">
+        <div className="mx-auto max-w-[var(--grid-max-width)]">
+          <PermissionDenied resource="Teachers" />
+        </div>
+      </div>
+    );
+  }
+
+  return <TeachersContent
+    classes={classes}
+    isLoading={isLoading}
+    isError={isError}
+    refetch={refetch}
+    toast={toast}
+  />;
+}
+
+/* ---------------------------------------------------------------
+ * Inner content (so we can early-return for permission above)
+ * --------------------------------------------------------------- */
+
+type TeachersContentProps = {
+  classes: { id: string; name: string; sections: string[] }[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+  toast: ReturnType<typeof useToast>["toast"];
+};
+
+function TeachersContent({
+  classes, isLoading, isError, refetch, toast,
+}: TeachersContentProps) {
+  const { data: teachers } = useTeachers();
+  const { data: subjects } = useSubjects();
+  const { data: employees } = useEmployees();
+  const [assignments, setAssignments] = React.useState<Assignment[]>(INITIAL_ASSIGNMENTS);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [newTeacher, setNewTeacher] = React.useState<string>("");
+  const [newClass, setNewClass] = React.useState<string>("");
+  const [newSubject, setNewSubject] = React.useState<string>("");
+  const [search, setSearch] = React.useState("");
+  const [duplicateError, setDuplicateError] = React.useState<string | null>(null);
+
+  // --- Add Teacher dialog state ---
+  const [addTeacherOpen, setAddTeacherOpen] = React.useState(false);
+  const [addTeacherSubmitting, setAddTeacherSubmitting] = React.useState(false);
+  const [addTeacherError, setAddTeacherError] = React.useState<string | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = React.useState<string>("");
+  const [teacherEmployeeCode, setTeacherEmployeeCode] = React.useState<string>("");
+  const [teacherDesignation, setTeacherDesignation] = React.useState<string>("");
+  const [teacherSpecialization, setTeacherSpecialization] = React.useState<string>("");
+  const [teacherJoinedAt, setTeacherJoinedAt] = React.useState<string>(
+    new Date().toISOString().slice(0, 10),
+  );
+
+  // Real Teacher records — used for the Assign Teacher dropdown.
+  // The assign API (POST /teachers/assign) requires a Teacher row, so
+  // employees must NOT appear here (they'd cause "Teacher not found").
+  const realTeachers = (teachers ?? []) as Array<{
+    id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
+    designation?: string; status?: string; userId?: string;
+  }>;
+
+  // Employees — used to populate the "Add Teacher" employee picker AND
+  // merged into the staff directory for display.
+  const employeeList = (employees ?? []) as Array<{
+    id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
+    designation?: string; status?: string;
+    user?: { id?: string } | null;
+  }>;
+
+  // Combine Teacher records + Employee records for the staff directory
+  // (display only — NOT for the assign dropdown).
+  const teacherList = React.useMemo(() => {
+    const ids = new Set(realTeachers.map((t) => t.id));
+    return [...realTeachers, ...employeeList.filter((e) => !ids.has(e.id))];
+  }, [realTeachers, employeeList]);
+
+  // Employees eligible for promotion to Teacher: those with a linked
+  // user_id who are not already in the realTeachers list (by user_id).
+  const eligibleEmployees = React.useMemo(() => {
+    const teacherUserIds = new Set(
+      realTeachers.map((t) => t.userId).filter(Boolean) as string[],
+    );
+    return employeeList.filter((e) => {
+      const uid = e.user?.id;
+      return uid && !teacherUserIds.has(uid);
+    });
+  }, [employeeList, realTeachers]);
+
+  const subjectList = (subjects ?? []) as Array<{
+    id: string; name: string; code?: string;
+  }>;
+
+  const classMap = React.useMemo(() => {
+    const m = new Map<string, { name: string; sections: string[] }>();
+    classes?.forEach((c) => m.set(c.id, { name: c.name, sections: c.sections }));
+    return m;
+  }, [classes]);
+  const subjectMap = React.useMemo(() => {
+    const m = new Map<string, { id: string; name: string; code?: string }>();
+    subjectList.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [subjectList]);
+  const userMap = React.useMemo(() => {
+    const m = new Map<string, { id: string; name: string; role?: string; nameBn?: string; email?: string; phone?: string }>();
+    teacherList.forEach((t) => m.set(t.id, { id: t.id, name: t.name, role: "teacher", nameBn: t.nameBn, email: t.email, phone: t.phone }));
+    return m;
+  }, [teacherList]);
+
+  // Filtered staff (search by name or email)
+  const filteredStaff = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return teacherList;
+    return teacherList.filter((t) =>
+      `${t.name} ${t.designation ?? ""}`.toLowerCase().includes(q),
+    );
+  }, [search, teacherList]);
+
+  const filteredAssignments = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return assignments;
+    return assignments.filter((asg) => {
+      const u = userMap.get(asg.teacherId);
+      const c = classMap.get(asg.classId);
+      const s = subjectMap.get(asg.subjectId);
+      const hay = `${u?.name ?? ""} ${u?.nameBn ?? ""} ${c?.name ?? ""} ${s?.name ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [assignments, search, userMap, classMap, subjectMap]);
+
+  const handleOpenDialog = () => {
+    setNewTeacher("");
+    setNewClass("");
+    setNewSubject("");
+    setDuplicateError(null);
+    setDialogOpen(true);
+  };
+
+  const handleConfirmAssign = async () => {
+    setDuplicateError(null);
+    if (!newTeacher || !newClass || !newSubject) {
+      setDuplicateError("Please select a teacher, class, and subject.");
+      return;
+    }
+    // Duplicate-active-assignment block (same teacher + class + subject)
+    const exists = assignments.some(
+      (a) =>
+        a.teacherId === newTeacher &&
+        a.classId === newClass &&
+        a.subjectId === newSubject,
+    );
+    if (exists) {
+      setDuplicateError(
+        "This teacher is already assigned to this class for the same subject. Pick a different combination.",
+      );
+      return;
+    }
+    // Call the real API
+    try {
+      const res = await fetch("/api/v1/teachers/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teacher_id: newTeacher,
+          class_id: newClass,
+          subject_id: newSubject || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDuplicateError(data?.error || `Failed to assign (HTTP ${res.status})`);
+        return;
+      }
+      // Add to local state too
+      const next: Assignment = {
+        id: data?.id || `asg-${Date.now()}`,
+        teacherId: newTeacher,
+        classId: newClass,
+        subjectId: newSubject,
+      };
+      setAssignments((prev) => [...prev, next]);
+      setDialogOpen(false);
+      const u = userMap.get(newTeacher) as { id: string; name: string; role?: string; nameBn?: string } | undefined;
+      const c = classMap.get(newClass);
+      const s = subjectMap.get(newSubject);
+      toast({
+        title: "Assignment created",
+        description: `${u?.name ?? "Teacher"} assigned to ${c?.name ?? ""} · ${s?.name ?? ""}`,
+      });
+    } catch {
+      setDuplicateError("Network error — please try again.");
+    }
+  };
+
+  const handleDeleteAssignment = (id: string) => {
+    setAssignments((prev) => prev.filter((a) => a.id !== id));
+    toast({ title: "Assignment removed" });
+  };
+
+  // --- Add Teacher: promote an Employee to a Teacher record ---
+  // The assign API requires a Teacher row; this creates one linked to
+  // an existing Employee's User account.
+  function openAddTeacherDialog() {
+    setSelectedEmployeeId("");
+    setTeacherEmployeeCode("");
+    setTeacherDesignation("");
+    setTeacherSpecialization("");
+    setTeacherJoinedAt(new Date().toISOString().slice(0, 10));
+    setAddTeacherError(null);
+    setAddTeacherOpen(true);
+  }
+
+  function onEmployeeSelect(empId: string) {
+    setSelectedEmployeeId(empId);
+    // Pre-fill code + designation from the employee for convenience
+    const emp = employeeList.find((e) => e.id === empId);
+    if (emp) {
+      setTeacherEmployeeCode(emp.employeeCode ?? "");
+      setTeacherDesignation(emp.designation ?? "");
+    }
+  }
+
+  async function handleAddTeacher() {
+    setAddTeacherError(null);
+    const emp = employeeList.find((e) => e.id === selectedEmployeeId);
+    const userId = emp?.user?.id;
+    if (!userId) {
+      setAddTeacherError("Please select an employee with a linked user account.");
+      return;
+    }
+    if (!teacherEmployeeCode.trim()) {
+      setAddTeacherError("Employee code is required.");
+      return;
+    }
+    setAddTeacherSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/teachers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          employee_code: teacherEmployeeCode.trim(),
+          designation: teacherDesignation.trim() || undefined,
+          specialization: teacherSpecialization.trim() || undefined,
+          joined_at: new Date(teacherJoinedAt).toISOString(),
+          status: "active",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAddTeacherError(data?.error || `Failed (HTTP ${res.status})`);
+        setAddTeacherSubmitting(false);
+        return;
+      }
+      toast({
+        title: "Teacher added",
+        description: `${emp?.name ?? "Employee"} is now a teacher.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["teachers"] });
+      setAddTeacherOpen(false);
+    } catch {
+      setAddTeacherError("Network error — please try again.");
+    }
+    setAddTeacherSubmitting(false);
+  }
+
+  return (
+    <div className="px-4 py-8 md:px-8 md:py-12">
+      <div className="mx-auto max-w-[var(--grid-max-width)] space-y-6">
+        {/* Header */}
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="flex items-center gap-2 text-display font-bold text-text-primary">
+              <UserCheck className="h-7 w-7 text-primary-500" aria-hidden />
+              Teachers &amp; Staff
+            </h1>
+            <p className="mt-1 text-body text-text-secondary">
+              Directory of staff and their class / subject assignments.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <IfPermission code="teachers.create">
+              <Button variant="outline" onClick={openAddTeacherDialog}>
+                <UserPlus className="h-4 w-4" />
+                Add Teacher
+              </Button>
+            </IfPermission>
+            <IfPermission code="teachers.assign">
+              <Button onClick={handleOpenDialog}>
+                <Plus className="h-4 w-4" />
+                Assign Teacher
+              </Button>
+            </IfPermission>
+          </div>
+        </header>
+
+        {/* Search */}
+        <div className="relative">
+          <Input
+            type="search"
+            role="searchbox"
+            aria-label="Search staff or assignments"
+            placeholder="Search by name, role, class, or subject"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="ps-3"
+          />
+        </div>
+
+        {/* ---------- Staff directory ---------- */}
+        <section aria-labelledby="staff-heading">
+          <h2 id="staff-heading" className="mb-3 text-subtitle font-semibold text-text-primary">
+            Staff Directory ({filteredStaff.length})
+          </h2>
+
+          {isError && (
+            <ErrorState
+              title="Couldn't load staff data"
+              onRetry={() => refetch()}
+            />
+          )}
+
+          {isLoading && <LoadingState pattern="table" rows={4} />}
+
+          {!isError && !isLoading && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {filteredStaff.map((u) => {
+                const roleLabel = { native: u.designation ?? u.status ?? "Staff", english: u.designation ?? u.status ?? "Staff" };
+                const assignmentCount = assignments.filter((a) => a.teacherId === u.id).length;
+                return (
+                  <Card key={u.id} className="shadow-elevation-1">
+                    <CardContent className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <StudentAvatar name={u.name} size="md" />
+                        <div className="min-w-0">
+                          <p className="truncate text-body font-semibold text-text-primary">
+                            {u.name}
+                          </p>
+                          <p className="truncate text-caption text-text-muted" lang="bn">
+                            {u.nameBn}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={"bg-neutral-100"}>
+                          <Briefcase className="h-3 w-3" />
+                          {roleLabel.english}
+                        </Badge>
+                        <span className="text-caption text-text-muted">
+                          {assignmentCount} assignment{assignmentCount === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-caption text-text-secondary">
+                        <p className="flex items-center gap-1.5 truncate">
+                          <Mail className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                          <span className="truncate">{u.email}</span>
+                        </p>
+                        <p className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                          {u.phone}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ---------- Assignment grid ---------- */}
+        <section aria-labelledby="assignments-heading">
+          <h2 id="assignments-heading" className="mb-3 flex items-center gap-2 text-subtitle font-semibold text-text-primary">
+            <BookOpen className="h-4 w-4 text-primary-500" />
+            Teacher Assignments ({filteredAssignments.length})
+          </h2>
+
+          {isError && (
+            <ErrorState title="Couldn't load assignments" onRetry={() => refetch()} />
+          )}
+
+          {isLoading && <LoadingState pattern="table" rows={5} />}
+
+          {!isError && !isLoading && filteredAssignments.length === 0 && (
+            <Card>
+              <CardContent>
+                <div className="flex flex-col items-center gap-3 py-8 text-center">
+                  <GraduationCap className="h-10 w-10 text-text-muted" aria-hidden />
+                  <div>
+                    <p className="text-body font-medium text-text-primary">No assignments yet</p>
+                    <p className="text-caption text-text-secondary">
+                      Assign a teacher to a class and subject to get started.
+                    </p>
+                  </div>
+                  <IfPermission code="teachers.assign">
+                    <Button size="sm" onClick={handleOpenDialog}>
+                      <Plus className="h-4 w-4" />
+                      Assign Teacher
+                    </Button>
+                  </IfPermission>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isError && !isLoading && filteredAssignments.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-border-default bg-surface-card shadow-elevation-1">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-neutral-50 hover:bg-neutral-50">
+                    <TableHead className="ps-4 text-caption font-semibold uppercase tracking-wide text-text-muted">
+                      Teacher
+                    </TableHead>
+                    <TableHead className="text-caption font-semibold uppercase tracking-wide text-text-muted">
+                      Class
+                    </TableHead>
+                    <TableHead className="text-caption font-semibold uppercase tracking-wide text-text-muted">
+                      Subject
+                    </TableHead>
+                    <TableHead className="text-caption font-semibold uppercase tracking-wide text-text-muted">
+                      Subject code
+                    </TableHead>
+                    <TableHead className="pe-4 text-end text-caption font-semibold uppercase tracking-wide text-text-muted">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAssignments.map((asg) => {
+                    const u = userMap.get(asg.teacherId);
+                    const c = classMap.get(asg.classId);
+                    const s = subjectMap.get(asg.subjectId);
+                    return (
+                      <TableRow key={asg.id} className="hover:bg-surface-hover">
+                        <TableCell className="ps-4">
+                          <div className="flex items-center gap-2">
+                            <StudentAvatar name={u?.name ?? "?"} size="sm" />
+                            <div>
+                              <p className="text-body font-medium text-text-primary">
+                                {u?.name ?? "—"}
+                              </p>
+                              <p className="text-caption text-text-muted">
+                                {ROLE_LABELS[u?.role as Role]?.english ?? u?.role}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-primary-50 text-primary-700">
+                            <GraduationCap className="h-3 w-3" />
+                            {c?.name ?? "—"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-body text-text-primary">
+                          {s?.name ?? "—"}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-caption text-text-secondary">
+                            {s?.code ?? "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="pe-4 text-end">
+                          <IfPermission
+                            code="teachers.assign"
+                            fallback={
+                              <span className="text-caption text-text-muted">—</span>
+                            }
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Remove assignment for ${u?.name}`}
+                              onClick={() => handleDeleteAssignment(asg.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-semantic-danger" />
+                            </Button>
+                          </IfPermission>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ---------- Assign Teacher dialog ---------- */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary-500" />
+              Assign Teacher
+            </DialogTitle>
+            <DialogDescription>
+              Pick a teacher, a class, and a subject. Duplicate assignments are blocked.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Guidance banners — show when a prerequisite list is empty */}
+          {realTeachers.length === 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-semantic-warning/40 bg-warning-50 px-3 py-2 text-caption text-semantic-warning">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">
+                No teachers found. Promote an employee to a teacher first.
+              </span>
+              <IfPermission code="teachers.create">
+                <button
+                  type="button"
+                  onClick={() => { setDialogOpen(false); openAddTeacherDialog(); }}
+                  className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+                >
+                  Add Teacher <ArrowRight className="h-3 w-3" />
+                </button>
+              </IfPermission>
+            </div>
+          )}
+          {classes && classes.length === 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-semantic-warning/40 bg-warning-50 px-3 py-2 text-caption text-semantic-warning">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">
+                No classes found. Create a class first.
+              </span>
+              <Link
+                href="/academic/structure"
+                className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+              >
+                Add Class <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+          {subjectList.length === 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-semantic-warning/40 bg-warning-50 px-3 py-2 text-caption text-semantic-warning">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">
+                No subjects found. Create a subject first.
+              </span>
+              <Link
+                href="/subjects"
+                className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+              >
+                Add Subject <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="assign-teacher">Teacher</Label>
+              <Select value={newTeacher} onValueChange={setNewTeacher}>
+                <SelectTrigger id="assign-teacher" className="w-full">
+                  <SelectValue placeholder="Select teacher" />
+                </SelectTrigger>
+                <SelectContent>
+                  {realTeachers.length === 0 && (
+                    <div className="px-3 py-2 text-caption text-text-muted">
+                      No teachers found. Use “Add Teacher” to promote an employee first.
+                    </div>
+                  )}
+                  {realTeachers.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} {t.designation ? `· ${t.designation}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="assign-class">Class</Label>
+              <Select value={newClass} onValueChange={setNewClass}>
+                <SelectTrigger id="assign-class" className="w-full">
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes?.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} (Sections: {c.sections.join(", ")})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="assign-subject">Subject</Label>
+              <Select value={newSubject} onValueChange={setNewSubject}>
+                <SelectTrigger id="assign-subject" className="w-full">
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjectList.length === 0 && (
+                    <div className="px-3 py-2 text-caption text-text-muted">
+                      No subjects found. Add subjects first.
+                    </div>
+                  )}
+                  {subjectList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} {s.code ? `· ${s.code}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {duplicateError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{duplicateError}</span>
+              </div>
+            )}
+
+            {/* Live preview of what's about to be assigned */}
+            {newTeacher && newClass && newSubject && !duplicateError && (
+              <div className="rounded-md border border-primary-200 bg-primary-50 px-3 py-2 text-caption text-primary-700">
+                <span className="font-medium">{userMap.get(newTeacher)?.name}</span> will teach{" "}
+                <span className="font-medium">{subjectMap.get(newSubject)?.name}</span> to{" "}
+                <span className="font-medium">{classMap.get(newClass)?.name}</span>.
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <IfPermission code="teachers.assign" fallback={null}>
+              <Button onClick={handleConfirmAssign}>
+                <Plus className="h-4 w-4" />
+                Create Assignment
+              </Button>
+            </IfPermission>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Add Teacher dialog ---------- */}
+      <Dialog open={addTeacherOpen} onOpenChange={(o) => (o ? setAddTeacherOpen(true) : setAddTeacherOpen(false))}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary-500" />
+              Add Teacher
+            </DialogTitle>
+            <DialogDescription>
+              Promote an existing employee to a teacher. The teacher can then
+              be assigned to classes and subjects.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="add-teacher-employee">Select Employee *</Label>
+              <Select value={selectedEmployeeId} onValueChange={onEmployeeSelect}>
+                <SelectTrigger id="add-teacher-employee" className="w-full">
+                  <SelectValue placeholder="Select an employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligibleEmployees.length === 0 && (
+                    <div className="px-3 py-2 text-caption text-text-muted">
+                      No eligible employees. Add employees first, or they may
+                      already be teachers.
+                    </div>
+                  )}
+                  {eligibleEmployees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name} {e.designation ? `· ${e.designation}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {eligibleEmployees.length === 0 && (
+                <p className="flex items-center gap-1 text-caption text-text-muted">
+                  <Link href="/employees" className="inline-flex items-center gap-1 font-medium text-primary-600 underline hover:no-underline">
+                    Add Employee first <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="add-teacher-code">Employee Code *</Label>
+                <Input
+                  id="add-teacher-code"
+                  placeholder="T-001"
+                  value={teacherEmployeeCode}
+                  onChange={(e) => setTeacherEmployeeCode(e.target.value)}
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add-teacher-joined">Joined Date</Label>
+                <Input
+                  id="add-teacher-joined"
+                  type="date"
+                  value={teacherJoinedAt}
+                  onChange={(e) => setTeacherJoinedAt(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="add-teacher-designation">Designation</Label>
+              <Input
+                id="add-teacher-designation"
+                placeholder="Senior Teacher"
+                value={teacherDesignation}
+                onChange={(e) => setTeacherDesignation(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="add-teacher-spec">Specialization</Label>
+              <Input
+                id="add-teacher-spec"
+                placeholder="Quran, Hadith, Arabic…"
+                value={teacherSpecialization}
+                onChange={(e) => setTeacherSpecialization(e.target.value)}
+              />
+            </div>
+
+            {addTeacherError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{addTeacherError}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddTeacherOpen(false)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <IfPermission code="teachers.create" fallback={null}>
+              <Button onClick={handleAddTeacher} disabled={addTeacherSubmitting}>
+                <Save className="h-4 w-4" />
+                {addTeacherSubmitting ? "Adding…" : "Add Teacher"}
+              </Button>
+            </IfPermission>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
