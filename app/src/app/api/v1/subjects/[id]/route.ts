@@ -79,3 +79,37 @@ export const PATCH = withPermission("academic.structure.edit", async (req: Reque
 
   return successResponse(updated, "Subject updated");
 });
+
+/** DELETE /api/v1/subjects/:id — soft delete (perm: academic.structure.edit)
+ *
+ * Refuses to delete a subject that is referenced by active teacher
+ * assignments, exam marks, or routines — those would orphan records.
+ */
+export const DELETE = withPermission("academic.structure.edit", async (_req: Request, ctx: RouteContext) => {
+  const tenantCtx = await getTenantContext();
+  if (!tenantCtx) return errorResponse("Unauthorized", 401);
+  const { id } = await ctx.params;
+
+  const existing = await db.subject.findFirst({
+    where: { id, organization_id: tenantCtx.organization_id, deleted_at: null },
+  });
+  if (!existing) return errorResponse("Subject not found", 404);
+
+  // Block deletion if active teacher assignments reference this subject.
+  const activeAssignments = await db.teacherAssignment.count({
+    where: { subject_id: id, is_active: true, deleted_at: null },
+  });
+  if (activeAssignments > 0) {
+    return errorResponse(
+      `Cannot delete subject: ${activeAssignments} active teacher assignment(s) reference it. Remove those assignments first.`,
+      409,
+    );
+  }
+
+  await db.subject.update({
+    where: { id },
+    data: { deleted_at: new Date(), is_active: false, updated_by: tenantCtx.user_id } as never,
+  });
+
+  return successResponse(null, "Subject deleted (soft)");
+});

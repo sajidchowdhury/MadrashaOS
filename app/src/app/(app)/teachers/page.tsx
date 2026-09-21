@@ -26,8 +26,9 @@
 import * as React from "react";
 import {
   UserCheck, Briefcase, Mail, Phone, Plus, XCircle,
-  AlertCircle, BookOpen, GraduationCap, Trash2,
+  AlertCircle, BookOpen, GraduationCap, Trash2, ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import { useClasses, useTeachers, useSubjects, useEmployees } from "@/lib/query/client";
 // Real data: useTeachers + useSubjects (replaces mock fixtures)
 import { ROLE_LABELS, type Role } from "@/stores/types";
@@ -501,6 +502,50 @@ function TeachersContent({
               Pick a teacher, a class, and a subject. Duplicate assignments are blocked.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Guidance banners — show when a prerequisite list is empty */}
+          {teacherList.length === 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-semantic-warning/40 bg-warning-50 px-3 py-2 text-caption text-semantic-warning">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">
+                No teachers or employees found. Add staff first.
+              </span>
+              <Link
+                href="/employees"
+                className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+              >
+                Add Employee <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+          {classes && classes.length === 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-semantic-warning/40 bg-warning-50 px-3 py-2 text-caption text-semantic-warning">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">
+                No classes found. Create a class first.
+              </span>
+              <Link
+                href="/academic/structure"
+                className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+              >
+                Add Class <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+          {subjectList.length === 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-semantic-warning/40 bg-warning-50 px-3 py-2 text-caption text-semantic-warning">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">
+                No subjects found. Create a subject first.
+              </span>
+              <Link
+                href="/subjects"
+                className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+              >
+                Add Subject <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
 
           <div className="space-y-3">
             <div className="space-y-1.5">

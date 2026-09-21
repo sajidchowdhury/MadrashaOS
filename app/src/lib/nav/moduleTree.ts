@@ -19,7 +19,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, Building2, ShieldCheck, History, Lock, DatabaseBackup,
   GraduationCap, UserPlus, Users, UserCheck, Briefcase,
-  ClipboardCheck, FileText, Award, CalendarDays,
+  ClipboardCheck, FileText, Award, CalendarDays, BookMarked,
   Wallet, Calculator, HandCoins, Scale, Gift, Landmark, CreditCard,
   Package, ShoppingCart, Truck, Sofa, UtensilsCrossed, BookOpen, Bus,
   Bell, FileArchive, BarChart3, Settings,
@@ -95,6 +95,7 @@ export const moduleTree: ModuleGroup[] = [
     labelKey: "shell.nav.group.academic",
     items: [
       { id: "academic-structure", labelKey: "shell.nav.attendance", icon: CalendarDays, layer: "academic", permissionRequired: "academic.structure.view", phase: 1, route: "/academic/structure" },
+      { id: "subjects", labelKey: "shell.nav.subjects", icon: BookMarked, layer: "academic", permissionRequired: "academic.structure.view", phase: 1, route: "/subjects" },
       { id: "attendance", labelKey: "shell.nav.attendance", icon: ClipboardCheck, layer: "academic", permissionRequired: "attendance.view", phase: 1, route: "/attendance" },
       { id: "exams", labelKey: "shell.nav.exams", icon: FileText, layer: "academic", permissionRequired: "exams.view", phase: 2, route: "/exams" },
       { id: "results", labelKey: "shell.nav.results", icon: Award, layer: "academic", permissionRequired: "results.view", phase: 2, route: "/results" },

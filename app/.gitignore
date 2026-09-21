@@ -54,6 +54,9 @@ server.log
 # Skills directory
 /skills/
 
+# Agent worklog (internal tracking, not for the repo)
+/worklog.md
+
 # Prisma generated client (regenerated on build — don't commit)
 /src/generated/
 
