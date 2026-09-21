@@ -20,6 +20,7 @@ import {
   ClassPerformanceWidget, PendingApprovalsWidget,
 } from "@/components/widgets";
 import { IfPermission } from "@/components/auth/IfPermission";
+import { OnboardingWidget } from "@/components/shell/OnboardingWidget";
 
 export default function AuthorityDashboard() {
   const { locale } = useI18n();
@@ -42,6 +43,9 @@ export default function AuthorityDashboard() {
             All-branch overview · financial approvals · student outcomes.
           </p>
         </header>
+
+        {/* Onboarding checklist — shows setup progress */}
+        <OnboardingWidget />
 
         {/* KPIs */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
