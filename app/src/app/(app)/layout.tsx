@@ -4,7 +4,7 @@
  * MadrashaOS — App Route Group Layout (v1.0 — clean)
  *
  * Wraps every route under `/dashboard`, `/students`, `/fees`, `/notices`, …
- * in the authenticated AppShell (TopBar + SideNav + Footer).
+ * in the authenticated AppShell (TopBar + SideNav + Footer) + DevToolbar.
  *
  * Providers (ThemeProvider, I18nProvider, QueryProvider) are inherited
  * from the root `src/app/layout.tsx`.
@@ -12,6 +12,7 @@
 
 import React from "react";
 import { AppShell } from "@/components/shell/AppShell";
+import { DevToolbar } from "@/components/dev/DevToolbar";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useCurrentUser } from "@/lib/query/client";
 
@@ -34,6 +35,7 @@ export default function AppGroupLayout({
   return (
     <>
       <AppShell>{children}</AppShell>
+      <DevToolbar />
     </>
   );
 }
