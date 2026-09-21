@@ -42,6 +42,13 @@ import {
 } from "@/components/foundation/SectionCard";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { queryClient } from "@/lib/query/client";
 import { formatDate, formatNumber } from "@/lib/i18n/format";
 
 /** Row shape produced by api.getEmployees() (camelCase via toCamel()). */
@@ -97,6 +104,51 @@ export default function EmployeesListPage() {
   } = useEmployees();
 
   const [search, setSearch] = React.useState("");
+  const { toast } = useToast();
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [empName, setEmpName] = React.useState("");
+  const [empNameBn, setEmpNameBn] = React.useState("");
+  const [empDesignation, setEmpDesignation] = React.useState("");
+  const [empPhone, setEmpPhone] = React.useState("");
+  const [empEmail, setEmpEmail] = React.useState("");
+  const [empSalary, setEmpSalary] = React.useState("");
+
+  const handleAddEmployee = async () => {
+    if (!empName.trim() || !empDesignation.trim() || !empPhone.trim() || !empEmail.trim()) {
+      toast({ title: "Missing fields", description: "Name, designation, phone, and email are required.", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: empName.trim(),
+          name_bn: empNameBn.trim() || undefined,
+          designation: empDesignation.trim(),
+          phone: empPhone.trim(),
+          email: empEmail.trim(),
+          salary: empSalary ? Number(empSalary) : undefined,
+          joining_date: new Date().toISOString(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({ title: "Failed", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+      toast({ title: "Employee added", description: `${empName} — ${empDesignation}` });
+      setEmpName(""); setEmpNameBn(""); setEmpDesignation(""); setEmpPhone(""); setEmpEmail(""); setEmpSalary("");
+      setAddOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    }
+    setSubmitting(false);
+  };
   const [status, setStatus] = React.useState<string>("all");
 
   // Client-side filter pipeline.
@@ -149,7 +201,7 @@ export default function EmployeesListPage() {
             </p>
           </div>
           <IfPermission code="employees.create">
-            <Button>
+            <Button onClick={() => setAddOpen(true)}>
               <UserPlus className="h-4 w-4" />
               Add Employee
             </Button>
@@ -352,6 +404,55 @@ export default function EmployeesListPage() {
           </SectionCard>
         )}
       </div>
+
+      {/* Add Employee Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary-500" />
+              Add New Employee
+            </DialogTitle>
+            <DialogDescription>Create a new non-teaching staff member.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-name">Name (English) *</Label>
+                <Input id="emp-name" value={empName} onChange={(e) => setEmpName(e.target.value)} placeholder="Abdul Karim" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-name-bn">নাম (বাংলা)</Label>
+                <Input id="emp-name-bn" value={empNameBn} onChange={(e) => setEmpNameBn(e.target.value)} placeholder="আব্দুল করিম" lang="bn" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="emp-designation">Designation *</Label>
+              <Input id="emp-designation" value={empDesignation} onChange={(e) => setEmpDesignation(e.target.value)} placeholder="Office Assistant" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-phone">Phone *</Label>
+                <Input id="emp-phone" value={empPhone} onChange={(e) => setEmpPhone(e.target.value)} placeholder="+880 1XXX-XXXXXX" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-email">Email *</Label>
+                <Input id="emp-email" type="email" value={empEmail} onChange={(e) => setEmpEmail(e.target.value)} placeholder="name@madrashaos.org" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="emp-salary">Salary (monthly, BDT)</Label>
+              <Input id="emp-salary" type="number" value={empSalary} onChange={(e) => setEmpSalary(e.target.value)} placeholder="15000" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddEmployee} disabled={submitting}>
+              {submitting ? "Adding…" : "Add Employee"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

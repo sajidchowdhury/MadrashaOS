@@ -44,6 +44,13 @@ import {
 } from "@/components/foundation/SectionCard";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { queryClient } from "@/lib/query/client";
 import { formatNumber } from "@/lib/i18n/format";
 
 /** Row shape produced by api.getGuardians() (camelCase via toCamel()). */
@@ -73,6 +80,50 @@ export default function GuardiansListPage() {
   } = useGuardians();
 
   const [search, setSearch] = React.useState("");
+  const { toast } = useToast();
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [gName, setGName] = React.useState("");
+  const [gNameBn, setGNameBn] = React.useState("");
+  const [gPhone, setGPhone] = React.useState("");
+  const [gEmail, setGEmail] = React.useState("");
+  const [gOccupation, setGOccupation] = React.useState("");
+  const [gRelation, setGRelation] = React.useState("father");
+
+  const handleAddGuardian = async () => {
+    if (!gName.trim() || !gPhone.trim()) {
+      toast({ title: "Missing fields", description: "Name and phone are required.", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/guardians", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: gName.trim(),
+          name_bn: gNameBn.trim() || undefined,
+          phone: gPhone.trim(),
+          email: gEmail.trim() || undefined,
+          occupation: gOccupation.trim() || undefined,
+          relation: gRelation,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({ title: "Failed", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+      toast({ title: "Guardian added", description: gName });
+      setGName(""); setGNameBn(""); setGPhone(""); setGEmail(""); setGOccupation(""); setGRelation("father");
+      setAddOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["guardians"] });
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    }
+    setSubmitting(false);
+  };
   const [relation, setRelation] = React.useState<string>("all");
 
   // Build the unique relation dropdown values.
@@ -135,7 +186,7 @@ export default function GuardiansListPage() {
             </p>
           </div>
           <IfPermission code="students.create">
-            <Button>Add Guardian</Button>
+            <Button onClick={() => setAddOpen(true)}>Add Guardian</Button>
           </IfPermission>
         </header>
 
@@ -354,6 +405,67 @@ export default function GuardiansListPage() {
           </SectionCard>
         )}
       </div>
+
+      {/* Add Guardian Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Guardian</DialogTitle>
+            <DialogDescription>Create a new guardian record for student linkage.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="g-name">Name (English) *</Label>
+                <Input id="g-name" value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Omar Faruq" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="g-name-bn">নাম (বাংলা)</Label>
+                <Input id="g-name-bn" value={gNameBn} onChange={(e) => setGNameBn(e.target.value)} placeholder="ওমর ফারুক" lang="bn" />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="g-phone">Phone *</Label>
+                <Input id="g-phone" value={gPhone} onChange={(e) => setGPhone(e.target.value)} placeholder="+880 1XXX-XXXXXX" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="g-email">Email</Label>
+                <Input id="g-email" type="email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="name@example.com" />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="g-occupation">Occupation</Label>
+                <Input id="g-occupation" value={gOccupation} onChange={(e) => setGOccupation(e.target.value)} placeholder="Business" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="g-relation">Relation</Label>
+                <Select value={gRelation} onValueChange={setGRelation}>
+                  <SelectTrigger id="g-relation" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="father">Father</SelectItem>
+                    <SelectItem value="mother">Mother</SelectItem>
+                    <SelectItem value="guardian">Guardian</SelectItem>
+                    <SelectItem value="uncle">Uncle</SelectItem>
+                    <SelectItem value="aunt">Aunt</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddGuardian} disabled={submitting}>
+              {submitting ? "Adding…" : "Add Guardian"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
