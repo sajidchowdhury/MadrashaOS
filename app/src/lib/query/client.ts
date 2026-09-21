@@ -259,6 +259,16 @@ export function useExamMarks(
   });
 }
 
+export function useTeachers(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["teachers", ...sessionKey()],
+    queryFn: () => api.getTeachers(),
+    ...options,
+  });
+}
+
 export function useAccounts(
   options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
 ) {

@@ -392,6 +392,25 @@ export const api = {
     return res.data as never;
   },
 
+  // --- Teachers ---
+  async getTeachers() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/teachers?pageSize=100");
+    return res.data as never;
+  },
+
+  async assignTeacher(teacherId: string, classId: string, subjectId?: string, isClassTeacher = false) {
+    const res = await apiFetch<{ data: Record<string, unknown> }>("/teachers/assign", {
+      method: "POST",
+      body: JSON.stringify({
+        teacher_id: teacherId,
+        class_id: classId,
+        subject_id: subjectId,
+        is_class_teacher: isClassTeacher,
+      }),
+    });
+    return res as never;
+  },
+
   // --- Exams + Marks ---
   async getExams() {
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/exams?pageSize=100");

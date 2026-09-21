@@ -200,7 +200,7 @@ function TeachersContent({
     setDialogOpen(true);
   };
 
-  const handleConfirmAssign = () => {
+  const handleConfirmAssign = async () => {
     setDuplicateError(null);
     if (!newTeacher || !newClass || !newSubject) {
       setDuplicateError("Please select a teacher, class, and subject.");
@@ -219,21 +219,41 @@ function TeachersContent({
       );
       return;
     }
-    const next: Assignment = {
-      id: `asg-${Date.now()}`,
-      teacherId: newTeacher,
-      classId: newClass,
-      subjectId: newSubject,
-    };
-    setAssignments((prev) => [...prev, next]);
-    setDialogOpen(false);
-    const u = userMap.get(newTeacher);
-    const c = classMap.get(newClass);
-    const s = subjectMap.get(newSubject);
-    toast({
-      title: "Assignment created",
-      description: `${u?.name ?? "Teacher"} → ${c?.name ?? ""} · ${s?.name ?? ""}`,
-    });
+    // Call the real API
+    try {
+      const res = await fetch("/api/v1/teachers/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teacher_id: newTeacher,
+          class_id: newClass,
+          subject_id: newSubject || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDuplicateError(data?.error || `Failed to assign (HTTP ${res.status})`);
+        return;
+      }
+      // Add to local state too
+      const next: Assignment = {
+        id: data?.id || `asg-${Date.now()}`,
+        teacherId: newTeacher,
+        classId: newClass,
+        subjectId: newSubject,
+      };
+      setAssignments((prev) => [...prev, next]);
+      setDialogOpen(false);
+      const u = userMap.get(newTeacher);
+      const c = classMap.get(newClass);
+      const s = subjectMap.get(newSubject);
+      toast({
+        title: "Assignment created",
+        description: `${u?.name ?? "Teacher"} assigned to ${c?.name ?? ""} · ${s?.name ?? ""}`,
+      });
+    } catch {
+      setDuplicateError("Network error — please try again.");
+    }
   };
 
   const handleDeleteAssignment = (id: string) => {
