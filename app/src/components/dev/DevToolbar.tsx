@@ -17,8 +17,7 @@
  *   - The FlowOverlay (pulsing CTA ring + completion celebration) is
  *     mounted alongside this toolbar.
  *
- * Language + Theme remain on their respective providers (I18nProvider +
- * next-themes) since those are also persisted separately.
+ * Language + Theme controls are in the TopBar (user dropdown + theme toggle).
  *
  * Collapses to a small "DEV" badge; expands to show all controls. When
  * a flow is active, the collapsed badge also shows a "2/5" pill so the
@@ -31,7 +30,6 @@ import {
   Bug, ChevronUp, Play, ChevronRight, X, ArrowRight, ListChecks,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/I18nProvider";
-import { useTheme } from "next-themes";
 import { useSessionStore } from "@/stores/sessionStore";
 import {
   ROLES,
@@ -43,7 +41,6 @@ import {
   type Branch,
   type NetworkMode,
 } from "@/stores/types";
-import { locales, localeConfig, type Locale } from "@/lib/i18n/config";
 import { getRolePermissions } from "@/lib/auth/role-permissions";
 import { FLOWS } from "@/lib/flows/registry";
 import type { FlowDef } from "@/lib/flows/registry";
@@ -52,8 +49,7 @@ import { FlowOverlay } from "@/components/dev/FlowOverlay";
 import { Button } from "@/components/ui/button";
 
 export function DevToolbar() {
-  const { t, locale, setLocale } = useI18n();
-  const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const { role, branch, network, permissions, setRole, setBranch, setNetwork } =
     useSessionStore();
   const [expanded, setExpanded] = useState(false);
@@ -200,60 +196,6 @@ export function DevToolbar() {
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Language buttons — wired to I18nProvider */}
-          <div>
-            <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
-              Language
-            </label>
-            <div className="flex gap-1">
-              {locales.map((l: Locale) => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => setLocale(l)}
-                  className={`flex-1 rounded-md px-2 py-1.5 text-caption font-medium transition-colors ${
-                    locale === l
-                      ? "bg-primary-500 text-primary-foreground"
-                      : "bg-neutral-100 text-text-secondary hover:bg-neutral-200"
-                  }`}
-                >
-                  {localeConfig[l].labelNative}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Theme toggle — wired to next-themes */}
-          <div>
-            <label className="mb-1 block text-caption font-medium uppercase tracking-wider text-text-muted">
-              Theme
-            </label>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => setTheme("light")}
-                className={`flex-1 rounded-md px-2 py-1.5 text-caption font-medium transition-colors ${
-                  theme === "light"
-                    ? "bg-primary-500 text-primary-foreground"
-                    : "bg-neutral-100 text-text-secondary hover:bg-neutral-200"
-                }`}
-              >
-                ☀ Light
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme("dark")}
-                className={`flex-1 rounded-md px-2 py-1.5 text-caption font-medium transition-colors ${
-                  theme === "dark"
-                    ? "bg-primary-500 text-primary-foreground"
-                    : "bg-neutral-100 text-text-secondary hover:bg-neutral-200"
-                }`}
-              >
-                ☾ Dark
-              </button>
-            </div>
           </div>
 
           {/* Network simulator — wired to sessionStore */}
