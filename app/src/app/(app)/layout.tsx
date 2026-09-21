@@ -13,6 +13,7 @@
 import React from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { DevToolbar } from "@/components/dev/DevToolbar";
+import { HelpButton } from "@/components/shell/HelpButton";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useCurrentUser } from "@/lib/query/client";
 
@@ -35,6 +36,7 @@ export default function AppGroupLayout({
   return (
     <>
       <AppShell>{children}</AppShell>
+      <HelpButton />
       <DevToolbar />
     </>
   );
