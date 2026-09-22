@@ -32,14 +32,24 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   UserPlus, GripVertical, CalendarDays, GraduationCap,
-  XCircle, CheckCircle2, AlertCircle, Ban,
+  XCircle, CheckCircle2, AlertCircle, Ban, Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { IfPermission } from "@/components/auth/IfPermission";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useToast } from "@/hooks/use-toast";
+import { useClasses, queryClient } from "@/lib/query/client";
 import { StudentAvatar } from "@/components/people";
 import { formatDate } from "@/lib/i18n/format";
 import { useI18n } from "@/lib/i18n/I18nProvider";
@@ -217,9 +227,71 @@ export default function AdmissionKanbanPage() {
   const { toast } = useToast();
   const { hasPermission } = useSessionStore();
   const { locale } = useI18n();
+  const { data: classes } = useClasses();
 
   const [applicants, setApplicants] = React.useState<Applicant[]>(INITIAL_APPLICANTS);
   const [activeId, setActiveId] = React.useState<string | null>(null);
+
+  // --- New Application dialog state ---
+  const [newAppOpen, setNewAppOpen] = React.useState(false);
+  const [newAppSubmitting, setNewAppSubmitting] = React.useState(false);
+  const [newAppError, setNewAppError] = React.useState<string | null>(null);
+  const [appName, setAppName] = React.useState("");
+  const [appNameBn, setAppNameBn] = React.useState("");
+  const [guardianName, setGuardianName] = React.useState("");
+  const [guardianPhone, setGuardianPhone] = React.useState("");
+  const [appEmail, setAppEmail] = React.useState("");
+  const [desiredClassId, setDesiredClassId] = React.useState("");
+
+  function openNewAppDialog() {
+    setAppName("");
+    setAppNameBn("");
+    setGuardianName("");
+    setGuardianPhone("");
+    setAppEmail("");
+    setDesiredClassId("");
+    setNewAppError(null);
+    setNewAppOpen(true);
+  }
+
+  async function handleNewAppSubmit() {
+    setNewAppError(null);
+    if (!appName.trim() || !guardianName.trim() || !guardianPhone.trim() || !desiredClassId) {
+      setNewAppError("Applicant name, guardian name, guardian phone, and desired class are required.");
+      return;
+    }
+    setNewAppSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/admissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicant_name: appName.trim(),
+          applicant_name_bn: appNameBn.trim() || undefined,
+          guardian_name: guardianName.trim(),
+          guardian_phone: guardianPhone.trim(),
+          phone: guardianPhone.trim(),
+          email: appEmail.trim() || undefined,
+          desired_class_id: desiredClassId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNewAppError(data?.error || `Failed (HTTP ${res.status})`);
+        setNewAppSubmitting(false);
+        return;
+      }
+      toast({
+        title: "Application submitted",
+        description: `${appName} — reference ${String(data?.id ?? "").slice(0, 8).toUpperCase()}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["admissions"] });
+      setNewAppOpen(false);
+    } catch {
+      setNewAppError("Network error — please try again.");
+    }
+    setNewAppSubmitting(false);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -295,7 +367,7 @@ export default function AdmissionKanbanPage() {
             </p>
           </div>
           <IfPermission code="admission.view">
-            <Button>
+            <Button onClick={openNewAppDialog}>
               <UserPlus className="h-4 w-4" />
               New Application
             </Button>
@@ -365,6 +437,121 @@ export default function AdmissionKanbanPage() {
           Showing {applicants.length} applicants · Stage labels localized · {locale.toUpperCase()}
         </p>
       </div>
+
+      {/* ---------- New Application dialog ---------- */}
+      <Dialog open={newAppOpen} onOpenChange={setNewAppOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary-500" />
+              New Admission Application
+            </DialogTitle>
+            <DialogDescription>
+              Submit a new admission application. It will appear in the
+              “Applied” column with status <code>applied</code>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="app-name">Applicant Name (English) *</Label>
+                <Input
+                  id="app-name"
+                  placeholder="Tahsin Rahman"
+                  value={appName}
+                  onChange={(e) => setAppName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="app-name-bn">আবেদনকারীর নাম (বাংলা)</Label>
+                <Input
+                  id="app-name-bn"
+                  placeholder="তাহসিন রহমান"
+                  value={appNameBn}
+                  onChange={(e) => setAppNameBn(e.target.value)}
+                  lang="bn"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="app-guardian">Guardian Name *</Label>
+                <Input
+                  id="app-guardian"
+                  placeholder="Abdul Rahman"
+                  value={guardianName}
+                  onChange={(e) => setGuardianName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="app-phone">Guardian Phone *</Label>
+                <Input
+                  id="app-phone"
+                  placeholder="+880 1XXX-XXXXXX"
+                  value={guardianPhone}
+                  onChange={(e) => setGuardianPhone(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="app-email">Email</Label>
+                <Input
+                  id="app-email"
+                  type="email"
+                  placeholder="guardian@example.com"
+                  value={appEmail}
+                  onChange={(e) => setAppEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="app-class">Desired Class *</Label>
+                <Select value={desiredClassId} onValueChange={setDesiredClassId}>
+                  <SelectTrigger id="app-class" className="w-full">
+                    <SelectValue placeholder="Select class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(classes as Array<{ id: string; name: string }> | undefined ?? []).length === 0 && (
+                      <div className="px-3 py-2 text-caption text-text-muted">
+                        No classes found. Create classes first.
+                      </div>
+                    )}
+                    {(classes as Array<{ id: string; name: string }> | undefined ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {newAppError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{newAppError}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewAppOpen(false)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleNewAppSubmit} disabled={newAppSubmitting}>
+              <Save className="h-4 w-4" />
+              {newAppSubmitting ? "Submitting…" : "Submit Application"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

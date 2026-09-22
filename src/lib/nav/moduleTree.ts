@@ -94,7 +94,7 @@ export const moduleTree: ModuleGroup[] = [
     id: "academic",
     labelKey: "shell.nav.group.academic",
     items: [
-      { id: "academic-structure", labelKey: "shell.nav.attendance", icon: CalendarDays, layer: "academic", permissionRequired: "academic.structure.view", phase: 1, route: "/academic/structure" },
+      { id: "academic-structure", labelKey: "shell.nav.academic-structure", icon: CalendarDays, layer: "academic", permissionRequired: "academic.structure.view", phase: 1, route: "/academic/structure" },
       { id: "subjects", labelKey: "shell.nav.subjects", icon: BookMarked, layer: "academic", permissionRequired: "academic.structure.view", phase: 1, route: "/subjects" },
       { id: "attendance", labelKey: "shell.nav.attendance", icon: ClipboardCheck, layer: "academic", permissionRequired: "attendance.view", phase: 1, route: "/attendance" },
       { id: "exams", labelKey: "shell.nav.exams", icon: FileText, layer: "academic", permissionRequired: "exams.view", phase: 2, route: "/exams" },

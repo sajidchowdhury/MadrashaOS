@@ -26,10 +26,10 @@
 import * as React from "react";
 import {
   UserCheck, Briefcase, Mail, Phone, Plus, XCircle,
-  AlertCircle, BookOpen, GraduationCap, Trash2, ArrowRight,
+  AlertCircle, BookOpen, GraduationCap, Trash2, ArrowRight, UserPlus, Save,
 } from "lucide-react";
 import Link from "next/link";
-import { useClasses, useTeachers, useSubjects, useEmployees } from "@/lib/query/client";
+import { useClasses, useTeachers, useSubjects, useEmployees, queryClient } from "@/lib/query/client";
 // Real data: useTeachers + useSubjects (replaces mock fixtures)
 import { ROLE_LABELS, type Role } from "@/stores/types";
 import { useI18n } from "@/lib/i18n/I18nProvider";
@@ -149,22 +149,52 @@ function TeachersContent({
   const [search, setSearch] = React.useState("");
   const [duplicateError, setDuplicateError] = React.useState<string | null>(null);
 
-  // Lookups
-  // Combine Teacher records + Employee records for the staff directory + dropdown
+  // --- Add Teacher dialog state ---
+  const [addTeacherOpen, setAddTeacherOpen] = React.useState(false);
+  const [addTeacherSubmitting, setAddTeacherSubmitting] = React.useState(false);
+  const [addTeacherError, setAddTeacherError] = React.useState<string | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = React.useState<string>("");
+  const [teacherEmployeeCode, setTeacherEmployeeCode] = React.useState<string>("");
+  const [teacherDesignation, setTeacherDesignation] = React.useState<string>("");
+  const [teacherSpecialization, setTeacherSpecialization] = React.useState<string>("");
+  const [teacherJoinedAt, setTeacherJoinedAt] = React.useState<string>(
+    new Date().toISOString().slice(0, 10),
+  );
+
+  // Real Teacher records — used for the Assign Teacher dropdown.
+  // The assign API (POST /teachers/assign) requires a Teacher row, so
+  // employees must NOT appear here (they'd cause "Teacher not found").
+  const realTeachers = (teachers ?? []) as Array<{
+    id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
+    designation?: string; status?: string; userId?: string;
+  }>;
+
+  // Employees — used to populate the "Add Teacher" employee picker AND
+  // merged into the staff directory for display.
+  const employeeList = (employees ?? []) as Array<{
+    id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
+    designation?: string; status?: string;
+    user?: { id?: string } | null;
+  }>;
+
+  // Combine Teacher records + Employee records for the staff directory
+  // (display only — NOT for the assign dropdown).
   const teacherList = React.useMemo(() => {
-    const tList = (teachers ?? []) as Array<{
-      id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
-      designation?: string; status?: string; userId?: string;
-    }>;
-    const eList = (employees ?? []) as Array<{
-      id: string; name: string; nameBn?: string; email?: string; phone?: string; employeeCode?: string;
-      designation?: string; status?: string;
-    }>;
-    // Merge: teachers first, then employees not already in the list
-    const ids = new Set(tList.map((t) => t.id));
-    const merged = [...tList, ...eList.filter((e) => !ids.has(e.id))];
-    return merged;
-  }, [teachers, employees]);
+    const ids = new Set(realTeachers.map((t) => t.id));
+    return [...realTeachers, ...employeeList.filter((e) => !ids.has(e.id))];
+  }, [realTeachers, employeeList]);
+
+  // Employees eligible for promotion to Teacher: those with a linked
+  // user_id who are not already in the realTeachers list (by user_id).
+  const eligibleEmployees = React.useMemo(() => {
+    const teacherUserIds = new Set(
+      realTeachers.map((t) => t.userId).filter(Boolean) as string[],
+    );
+    return employeeList.filter((e) => {
+      const uid = e.user?.id;
+      return uid && !teacherUserIds.has(uid);
+    });
+  }, [employeeList, realTeachers]);
 
   const subjectList = (subjects ?? []) as Array<{
     id: string; name: string; code?: string;
@@ -276,6 +306,73 @@ function TeachersContent({
     toast({ title: "Assignment removed" });
   };
 
+  // --- Add Teacher: promote an Employee to a Teacher record ---
+  // The assign API requires a Teacher row; this creates one linked to
+  // an existing Employee's User account.
+  function openAddTeacherDialog() {
+    setSelectedEmployeeId("");
+    setTeacherEmployeeCode("");
+    setTeacherDesignation("");
+    setTeacherSpecialization("");
+    setTeacherJoinedAt(new Date().toISOString().slice(0, 10));
+    setAddTeacherError(null);
+    setAddTeacherOpen(true);
+  }
+
+  function onEmployeeSelect(empId: string) {
+    setSelectedEmployeeId(empId);
+    // Pre-fill code + designation from the employee for convenience
+    const emp = employeeList.find((e) => e.id === empId);
+    if (emp) {
+      setTeacherEmployeeCode(emp.employeeCode ?? "");
+      setTeacherDesignation(emp.designation ?? "");
+    }
+  }
+
+  async function handleAddTeacher() {
+    setAddTeacherError(null);
+    const emp = employeeList.find((e) => e.id === selectedEmployeeId);
+    const userId = emp?.user?.id;
+    if (!userId) {
+      setAddTeacherError("Please select an employee with a linked user account.");
+      return;
+    }
+    if (!teacherEmployeeCode.trim()) {
+      setAddTeacherError("Employee code is required.");
+      return;
+    }
+    setAddTeacherSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/teachers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          employee_code: teacherEmployeeCode.trim(),
+          designation: teacherDesignation.trim() || undefined,
+          specialization: teacherSpecialization.trim() || undefined,
+          joined_at: new Date(teacherJoinedAt).toISOString(),
+          status: "active",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAddTeacherError(data?.error || `Failed (HTTP ${res.status})`);
+        setAddTeacherSubmitting(false);
+        return;
+      }
+      toast({
+        title: "Teacher added",
+        description: `${emp?.name ?? "Employee"} is now a teacher.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["teachers"] });
+      setAddTeacherOpen(false);
+    } catch {
+      setAddTeacherError("Network error — please try again.");
+    }
+    setAddTeacherSubmitting(false);
+  }
+
   return (
     <div className="px-4 py-8 md:px-8 md:py-12">
       <div className="mx-auto max-w-[var(--grid-max-width)] space-y-6">
@@ -290,12 +387,20 @@ function TeachersContent({
               Directory of staff and their class / subject assignments.
             </p>
           </div>
-          <IfPermission code="teachers.assign">
-            <Button onClick={handleOpenDialog}>
-              <Plus className="h-4 w-4" />
-              Assign Teacher
-            </Button>
-          </IfPermission>
+          <div className="flex flex-wrap gap-2">
+            <IfPermission code="teachers.create">
+              <Button variant="outline" onClick={openAddTeacherDialog}>
+                <UserPlus className="h-4 w-4" />
+                Add Teacher
+              </Button>
+            </IfPermission>
+            <IfPermission code="teachers.assign">
+              <Button onClick={handleOpenDialog}>
+                <Plus className="h-4 w-4" />
+                Assign Teacher
+              </Button>
+            </IfPermission>
+          </div>
         </header>
 
         {/* Search */}
@@ -504,18 +609,21 @@ function TeachersContent({
           </DialogHeader>
 
           {/* Guidance banners — show when a prerequisite list is empty */}
-          {teacherList.length === 0 && (
+          {realTeachers.length === 0 && (
             <div className="flex items-center gap-2 rounded-md border border-semantic-warning/40 bg-warning-50 px-3 py-2 text-caption text-semantic-warning">
               <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
               <span className="flex-1">
-                No teachers or employees found. Add staff first.
+                No teachers found. Promote an employee to a teacher first.
               </span>
-              <Link
-                href="/employees"
-                className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
-              >
-                Add Employee <ArrowRight className="h-3 w-3" />
-              </Link>
+              <IfPermission code="teachers.create">
+                <button
+                  type="button"
+                  onClick={() => { setDialogOpen(false); openAddTeacherDialog(); }}
+                  className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+                >
+                  Add Teacher <ArrowRight className="h-3 w-3" />
+                </button>
+              </IfPermission>
             </div>
           )}
           {classes && classes.length === 0 && (
@@ -555,12 +663,12 @@ function TeachersContent({
                   <SelectValue placeholder="Select teacher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teacherList.length === 0 && (
+                  {realTeachers.length === 0 && (
                     <div className="px-3 py-2 text-caption text-text-muted">
-                      No teachers found. Add teachers first.
+                      No teachers found. Use “Add Teacher” to promote an employee first.
                     </div>
                   )}
-                  {teacherList.map((t) => (
+                  {realTeachers.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
                       {t.name} {t.designation ? `· ${t.designation}` : ""}
                     </SelectItem>
@@ -635,6 +743,118 @@ function TeachersContent({
               <Button onClick={handleConfirmAssign}>
                 <Plus className="h-4 w-4" />
                 Create Assignment
+              </Button>
+            </IfPermission>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Add Teacher dialog ---------- */}
+      <Dialog open={addTeacherOpen} onOpenChange={(o) => (o ? setAddTeacherOpen(true) : setAddTeacherOpen(false))}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary-500" />
+              Add Teacher
+            </DialogTitle>
+            <DialogDescription>
+              Promote an existing employee to a teacher. The teacher can then
+              be assigned to classes and subjects.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="add-teacher-employee">Select Employee *</Label>
+              <Select value={selectedEmployeeId} onValueChange={onEmployeeSelect}>
+                <SelectTrigger id="add-teacher-employee" className="w-full">
+                  <SelectValue placeholder="Select an employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligibleEmployees.length === 0 && (
+                    <div className="px-3 py-2 text-caption text-text-muted">
+                      No eligible employees. Add employees first, or they may
+                      already be teachers.
+                    </div>
+                  )}
+                  {eligibleEmployees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name} {e.designation ? `· ${e.designation}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {eligibleEmployees.length === 0 && (
+                <p className="flex items-center gap-1 text-caption text-text-muted">
+                  <Link href="/employees" className="inline-flex items-center gap-1 font-medium text-primary-600 underline hover:no-underline">
+                    Add Employee first <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="add-teacher-code">Employee Code *</Label>
+                <Input
+                  id="add-teacher-code"
+                  placeholder="T-001"
+                  value={teacherEmployeeCode}
+                  onChange={(e) => setTeacherEmployeeCode(e.target.value)}
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add-teacher-joined">Joined Date</Label>
+                <Input
+                  id="add-teacher-joined"
+                  type="date"
+                  value={teacherJoinedAt}
+                  onChange={(e) => setTeacherJoinedAt(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="add-teacher-designation">Designation</Label>
+              <Input
+                id="add-teacher-designation"
+                placeholder="Senior Teacher"
+                value={teacherDesignation}
+                onChange={(e) => setTeacherDesignation(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="add-teacher-spec">Specialization</Label>
+              <Input
+                id="add-teacher-spec"
+                placeholder="Quran, Hadith, Arabic…"
+                value={teacherSpecialization}
+                onChange={(e) => setTeacherSpecialization(e.target.value)}
+              />
+            </div>
+
+            {addTeacherError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{addTeacherError}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddTeacherOpen(false)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <IfPermission code="teachers.create" fallback={null}>
+              <Button onClick={handleAddTeacher} disabled={addTeacherSubmitting}>
+                <Save className="h-4 w-4" />
+                {addTeacherSubmitting ? "Adding…" : "Add Teacher"}
               </Button>
             </IfPermission>
           </DialogFooter>

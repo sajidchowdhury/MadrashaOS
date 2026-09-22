@@ -172,7 +172,7 @@ const ROLE_PERMS: Record<string, string[]> = {
     "admission.approve", "admission.reject", "guardians.view", "teachers.view",
     "teachers.create", "teachers.assign", "employees.view", "employees.create",
     "academic.structure.view", "academic.structure.edit", "attendance.view",
-    "exams.view", "results.view", "results.generate", "fees.view", "fees.plan.view",
+    "attendance.take", "exams.view", "results.view", "results.generate", "fees.view", "fees.plan.view",
     "fees.plan.edit", "scholarship.view", "accounting.ledger.view", "inventory.view",
     "purchase.view", "suppliers.view", "assets.view", "assets.transfer", "assets.dispose",
     "hostel.view", "hostel.allocate", "food.meal-plan", "library.view", "library.issue",

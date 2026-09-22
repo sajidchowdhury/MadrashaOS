@@ -142,6 +142,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionCode[]> = {
     "academic.structure.view",
     "academic.structure.edit",
     "attendance.view",
+    "attendance.take",
     "exams.view",
     "results.view",
     "results.generate",
