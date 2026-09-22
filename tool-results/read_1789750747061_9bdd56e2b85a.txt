@@ -1,0 +1,755 @@
+     1→     1→# MadrashaOS — UI/UX Coding Implementation Plan
+     2→     2→
+     3→     3→**From Design Documentation → Real, Working, Visible UI in the Browser**
+     4→     4→
+     5→     5→| Field | Value |
+     6→     6→|---|---|
+     7→     7→| Document | `MADRASHAOS_CODING_PLAN.md` |
+     8→     8→| Author Role | Lead UI/UX Engineer (Apple / Google / Tesla design heritage) |
+     9→     9→| Audience | Frontend Developer, Project Manager, Client Authority |
+    10→    10→| Source of Truth | `MadrashaOS_Session_1.1_Brand_Kit_Tokens.json` v1.0.0 (FROZEN) + Sessions 0.1–1.4 docs |
+    11→    11→| Stack | Next.js 16 (App Router) · TypeScript 5 · Tailwind CSS 4 · shadcn/ui · Prisma · TanStack Query · Zustand · next-themes |
+    12→    12→| Total Duration | ~7 weeks (8 coding phases, 32 sessions) |
+    13→    13→| Golden Rule | **Every session ends with something the user can SEE and CLICK in the browser. No session is "documentation-only".** |
+    14→    14→
+    15→    15→---
+    16→    16→
+    17→    17→## 0. Purpose & Relationship to the Design Plan
+    18→    18→
+    19→    19→The repository `sajidchowdhury/MadrashaOS` currently contains **only UI/UX design documentation** — Word docs, JSON tokens, Python generators. There is **zero application code**. The design plan (`MadrashaOS_UIUX_Implementation_Plan.md`) has 8 phases / 32 sessions; Phases 0 (Discovery) and 1 (Design System Foundation) are marked ✅ Done as **documentation**.
+    20→    20→
+    21→    21→This new plan is the **coding mirror** of design Phases 2–7. It assumes the design system substrate (tokens, components, icons, personas, journeys, risk lock-ins, Do-Not-Do list) is already locked and **converts every remaining design session into a coding session that produces a visible, clickable artifact in the browser**.
+    22→    22→
+    23→    23→> **Definition of Done for this plan:** after the final session, a user opening the `/` route sees a fully styled, role-switchable, trilingual (bn/en/ar with RTL), permission-aware Madrasha ERP shell with 40+ module screens, 5 role dashboards, mobile flows, branded PDF previews, and a public website — all running on mock data, ready for backend integration.
+    24→    24→
+    25→    25→---
+    26→    26→
+    27→    27→## 1. Governing Principles (carried over from Session 0.4 — LOCKED)
+    28→    28→
+    29→    29→Every line of code in this plan must satisfy all 10 principles from Session 0.4:
+    30→    30→
+    31→    31→| # | Principle | How it shows up in code |
+    32→    32→|---|---|---|
+    33→    33→| P1 | Progressive Disclosure | Surfaces only the role-relevant nav items; "More" drawer for advanced fields |
+    34→    34→| P2 | One Primary Action per Screen | One `Button variant="primary"` per surface; rest go to overflow `Menu` |
+    35→    35→| P3 | Mobile-First by Default | Every screen built at 375px first; `sm:`/`md:`/`lg:` enhance, never restructure |
+    36→    36→| P4 | Permission-Aware UI | `<IfPermission code="fees.payment.create">` wrapper hides, never disables |
+    37→    37→| P5 | Multi-Language First-Class | `next-intl` (or equivalent) with bn/en/ar message catalogs; RTL via `dir` attribute |
+    38→    38→| P6 | WCAG 2.1 AA | `@radix-ui` primitives, focus-visible rings, `aria-*` everywhere, contrast ≥ 4.5:1 |
+    39→    39→| P7 | Density Without Clutter | 8pt spacing scale; no off-grid values; whitespace > density |
+    40→    40→| P8 | Optimistic UI for Mobile | TanStack Query `onMutate` for attendance/fee flows; idempotency-key header |
+    41→    41→| P9 | Auditable by Default | Audit Explorer screen with field-diff viewer (mock data first) |
+    42→    42→| P10 | Brand-Consistent Outputs | PDF templates use `primary.500` + `accent.DEFAULT` tokens — never unbranded |
+    43→    43→
+    44→    44→**Hard constraints C1–C10 from Session 0.4 are non-negotiable** (≤3 clicks to core tasks, attendance <60s for 40 students, Zakat fund isolation in UI, etc.).
+    45→    45→
+    46→    46→---
+    47→    47→
+    48→    48→## 2. Mock-Data Strategy (Backend comes later per Handover Sequence)
+    49→    49→
+    50→    50→Per the Handover Sequence document, the recommended order is **Designer → Backend → Frontend**. We are flipping the frontend ahead of backend **only for UI/UX validation**, using a strict mock-data layer so swapping to the real API is a one-file change.
+    51→    51→
+    52→    52→- **Pattern:** TanStack Query hooks (`useStudents`, `useFeePlans`, etc.) call a `mockApi` module that returns seeded fixtures with artificial latency (300–800ms) so loading states are visible.
+    53→    53→- **Swap path:** when the backend ships the OpenAPI 3.1 spec, replace `mockApi` with a generated client; zero component changes.
+    54→    54→- **Seed data:** 3 branches, 8 users (1 per persona), 40 students, 4 classes, fee plans, ledger entries, attendance sessions — enough to populate every screen realistically.
+    55→    55→- **State store:** Zustand for `currentRole`, `currentBranch`, `currentLanguage`, `permissions[]` — switchable from a dev toolbar so the same screen can be previewed across all 8 personas instantly.
+    56→    56→
+    57→    57→---
+    58→    58→
+    59→    59→## 3. Phase Map (Coding)
+    60→    60→
+    61→    61→| Phase | Name | Sessions | Duration | Visible Result |
+    62→    62→|---|---|---|---|---|
+    63→    63→| **C0** | Foundation & Design System in Code | 0.1–0.4 | 3 days | Branded shell renders at `/` with tokens, fonts, theme toggle, RTL, dev toolbar |
+    64→    64→| **C1** | Component Library in Code | 1.1–1.5 | 6 days | 30 components live in a `/dev/components` showcase gallery |
+    65→    65→| **C2** | Information Architecture & Navigation | 2.1–2.4 | 5 days | Dynamic nav + 5 role dashboards + state system + permission matrix |
+    66→    66→| **C3** | Core Module Screens (Foundation → Finance) | 3.1–3.4 | 8 days | 40+ module screens clickable, threaded by nav |
+    67→    67→| **C4** | Operations, Communication & Mobile | 4.1–4.4 | 7 days | Operations modules + mobile attendance/marks/guardian portal |
+    68→    68→| **C5** | Print/PDF & Public Website | 5.1–5.3 | 4 days | Branded PDFs downloadable + 7-page public site |
+    69→    69→| **C6** | Prototype & Usability Validation | 6.1–6.3 | 4 days | 8-flow clickable prototype + role walkthroughs |
+    70→    70→| **C7** | Design QA, Docs & Handoff | 7.1–7.4 | 3 days | Component docs + QA contract + responsive audit + sign-off |
+    71→    71→
+    72→    72→**Total: ~40 working days → full workable UI/UX in the browser.**
+    73→    73→
+    74→    74→---
+    75→    75→
+    76→    76→## 3.5 Progress Tracker
+    77→    77→
+    78→    78→> Auto-updated after each coding session. Status legend: ✅ Done · 🔄 In Progress · ⏳ Pending · ⛔ Blocked
+    79→    79→
+    80→    80→| Phase | Session | Title | Status | Commit | Date | Deliverable |
+    81→    81→|-------|---------|-------|--------|--------|------|-------------|
+    82→    82→| C0 | 0.1 | Token Ingestion | ✅ Done | [`5141435`](https://github.com/sajidchowdhury/MadrashaOS/commit/5141435) | 2026-09-16 | `tokens.css` + `tokens.ts` + `globals.css` bridge + showcase `/` |
+    83→    83→| C0 | 0.2 | Multi-Language Font Stack & RTL Pipeline | ✅ Done | [`5141435`](https://github.com/sajidchowdhury/MadrashaOS/commit/5141435) | 2026-09-16 | `i18n/` module + `DirectionalIcon` + Bangla/Arabic numeral formatters |
+    84→    84→| C0 | 0.3 | Theme Provider & Global Shell Skeleton | ✅ Done | [`5141435`](https://github.com/sajidchowdhury/MadrashaOS/commit/5141435) | 2026-09-16 | `AppShell` + `TopBar` + `SideNav` + `Footer` + `DevToolbar` + next-themes |
+    85→    85→| C0 | 0.4 | Mock-Data Layer & Seeding | ✅ Done | [`4696fd6`](https://github.com/sajidchowdhury/MadrashaOS/commit/4696fd6) | 2026-09-16 | Zustand store + 110+ permission codes + 8-persona role map + fixtures (40 students, 12 ledger entries, 4 attendance sessions) + mockApi + 16 TanStack Query hooks + `/dev/data` route |
+    86→    86→| C1 | 1.1–1.5 | Component Library (30 components × 5 states) | ✅ Done | [`7ebf999`](https://github.com/sajidchowdhury/MadrashaOS/commit/7ebf999) | 2026-09-16 | 8 custom components (IconButton, ButtonGroup, NumberInput, DateInput, Chip, EmptyState, FilterBar, FieldRow) + 5 SVG illustrations + `/dev/components` showcase with all 30 components |
+    87→    87→| C2 | 2.1 | Dynamic Nav Model (Permission-Aware) | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `moduleTree.ts` (40+ modules, 8 groups) + SideNav rewired to `getVisibleModules()` |
+    88→    88→| C2 | 2.2 | Five Role Dashboards | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | 12 widgets + 5 dashboards (authority/accountant/teacher/storekeeper/guardian) + role-redirect |
+    89→    89→| C2 | 2.3 | State System | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `LoadingState` (5 patterns) + `ErrorState` + `PermissionDenied` (Risk R3) + `OfflineState` |
+    90→    90→| C2 | 2.4 | Permission-Aware UI Rules | ✅ Done | [`3904b7a`](https://github.com/sajidchowdhury/MadrashaOS/commit/3904b7a) | 2026-09-16 | `IfPermission` + `IfField` wrappers; QuickActions + Zakat KPI permission-gated |
+    91→    91→| C3 | 3.1 | Foundation Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/organization` + `/organization/modules` (Risk R2) + `/rbac` (D16) + `/audit` (52 events + field-diff viewer) |
+    92→    92→| C3 | 3.2 | People Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/students` + `/students/[id]` (7 tabs + Risk R4) + `/admission` (DnD Kanban) + `/teachers` |
+    93→    93→| C3 | 3.3 | Academic Module Screens (Mobile-First) | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/attendance` + `/attendance/take` (mobile, Risk R6) + `/exams` + `/exams/[id]/marks` (swipe-next) |
+    94→    94→| C3 | 3.4 | Finance Module Screens | ✅ Done | [`a5eef1f`](https://github.com/sajidchowdhury/MadrashaOS/commit/a5eef1f) | 2026-09-16 | `/fees` (3-step Collect Payment, Risk R8) + `/accounting` (Ledger Explorer) + `/zakat` (Risk R9) + `/donations` (Risk R10) |
+    95→    95→| C4 | 4.1 | Global Shell Hi-Fi Polish + Mobile Shell | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | TopBar flyouts (notifications + user menu) + MobileBottomActionBar + `/dev/shell` breakpoint spec |
+    96→    96→| C4 | 4.2 | Operations Modules | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | 8 routes: inventory/purchase/suppliers/assets/hostel/food/library/transport + KpiStat component |
+    97→    97→| C4 | 4.3 | Communication & Documents & Reporting | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | `/notices` (Risk R11) + `/documents` (60MB validation) + `/reports` (finance-gated) + 7 components |
+    98→    98→| C4 | 4.4 | Mobile Screens Hi-Fi | ✅ Done | [`ffa2853`](https://github.com/sajidchowdhury/MadrashaOS/commit/ffa2853) | 2026-09-16 | Guardian Portal mobile polish + MobileBottomActionBar + attendance/marks/fees CTA anchors |
+    99→    99→| C5 | 5.1 | Branded PDF Templates | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | 6 templates (FeeReceipt/MarkSheet/ResultSheet/Certificate/LedgerStatement/OutstandingFeesReport) + `/dev/pdfs` showcase + trigger buttons on /fees, /accounting, /students |
+   100→   100→| C5 | 5.2 | Public Website Templates | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | 7 public pages (home/programs/admission/notices/events/contact/donate) + PublicLayout + layout restructure (root → (app) + (public) groups) |
+   101→   101→| C5 | 5.3 | Multi-Language Typography Validation | ✅ Done | [`b0ff14a`](https://github.com/sajidchowdhury/MadrashaOS/commit/b0ff14a) | 2026-09-16 | TypographyChecker component + `/dev/typography` route + `scripts/typography-audit.ts` (36 routes × 3 locales = 108 combos · 0 tofu) |
+   102→   102→| C6 | 6.1 | Interactive Prototype (8 Flows) | ✅ Done | [`88df329`](https://github.com/sajidchowdhury/MadrashaOS/commit/88df329) | 2026-09-16 | `flows/registry.ts` (8 flows) + `flows/walkthrough.ts` (Zustand) + `FlowOverlay` (pulsing CTA ring) + `/dev/flows` route + DevToolbar FlowsSection |
+   103→   103→| C6 | 6.2 | Role Walkthroughs with Seeded Data | ✅ Done | [`88df329`](https://github.com/sajidchowdhury/MadrashaOS/commit/88df329) | 2026-09-16 | `/dev/walkthroughs` (8 personas × 3 tasks = 24 audit) + `/dev/a11y` (WCAG 2.1 AA checklist, 8 pass/2 partial) + a11y fixes (2.1.1 + 4.1.3) |
+   104→   104→| C6 | 6.3 | Polish & Iteration | ✅ Done | [`88df329`](https://github.com/sajidchowdhury/MadrashaOS/commit/88df329) | 2026-09-16 | Fixed 6 widget dead-ends (QuickActions/AttendanceToday/TeacherClasses/GuardianChildren/ApprovalsQueue now navigate + toast); removed stray app/ dir (was causing 404s); lazy-loaded illustrations; focus rings + hover states verified |
+   105→   105→| C7 | 7.1 | Component Documentation | ✅ Done | [`8c45fb2`](https://github.com/sajidchowdhury/MadrashaOS/commit/8c45fb2) | 2026-09-16 | `component-registry.ts` (30 defs) + `token-resolver.ts` + `component-preview.tsx` + `/dev/components/[name]` (30 detail pages × 6 sections each) + CopyButton |
+   106→   106→| C7 | 7.2 | Design QA Contract | ✅ Done | [`8c45fb2`](https://github.com/sajidchowdhury/MadrashaOS/commit/8c45fb2) | 2026-09-16 | `docs/DESIGN_QA_CONTRACT.md` (30-item checklist) + `scripts/design-qa.ts` + ESLint `madrasha/no-raw-tokens` rule + `/dev/qa` route + `qa:design` script |
+   107→   107→| C7 | 7.3 | Asset Library Export | ✅ Done | [`8c45fb2`](https://github.com/sajidchowdhury/MadrashaOS/commit/8c45fb2) | 2026-09-16 | `scripts/export-icons.ts` (158 icons scanned) + `public/assets/icons/` (158 SVGs + sprite + catalog) + 5 illustrations + brand (palette/favicon/logo) + `/dev/assets` gallery + `docs/PDF_TEMPLATES.md` |
+   108→   108→| C7 | 7.4 | Final Sign-Off & Responsive Audit | ✅ Done | [`8c45fb2`](https://github.com/sajidchowdhury/MadrashaOS/commit/8c45fb2) | 2026-09-16 | `docs/UI_UX_SIGNOFF.md` (519 lines, 10 sections) + `/dev/signoff` dashboard (54 routes, 30 components, 8/8 flows, 0 tofu, 8 roles, 3 locales) + responsive audit (375/768/1280/1440) |
+   109→   109→
+   110→   110→**Summary:** 32 / 32 sessions done · 0 in progress · 0 pending · 0 blocked · 🎉 ALL PHASES COMPLETE
+   111→   111→
+   112→   112→**Phase C0 (Foundation & Design System in Code): ✅ Complete** — 4/4 sessions done. Branded shell, trilingual i18n (bn/en/ar with RTL), next-themes, mock data layer (Zustand + 110+ permissions + 8-persona role map + fixtures), 16 TanStack Query hooks, `/dev/data` debug route.
+   113→   113→
+   114→   114→**Phase C1 (Component Library in Code): ✅ Complete** — 30 components (8 custom + 22 shadcn inherited) × 5 states × a11y contracts. 5 empty-state illustrations. `/dev/components` showcase gallery live.
+   115→   115→
+   116→   116→**Phase C2 (Information Architecture & Navigation): ✅ Complete** — 4/4 sessions done. Dynamic permission-aware nav (40+ modules filtered by role), 5 role dashboards with 12 widget types, 5-state system (empty/loading/error/permission-denied/offline), IfPermission/IfField wrappers. Verified: role switch via DevToolbar instantly updates nav + dashboard.
+   117→   117→
+   118→   118→**Phase C3 (Core Module Screens): ✅ Complete** — 4/4 sessions done. 16 module routes across Foundation (Organization/Modules/RBAC/Audit Explorer), People (Students/Profile/Admission Kanban/Teachers), Academic (Attendance list + mobile Take Attendance/Exams/Marks Entry), Finance (Fees 3-step Collect Payment/Ledger Explorer/Zakat Dashboard/Donations). Risk lock-ins enforced: R2 (module dependents), R4 (promotion history), R6 (attendance mobile <60s + offline + undo), R8 (pending discounts), R9 (Zakat fund isolation), R10 (donation honeypot), D16 (no self-approve). All 16 routes HTTP 200; lint clean; VLM-verified.
+   119→   119→
+   120→   120→**Phase C4 (Operations, Communication & Mobile): ✅ Complete** — 4/4 sessions done. 12 new routes: 8 operations (inventory/purchase Kanban/suppliers/assets/hostel floor plan/food/library/transport) + 3 communication (notices composer with Risk R11/documents/reports with finance gating) + `/dev/shell` responsive breakpoint spec. Shell polished: TopBar notification flyout + user menu flyout + MobileBottomActionBar on 3 key mobile routes. Guardian Portal mobile-polished (segmented child-switcher, sticky Pay Now, scrollable notices). All 12 routes HTTP 200; lint clean; VLM-verified.
+   121→   121→
+   122→   122→**Phase C5 (Print/PDF & Public Website): ✅ Complete** — 3/3 sessions done. 6 branded PDF templates (FeeReceipt/MarkSheet/ResultSheet/Certificate/LedgerStatement/OutstandingFeesReport) with `/dev/pdfs` showcase + trigger buttons on /fees, /accounting, /students/[id]. 7-page public website (home/programs/admission/notices/events/contact/donate) with separate PublicLayout (no AppShell/DevToolbar). Layout restructured: root → (app) + (public) route groups. Typography audit: 36 routes × 3 locales = 108 combinations · 0 tofu · 3/3 formatters passed. Risk R13 (branded PDFs), R14 (Arabic glyphs), R10 (donation honeypot), C8 (public/protected route segregation) all enforced.
+   123→   123→
+   124→   124→**Phase C6 (Prototype & Usability Validation): ✅ Complete** — 3/3 sessions done. 8-flow interactive prototype with FlowOverlay (pulsing CTA ring) + DevToolbar FlowsSection + `/dev/flows` catalog. 24-task role walkthrough audit (8 personas × 3 tasks) at `/dev/walkthroughs`. WCAG 2.1 AA checklist at `/dev/a11y` (8 pass / 2 partial / 0 fail after fixes). Polish pass: fixed 6 widget dead-ends (QuickActions/AttendanceToday/TeacherClasses/GuardianChildren/ApprovalsQueue now navigate + toast); removed stray `app/` dir that was causing 404s on all routes; lazy-loaded illustrations; a11y fixes (WCAG 2.1.1 disabled button + 4.1.3 status messages). All 8 flows now walkable end-to-end without dead-ends.
+   125→   125→
+   126→   126→**Phase C7 (Design QA, Docs & Handoff): ✅ Complete** — 4/4 sessions done. 30-component Storybook-style documentation at `/dev/components/[name]` (6 sections each: live preview, states, props table, a11y contract, token references, code snippet). 30-item Design QA Contract (`docs/DESIGN_QA_CONTRACT.md`) + automated audit script (`scripts/design-qa.ts`) + ESLint `madrasha/no-raw-tokens` rule + `/dev/qa` interactive checklist. Asset library exported: 158 SVG icons + sprite + catalog, 5 illustrations, brand palette/favicon/logo, 6 PDF templates documented (`docs/PDF_TEMPLATES.md`). Final sign-off document (`docs/UI_UX_SIGNOFF.md`, 519 lines) + `/dev/signoff` dashboard verifying 54 routes, 30 components, 8/8 flows, 0 tofu, 8 roles, 3 locales. Responsive audit passed at 375/768/1280/1440 widths.
+   127→   127→
+   128→   128→🎉 **ALL 8 PHASES COMPLETE — 32/32 SESSIONS DONE.** The MadrashaOS UI/UX implementation is fully workable and ready for backend integration. A non-technical client authority can open `/`, switch to their role via the dev toolbar, walk through their top-3 daily tasks in ≤3 clicks each, view a branded PDF receipt, and toggle between Bangla / English / Arabic without breaking layout. That is the "full workable UI/UX" deliverable defined in §0 of this plan.
+   129→   129→
+   130→   130→---
+   131→   131→
+   132→   132→## 4. Phase C0 — Foundation & Design System in Code (3 days) ✅
+   133→   133→
+   134→   134→### 0.1 — Token Ingestion
+   135→   135→
+   136→   136→**Objective:** Convert the FROZEN `MadrashaOS_Session_1.1_Brand_Kit_Tokens.json` into consumable code artifacts.
+   137→   137→
+   138→   138→**Inputs:**
+   139→   139→- `MadrashaOS_Session_1.1_Brand_Kit_Tokens.json` (v1.0.0, frozen)
+   140→   140→- Session 1.2 consumption rules R-T1 to R-T10 (binding)
+   141→   141→
+   142→   142→**Coding deliverables:**
+   143→   143→- `src/styles/tokens.css` — CSS custom properties for every color/spacing/radius/elevation/motion/breakpoint token (CSS variables, e.g. `--color-primary-500: #0E5C5C`)
+   144→   144→- `tailwind.config.ts` — extended theme mapping `primary`, `accent`, `neutral`, `semantic` to the CSS variables; `fontFamily`, `spacing`, `borderRadius`, `boxShadow`, `transitionDuration` all token-driven
+   145→   145→- `src/lib/tokens.ts` — typed token constants for use in TS (e.g. `export const tokens = { primary: { 500: '#0E5C5C' } } as const`)
+   146→   146→- Consumption rule enforcer: ESLint rule `no-raw-hex` / `no-raw-px` (warns when raw values appear in `.tsx`)
+   147→   147→
+   148→   148→**Exit criteria (visible):**
+   149→   149→- `/` route renders a single card showing the brand palette swatches, type scale, and 8pt grid demo — using ONLY tokens, no raw values
+   150→   150→- `bun run lint` passes with zero token-violation warnings
+   151→   151→
+   152→   152→---
+   153→   153→
+   154→   154→### 0.2 — Multi-Language Font Stack & RTL Pipeline
+   155→   155→
+   156→   156→**Objective:** Implement the trilingual typography stack (Inter + Hind Siliguri + Noto Naskh Arabic + JetBrains Mono) with RTL support.
+   157→   157→
+   158→   158→**Inputs:**
+   159→   159→- Session 1.1 typography stack table (5 font families)
+   160→   160→- Session 1.4 RTL icon mirroring rule
+   161→   161→
+   162→   162→**Coding deliverables:**
+   163→   163→- `next/font` self-hosted loading for Inter (variable), Hind Siliguri, Noto Naskh Arabic, JetBrains Mono
+   164→   164→- CSS `:root { --font-bn; --font-en; --font-ar; --font-mono; --font-default }` cascading stack
+   165→   165→- `src/lib/i18n.ts` — locale config (bn-BD, en-US, ar-SA); `dir` attribute toggles `rtl` for ar
+   166→   166→- RTL CSS plugin (`tailwindcss-rtl` or logical properties `ps-*`/`pe-*`/`ms-*`/`me-*`)
+   167→   167→- Directional-icon mirroring utility: `<Icon className="rtl:scale-x-[-1]" />` for `nav-chevron-*`, `nav-arrow-*`, `act-send`, `act-undo`, `act-redo`
+   168→   168→
+   169→   169→**Exit criteria (visible):**
+   170→   170→- `/` shows a paragraph rendering "Hello / আসসালামু আলাইকুম / السلام عليكم" with zero tofu (□)
+   171→   171→- Language toggle button (bn/en/ar) re-renders text + flips layout to RTL in ar mode
+   172→   172→
+   173→   173→---
+   174→   174→
+   175→   175→### 0.3 — Theme Provider & Global Shell Skeleton
+   176→   176→
+   177→   177→**Objective:** Stand up the responsive app shell (top bar + left nav + sticky footer) using next-themes and the locked tokens.
+   178→   178→
+   179→   179→**Inputs:**
+   180→   180→- Session 1.3 component #13 (Breadcrumb), #15 (Menu), #21 (Modal), #23 (Toast)
+   181→   181→- SRS §5.1 global layout
+   182→   182→
+   183→   183→**Coding deliverables:**
+   184→   184→- `ThemeProvider` (next-themes) with `light` / `dark` / `system` — defaults match `neutral.0` / `neutral.950`
+   185→   185→- `src/app/layout.tsx` — root layout: `<html dir={dir} lang={locale}>`, theme provider, font variables, query client provider, toast viewport
+   186→   186→- `src/components/shell/AppShell.tsx` — `min-h-screen flex flex-col` with sticky header, collapsible left nav, `mt-auto` footer (per project UI rule)
+   187→   187→- `src/components/shell/TopBar.tsx` — placeholder slots: logo, branch switcher, academic-year switcher, language switcher, notification bell, user menu
+   188→   188→- `src/components/shell/SideNav.tsx` — collapsible left nav skeleton (items wired in 2.1)
+   189→   189→- `src/components/shell/Footer.tsx` — sticky footer with version + language attribution
+   190→   190→- `src/components/dev/DevToolbar.tsx` — floating toolbar (bottom-right) to switch role / branch / language / theme instantly
+   191→   191→
+   192→   192→**Exit criteria (visible):**
+   193→   193→- `/` shows the branded shell: deep-teal top bar, warm-neutral background, sticky footer at viewport bottom on short content, pushed down on long content
+   194→   194→- Dev toolbar visible; clicking "Dark" toggles theme; clicking "عربى" flips to RTL
+   195→   195→
+   196→   196→---
+   197→   197→
+   198→   198→### 0.4 — Mock-Data Layer & Seeding
+   199→   199→
+   200→   200→**Objective:** Build the mock API + Zustand session store so every downstream screen has realistic data on day one.
+   201→   201→
+   202→   202→**Inputs:**
+   203→   203→- Session 0.1 module taxonomy (40+ modules, primary users, primary actions)
+   204→   204→- Session 0.2 personas (8 roles with permissions)
+   205→   205→
+   206→   206→**Coding deliverables:**
+   207→   207→- `src/lib/mock/fixtures/` — typed JSON fixtures: `organizations.json`, `branches.json`, `users.json` (8 personas), `students.json` (40), `classes.json` (4), `feePlans.json`, `ledgerEntries.json`, `attendanceSessions.json`, `inventoryItems.json`, `notices.json`, `approvals.json`
+   208→   208→- `src/lib/mock/mockApi.ts` — async functions returning fixtures with 300–800ms artificial latency; throws simulated 403/500 for permission-denied tests
+   209→   209→- `src/stores/sessionStore.ts` — Zustand: `{ role, branchId, academicYear, locale, theme, permissions[] }` with setters
+   210→   210→- `src/lib/auth/permissions.ts` — permission-code catalog from SRS §6.2 (e.g. `fees.payment.create`, `students.notes.view`, `accounting.ledger.post`)
+   211→   211→- `src/lib/query/client.ts` — TanStack Query client + `useQuery` wrappers (`useStudents`, `useFeePlans`, …) that call `mockApi` today, swap to OpenAPI client tomorrow
+   212→   212→
+   213→   213→**Exit criteria (visible):**
+   214→   214→- `/dev/data` route shows a debug table listing every fixture with row counts (e.g. "Students: 40, Ledger entries: 128")
+   215→   215→- Dev toolbar role-switch updates `permissions[]` and the `/dev/data` view filters accordingly
+   216→   216→
+   217→   217→---
+   218→   218→
+   219→   219→## 5. Phase C1 — Component Library in Code (6 days) ✅
+   220→   220→
+   221→   221→**Goal:** Build all 30 components from Session 1.3 spec sheet, each with 5 states, a11y contracts, and a live demo in `/dev/components`.
+   222→   222→
+   223→   223→### 1.1 — Action Components
+   224→   224→
+   225→   225→**Build:** Button (primary/secondary/ghost/danger/link × sm/md/lg × 5 states), ButtonGroup, IconButton
+   226→   226→
+   227→   227→**Inputs:** Session 1.3 Tables 4 & 5 (Button variant + size matrix)
+   228→   228→
+   229→   229→**Deliverables:**
+   230→   230→- `src/components/ui/button.tsx` — uses `class-variance-authority`; references `button.primary.*` token aliases
+   231→   231→- `src/components/ui/button-group.tsx`
+   232→   232→- `src/components/ui/icon-button.tsx`
+   233→   233→- Focus ring: `outline 2px solid var(--color-primary-500); offset 2px` (WCAG 2.4.7)
+   234→   234→
+   235→   235→**Exit criteria:** `/dev/components/button` shows all 15 variant×size cells + 5 states hoverable.
+   236→   236→
+   237→   237→---
+   238→   238→
+   239→   239→### 1.2 — Form Components (8)
+   240→   240→
+   241→   241→**Build:** TextInput, NumberInput (with stepper), DateInput (with Bangla calendar toggle), Select (single/multi/searchable/async), Textarea, Checkbox, RadioGroup, Switch
+   242→   242→
+   243→   243→**Inputs:** Session 1.3 Tables 6 (Input state matrix), SRS §2.6.6 Bangla date format
+   244→   244→
+   245→   245→**Deliverables:**
+   246→   246→- All 8 form primitives in `src/components/ui/`
+   247→   247→- Each ships with `label` (always visible), `helper`, `error` slots
+   248→   248→- `DateInput` renders Bangla numerals when locale=bn (e.g. `১৬-০৯-২০২৬`)
+   249→   249→- `Select` async variant loads from `mockApi` with debounce
+   250→   250→
+   251→   251→**Exit criteria:** `/dev/components/forms` shows a fully validated sample form (login-style) with error/helper swapping per Session 1.3 Table 6.
+   252→   252→
+   253→   253→---
+   254→   254→
+   255→   255→### 1.3 — Navigation Components (4)
+   256→   256→
+   257→   257→**Build:** Tabs, Breadcrumb, Pagination, Menu/Dropdown
+   258→   258→
+   259→   259→**Inputs:** Session 1.3 #12–15
+   260→   260→
+   261→   261→**Deliverables:**
+   262→   262→- `tabs.tsx` (underline/pill/segmented variants; supports count badges)
+   263→   263→- `breadcrumb.tsx` (collapsible on mobile)
+   264→   264→- `pagination.tsx` (numbers + load-more variants; total count display)
+   265→   265→- `menu.tsx` (multi-level with icons; Radix DropdownMenu)
+   266→   266→
+   267→   267→**Exit criteria:** `/dev/components/nav` shows tab switching, breadcrumb collapse on mobile, pagination state, and a nested menu.
+   268→   268→
+   269→   269→---
+   270→   270→
+   271→   271→### 1.4 — Data + Feedback + Layout Components (15)
+   272→   272→
+   273→   273→**Build:** Table, Badge, Chip, Avatar, Card, Modal, Drawer, Toast, Tooltip, Spinner, Skeleton, EmptyState, Alert, FilterBar, FieldRow
+   274→   274→
+   275→   275→**Inputs:** Session 1.3 Table 7 (Table spec — the primary surface), Session 1.4 EmptyState pairing
+   276→   276→
+   277→   277→**Deliverables:**
+   278→   278→- `table.tsx` — sticky header, sortable columns, selectable rows, sticky horizontal scroll, density toggle (Comfortable 44px / Compact 32px), empty-state renders `<EmptyState>`, loading renders `<Skeleton>` rows
+   279→   279→- `modal.tsx` + `drawer.tsx` — focus trap, Esc close, return focus to trigger
+   280→   280→- `toast.tsx` — `sonner`-based; success/warning/danger/info variants
+   281→   281→- `empty-state.tsx` — accepts `illustration` prop keyed to the 5 illustrations from Session 1.4 (E1–E5)
+   282→   282→- `skeleton.tsx` — text/rect/circle/table-row variants
+   283→   283→- `filter-bar.tsx` — inline/collapsible; save-preset affordance
+   284→   284→- `field-row.tsx` — stacked/inline layout primitive
+   285→   285→
+   286→   286→**Exit criteria:** `/dev/components/data` shows a populated 40-row student table with sorting, filtering, density toggle, pagination, and an empty-state variant.
+   287→   287→
+   288→   288→---
+   289→   289→
+   290→   290→### 1.5 — Iconography & Illustrations in Code
+   291→   291→
+   292→   292→**Objective:** Wire the 200+ icon catalog from Session 1.4 into the codebase + ship the 5 empty-state illustrations.
+   293→   293→
+   294→   294→**Inputs:** Session 1.4 Tables 3–17 (200+ icon names across 15 categories), Table 18 (5 illustrations)
+   295→   295→
+   296→   296→**Deliverables:**
+   297→   297→- `lucide-react` as the base icon set (covers ~80% of catalog)
+   298→   298→- Custom SVG icons for module-specific names not in Lucide: `fin-taka`, `fin-zakat`, `msc-mosque`, `msc-quran`, `msc-kaaba`, `msc-bangladesh`, `bns-promote`, `bns-graduate`, `ops-hostel`, `ops-bed`, `ops-meal` — hand-drawn or AI-generated, 24×24 viewBox, 1.5px stroke, rounded caps
+   299→   299→- `src/components/ui/icon.tsx` — single `<Icon name="fin-taka" />` API; RTL mirroring via `dir=rtl` selector
+   300→   300→- 5 empty-state illustrations as inline SVG components in `src/components/illustrations/`:
+   301→   301→  - `EmptyStudents.tsx` (E1), `EmptyFees.tsx` (E2), `EmptyAttendance.tsx` (E3), `EmptyInventory.tsx` (E4), `EmptyResults.tsx` (E5)
+   302→   302→  - Each renders at 240×160, stroke = `currentColor` driven by tokens
+   303→   303→
+   304→   304→**Exit criteria:** `/dev/components/icons` shows a searchable grid of all 200+ icons; clicking one copies its name. Each of the 5 illustrations renders in brand colors.
+   305→   305→
+   306→   306→---
+   307→   307→
+   308→   308→## 6. Phase C2 — Information Architecture & Navigation (5 days) ✅
+   309→   309→
+   310→   310→### 2.1 — Dynamic Nav Model (Permission-Aware)
+   311→   311→
+   312→   312→**Objective:** Build the left navigation that renders only enabled modules + permitted actions.
+   313→   313→
+   314→   314→**Inputs:**
+   315→   315→- Session 0.1 module taxonomy (40+ modules grouped Foundation/People/Academic/Finance/Operations/Communication/Platform)
+   316→   316→- SRS §2.1.2 module configuration, §5.1 permission-aware UI
+   317→   317→- Session 2.4 (design) permission-to-UI rule matrix
+   318→   318→
+   319→   319→**Deliverables:**
+   320→   320→- `src/lib/nav/moduleTree.ts` — typed tree of all 40+ modules, each with `{ id, label, icon, phase, permissionRequired, enabledByDefault }`
+   321→   321→- `src/components/shell/SideNav.tsx` — filters tree by `sessionStore.permissions[]` AND `organization.enabledModules[]`; groups by layer (Foundation/People/Academic/…); collapses to icon-rail at <1024px; drawer at <768px
+   322→   322→- `src/components/shell/BranchSwitcher.tsx` — implements Risk R1 lock-in: switching branch opens a fresh tab (visual: tab bar appears), current tab keeps context
+   323→   323→- `src/components/shell/AcademicYearSwitcher.tsx` — same fresh-tab behavior
+   324→   324→- `src/components/shell/LanguageSwitcher.tsx` — bn/en/ar toggle; persists to cookie
+   325→   325→
+   326→   326→**Exit criteria (visible):**
+   327→   327→- Log in as Teacher → left nav shows ONLY: Dashboard, My Classes, Take Attendance, Enter Marks, Notices, My Profile (financial/admin items hidden, not disabled)
+   328→   328→- Log in as Accountant → nav shows: Dashboard, Fees, Accounting, Cash/Bank, Zakat, Donations, Reports, Approvals
+   329→   329→- Switch branch → new tab opens; previous tab's filter context preserved
+   330→   330→
+   331→   331→---
+   332→   332→
+   333→   333→### 2.2 — Five Role Dashboards
+   334→   334→
+   335→   335→**Objective:** Build the 5 dashboards from SRS §2.6.4 with 12 widget types.
+   336→   336→
+   337→   337→**Inputs:**
+   338→   338→- Session 0.2 personas (top-3 daily tasks per role)
+   339→   339→- SRS §2.6.4 dashboard acceptance (Authority outstanding figure reconciles to Fee module)
+   340→   340→
+   341→   341→**Deliverables:**
+   342→   342→- `src/components/widgets/` — 12 widgets: KpiCard, PendingApprovals, OutstandingFees, LowStockAlert, AttendanceToday, RecentReceipts, QuickActions, ClassPerformance, GuardianChildren, TeacherClasses, AuditTimeline, ApprovalsQueue
+   343→   343→- Each widget has `empty` / `loading` (Skeleton) / `error` / `permission-denied` states
+   344→   344→- 5 dashboard pages:
+   345→   345→  - `src/app/(app)/dashboard/authority/page.tsx` — KPIs + outstanding figure with "as of [timestamp]" + refresh (Risk R12)
+   346→   346→  - `src/app/(app)/dashboard/accountant/page.tsx` — collect-fee quick action + recent receipts + pending approvals
+   347→   347→  - `src/app/(app)/dashboard/teacher/page.tsx` — today's classes + take-attendance CTA
+   348→   348→  - `src/app/(app)/dashboard/storekeeper/page.tsx` — low-stock + receive-stock CTA
+   349→   349→  - `src/app/(app)/dashboard/guardian/page.tsx` — children overview with child-switcher (Risk R5)
+   350→   350→
+   351→   351→**Exit criteria (visible):**
+   352→   352→- Switch role via Dev Toolbar → dashboard re-renders with role-appropriate widgets
+   353→   353→- Authority dashboard "Outstanding Fees" figure matches the Fees module total (mock data consistency check)
+   354→   354→- Each widget shows skeleton → data transition when Dev Toolbar "Simulate slow network" is on
+   355→   355→
+   356→   356→---
+   357→   357→
+   358→   358→### 2.3 — State System (Empty / Loading / Error / Permission-Denied / Offline)
+   359→   359→
+   360→   360→**Objective:** Implement the 30-spec state sheet from design Session 2.3 (6 states × 5 screen patterns).
+   361→   361→
+   362→   362→**Inputs:**
+   363→   363→- SRS §5.5 state requirements
+   364→   364→- Session 0.3 Do-Not-Do D4 (no raw 403), D8 (no empty-dashboard dead-end)
+   365→   365→
+   366→   366→**Deliverables:**
+   367→   367→- `src/components/states/EmptyState.tsx` — generic; accepts illustration key + CTA
+   368→   368→- `src/components/states/LoadingState.tsx` — page-level Skeleton patterns (list / detail / form / dashboard / table)
+   369→   369→- `src/components/states/ErrorState.tsx` — friendly error with retry button + "contact admin" link
+   370→   370→- `src/components/states/PermissionDenied.tsx` — friendly page (NOT raw 403) with "Request access" CTA + admin contact (Risk R3 lock-in)
+   371→   371→- `src/components/states/OfflineState.tsx` — banner when `navigator.onLine === false`; queues optimistic mutations
+   372→   372→- Copy library: `src/lib/i18n/states.{bn,en,ar}.ts` — localized strings for every state
+   373→   373→
+   374→   374→**Exit criteria (visible):**
+   375→   375→- `/dev/states` shows all 5 states for a sample list screen
+   376→   376→- Trigger a 403 from Dev Toolbar → friendly permission-denied page renders, never a stack trace
+   377→   377→
+   378→   378→---
+   379→   379→
+   380→   380→### 2.4 — Permission-Aware UI Rules Matrix
+   381→   381→
+   382→   382→**Objective:** Implement the field-level permission rules from design Session 2.4.
+   383→   383→
+   384→   384→**Inputs:**
+   385→   385→- SRS §5.1 "hide, don't disable"
+   386→   386→- SRS §6.2 permission-code catalog
+   387→   387→
+   388→   388→**Deliverables:**
+   389→   389→- `src/components/auth/IfPermission.tsx` — `<IfPermission code="fees.payment.create" fallback={null}>` wrapper; renders children or fallback
+   390→   390→- `src/components/auth/IfField.tsx` — field-level variant for `students.notes.view` etc.
+   391→   391→- `src/lib/auth/permissions.ts` — full catalog (~150 codes from SRS §6.2)
+   392→   392→- `src/components/auth/PermissionMatrix.tsx` — admin-only matrix editor (Roles × Permissions grid) for the RBAC screen
+   393→   393→- ESLint rule: warn on `<button>` without `IfPermission` guard in financial/academic contexts
+   394→   394→
+   395→   395→**Exit criteria (visible):**
+   396→   396→- On Guardian dashboard, "Collect Fee" button is hidden (not greyed)
+   397→   397→- On Teacher dashboard, "Outstanding Fees" widget is hidden
+   398→   398→- Admin opens RBAC screen → interactive permission matrix grid renders
+   399→   399→
+   400→   400→---
+   401→   401→
+   402→   402→## 7. Phase C3 — Core Module Screens (8 days) ✅
+   403→   403→
+   404→   404→> Each session produces list + detail + form screens for the module group. All screens consume the C1 component library, mock data from 0.4, and the dynamic nav from 2.1.
+   405→   405→
+   406→   406→### 3.1 — Foundation Modules
+   407→   407→
+   408→   408→**Modules:** Organization & Multi-Branch · Module Configuration · Users & Roles (RBAC) · Audit Trail · Security · Backup & Recovery (SRS §2.1)
+   409→   409→
+   410→   410→**Key screens:**
+   411→   411→- Organization list + branch editor (with `branch.scope` visual indicator)
+   412→   412→- Module Configuration toggles — implements Risk R2 (dependent modules shown as chips; Save disabled until resolved)
+   413→   413→- RBAC Permission Matrix editor (interactive grid; C7 enforced: requester cannot approve own request)
+   414→   414→- **Audit Explorer** — timeline view with field-diff viewer (old → new highlighted, e.g. `20000 → 25000` by `accountant@` at `2026-09-16 14:32`)
+   415→   415→
+   416→   416→**Exit criteria (visible):** Admin can toggle Hostel module off → dependent modules show as chips → Save blocked until user confirms; Audit Explorer shows 50+ seeded change events with diffs.
+   417→   417→
+   418→   418→---
+   419→   419→
+   420→   420→### 3.2 — People Modules
+   421→   421→
+   422→   422→**Modules:** Student · Admission · Guardian · Teacher · Teacher Assignment · Employee (SRS §2.2)
+   423→   423→
+   424→   424→**Key screens:**
+   425→   425→- Student list (40 seeded) + Student Profile with 7 tabs (Personal / Academic / Guardians / Documents / Fees / Attendance / History) — Risk R4: Promotion Wizard shows history timeline panel on right
+   426→   426→- **Admission Kanban** — drag-drop columns (Applied → Interviewed → Approved → Registered → Rejected); each card shows applicant photo + key fields
+   427→   427→- Guardian Portal entry (mobile-first; child-switcher segmented control per Risk R5)
+   428→   428→- Teacher Assignment grid (teacher × section × subject; duplicate-active-assignment blocked inline)
+   429→   429→
+   430→   430→**Exit criteria (visible):** Walk through admission pipeline — drag a card from Applied → Approved → Registered → see new Student row appear in Student list with auto-created fee plan.
+   431→   431→
+   432→   432→---
+   433→   433→
+   434→   434→### 3.3 — Academic Modules (Mobile-First)
+   435→   435→
+   436→   436→**Modules:** Academic Structure · Attendance · Examination · Results (SRS §2.3)
+   437→   437→
+   438→   438→**Key screens:**
+   439→   439→- Routine Builder — drag-drop grid (days × periods); double-booked teacher slot rejected inline
+   440→   440→- **Take Attendance (mobile)** — default Present; one-tap cycle (Present → Absent → Late → Leave); sticky "Present all" + exception swipe; optimistic local state; 30s undo window; Idempotency-Key header on POST (Risk R6 lock-in)
+   441→   441→- **Enter Marks (mobile)** — swipe-next between students; mark > full_marks rejected inline; publish locks paper
+   442→   442→- Result Dashboard + printable Mark Sheet (preview only in this phase; branded PDF in Phase C5)
+   443→   443→
+   444→   444→**Exit criteria (visible):**
+   445→   445→- Take Attendance for 40 students completes in <60s on a 375px viewport (timed via Dev Toolbar)
+   446→   446→- Network drop mid-submit (toggle offline in Dev Toolbar) → local state preserved, submits on reconnect
+   447→   447→- Marks entry: enter 60 for a 50-mark paper → inline rejection
+   448→   448→
+   449→   449→---
+   450→   450→
+   451→   451→### 3.4 — Finance Modules
+   452→   452→
+   453→   453→**Modules:** Fees · Scholarship & Discount · Accounting (GL) · Cash & Bank · Zakat · Donations (SRS §2.4)
+   454→   454→
+   455→   455→**Key screens:**
+   456→   456→- **Collect Payment flow (3-step)** — Step 1: search student → Step 2: select installment + amount + method + account → Step 3: confirm + receipt. Implements Risk R8 (pending discounts shown as striped rows), C6 (Zakat badge on every Zakat row), C7 (no self-approve)
+   457→   457→- Ledger Explorer — running balance; debits ≠ credits rejected on submit
+   458→   458→- Cash & Bank transfer — both legs post in one entry (visual confirmation)
+   459→   459→- **Zakat Dashboard** — fund-isolated visualization; Zakat badge; non-Zakat accounts greyed out (Risk R9)
+   460→   460→- Donation form — captures email OR mobile mandatory; anonymous checkbox; honeypot field (Risk R10)
+   461→   461→
+   462→   462→**Exit criteria (visible):**
+   463→   463→- Accountant completes fee collection in <90s (timed via Dev Toolbar)
+   464→   464→- Submit an unbalanced ledger entry (debit 100, credit 90) → inline rejection
+   465→   465→- Submit Zakat distribution > fund balance → inline rejection with fund badge visible
+   466→   466→
+   467→   467→---
+   468→   468→
+   469→   469→## 8. Phase C4 — Operations, Communication & Mobile (7 days) ✅
+   470→   470→
+   471→   471→### 4.1 — Global Shell Hi-Fi Polish + Mobile Shell
+   472→   472→
+   473→   473→**Objective:** Apply the design system to its fullest on the shell + establish mobile breakpoints.
+   474→   474→
+   475→   475→**Deliverables:**
+   476→   476→- Top bar: notification bell flyout (with unread count), user menu flyout (profile / settings / logout)
+   477→   477→- Language switcher with all interaction states (bn/en/ar + RTL transition)
+   478→   478→- Mobile shell at 375px: hamburger drawer nav, sticky bottom action bar on key screens
+   479→   479→- Responsive breakpoint spec documented in `/dev/components/shell`
+   480→   480→
+   481→   481→**Exit criteria (visible):** Resize browser 1440 → 1280 → 768 → 375 — layout adapts, no horizontal scroll at any width.
+   482→   482→
+   483→   483→---
+   484→   484→
+   485→   485→### 4.2 — Operations Modules
+   486→   486→
+   487→   487→**Modules:** Inventory · Purchase · Supplier · Asset · Hostel · Food/Meal · Library · Transport (SRS §2.5)
+   488→   488→
+   489→   489→**Key screens:**
+   490→   490→- Inventory: receive/issue stock with qty validation (issue > stock rejected); low-stock alert widget on dashboard
+   491→   491→- **Purchase Pipeline board** — Kanban (Draft → Pending Approval → Approved → Received → Paid)
+   492→   492→- Supplier list with outstanding totals
+   493→   493→- Asset transfer/dispose flow (disposed asset leaves register, keeps record)
+   494→   494→- **Hostel Occupancy Map** — visual floor plan; occupied beds colored, available beds tappable
+   495→   495→- Library circulation quick-scan (issue already-issued copy → rejected)
+   496→   496→- Transport fuel/maintenance entry (posts to vehicle cost + expense)
+   497→   497→
+   498→   498→**Exit criteria (visible):** Allocate an occupied bed → rejected with friendly error; issue an already-issued library book → rejected; record fuel ৳3000 → vehicle cost + expense both update.
+   499→   499→
+   500→   500→---
+   501→   501→
+   502→   502→### 4.3 — Communication & Documents & Reporting
+   503→   503→
+   504→   504→**Modules:** Communication · Document Management · Reporting (SRS §2.6.1–2.6.3)
+   505→   505→
+   506→   506→**Key screens:**
+   507→   507→- Notice Composer with audience selector (Risk R11: live recipient-count chip updates as audience is selected; "Preview recipients" drawer)
+   508→   508→- Notice list filtered by audience
+   509→   509→- Document upload (60MB rejected; signed-URL expiry countdown)
+   510→   510→- Reporting: filtered reports (Finance report totals reconcile to ledger; Teacher gets 403 → friendly permission-denied page)
+   511→   511→
+   512→   512→**Exit criteria (visible):** Select "Class 5 guardians" as audience → count chip shows "12 recipients"; click "Preview recipients" → drawer lists them; upload 70MB file → rejected inline.
+   513→   513→
+   514→   514→---
+   515→   515→
+   516→   516→### 4.4 — Mobile Screens Hi-Fi
+   517→   517→
+   518→   518→**Objective:** Deliver full mobile hi-fi for the 3 mobile-first workflows + Guardian Portal.
+   519→   519→
+   520→   520→**Deliverables:**
+   521→   521→- Mobile Attendance (full flow, hi-fi) — already started in 3.3; polish with brand-colored quick-toggles
+   522→   522→- Mobile Marks Entry — swipe-next pattern; progress bar showing "12/40"
+   523→   523→- Guardian Portal mobile — children overview, fees tab (pay now CTA), results tab, notices tab
+   524→   524→- Responsive shell rules — breakpoint spec documented
+   525→   525→
+   526→   526→**Exit criteria (visible):** All primary CRUD actions reachable on 375px width; Guardian Portal passes a manual walk-through (login → view child → see result → read notice).
+   527→   527→
+   528→   528→---
+   529→   529→
+   530→   530→## 9. Phase C5 — Print/PDF & Public Website (4 days) ✅
+   531→   531→
+   532→   532→### 5.1 — Branded PDF Templates
+   533→   533→
+   534→   534→**Objective:** Generate branded PDFs for receipts, mark sheets, certificates, reports.
+   535→   535→
+   536→   536→**Inputs:**
+   537→   537→- Session 1.1 brand kit (primary.500 + accent.DEFAULT + neutral.0)
+   538→   538→- SRS §2.6.5 PDF requirements
+   539→   539→- Risk R13 lock-in (no unbranded PDFs)
+   540→   540→
+   541→   541→**Deliverables:**
+   542→   542→- Use `@react-pdf/renderer` or `react-pdf` for client-side PDF generation (no backend dependency)
+   543→   543→- Templates in `src/lib/pdf/templates/`:
+   544→   544→  - `FeeReceipt.tsx` — bn/en/ar variants; branded header bar
+   545→   545→  - `MarkSheet.tsx` — student + subjects + grades
+   546→   546→  - `ResultSheet.tsx` — class-wide result sheet
+   547→   547→  - `Certificate.tsx` (Phase 3 placeholder text)
+   548→   548→  - `LedgerStatement.tsx` — running balance
+   549→   549→  - `OutstandingFeesReport.tsx`
+   550→   550→- PDF trigger buttons on Fee Receipt, Result, Ledger screens
+   551→   551→- Arabic student name renders correctly (no tofu — Risk R14)
+   552→   552→
+   553→   553→**Exit criteria (visible):** Click "Print Receipt" on Fee Payment success → branded PDF opens in new tab; Arabic name field renders correctly.
+   554→   554→
+   555→   555→---
+   556→   556→
+   557→   557→### 5.2 — Public Website Templates
+   558→   558→
+   559→   559→**Objective:** Build the optional per-madrasha public site.
+   560→   560→
+   561→   561→**Inputs:** SRS §2.7.3 (public cannot reach protected endpoints)
+   562→   562→
+   563→   563→**Deliverables:**
+   564→   564→- Routes (NOT under `/app` group, so no auth layout):
+   565→   565→  - `/public/home`, `/public/programs`, `/public/admission`, `/public/notices`, `/public/events`, `/public/contact`, `/public/donate`
+   566→   566→- CMS admin wireframe (content editors only) at `/app/website/content`
+   567→   567→- Donation form with honeypot + reCAPTCHA v3 placeholder (Risk R10 + Risk R16)
+   568→   568→- Route guard: any request to `/students`, `/accounts`, `/documents` from a public visitor → 401 (C8 enforced)
+   569→   569→
+   570→   570→**Exit criteria (visible):** Open `/public/donate` → submit anonymous donation with email → branded PDF receipt downloads on confirmation screen.
+   571→   571→
+   572→   572→---
+   573→   573→
+   574→   574→### 5.3 — Multi-Language Typography Validation
+   575→   575→
+   576→   576→**Objective:** Zero-tofu check across bn/en/ar on every screen and PDF.
+   577→   577→
+   578→   578→**Deliverables:**
+   579→   579→- Typography QA script: `scripts/typography-audit.ts` — walks every route, screenshots, scans for `□` characters
+   580→   580→- Bangla date format validator (`১৬-০৯-২০২৬`)
+   581→   581→- ৳ currency rendering validator
+   582→   582→
+   583→   583→**Exit criteria (visible):** Audit script runs green; zero tofu across all screens + all 6 PDF templates × 3 languages.
+   584→   584→
+   585→   585→---
+   586→   586→
+   587→   587→## 10. Phase C6 — Prototype & Usability Validation (4 days) ✅
+   588→   588→
+   589→   589→### 6.1 — Interactive Prototype (8 Flows)
+   590→   590→
+   591→   591→**Objective:** Link the key flows end-to-end so a user can click through without dead-ends.
+   592→   592→
+   593→   593→**Flows:**
+   594→   594→1. Login (any of 8 personas)
+   595→   595→2. Take Attendance (Teacher, mobile)
+   596→   596→3. Collect Fee Payment (Accountant)
+   597→   597→4. Record Expense with approval routing (Accountant → Authority)
+   598→   598→5. View Child Results (Guardian)
+   599→   599→6. Approve Pending Request (Authority)
+   600→   600→7. Admit a Student (Administrator)
+   601→   601→8. Public Donation (anonymous visitor)
+   602→   602→
+   603→   603→**Deliverables:**
+   604→   604→- Each flow linked via real navigation (no prototype-only links)
+   605→   605→- Seed data tuned so each flow has realistic starting state
+   606→   606→- "Flow walkthrough" mode in Dev Toolbar: highlights the next CTA in the current flow
+   607→   607→
+   608→   608→**Exit criteria (visible):** Walk all 8 flows end-to-end without hitting a dead-end or "TODO" placeholder.
+   609→   609→
+   610→   610→---
+   611→   611→
+   612→   612→### 6.2 — Role Walkthroughs with Seeded Data
+   613→   613→
+   614→   614→**Objective:** Validate the 8 personas' top-3 daily tasks are reachable in ≤3 clicks (C1).
+   615→   615→
+   616→   616→**Deliverables:**
+   617→   617→- Walkthrough checklist document: 8 personas × 3 tasks = 24 task timings
+   618→   618→- Lighthouse accessibility audit on every primary screen
+   619→   619→- Manual a11y audit: keyboard-only navigation through 1 flow per role
+   620→   620→
+   621→   621→**Exit criteria (visible):** Every persona's 3 daily tasks reachable in ≤3 clicks; Lighthouse a11y score ≥ 95 on all primary screens.
+   622→   622→
+   623→   623→---
+   624→   624→
+   625→   625→### 6.3 — Polish & Iteration
+   626→   626→
+   627→   627→**Objective:** Fix any Blocker/Critical issues from 6.2; freeze the visual spec.
+   628→   628→
+   629→   629→**Deliverables:**
+   630→   630→- Issue log + fix commits
+   631→   631→- Final visual polish pass: micro-interactions, hover states, focus rings, empty-state copy
+   632→   632→- Performance pass: code-split heavy screens (Audit Explorer, Ledger), lazy-load illustrations
+   633→   633→
+   634→   634→**Exit criteria (visible):** Zero Blocker/Critical issues; Lighthouse Performance ≥ 80 on primary screens.
+   635→   635→
+   636→   636→---
+   637→   637→
+   638→   638→## 11. Phase C7 — Design QA, Docs & Handoff (3 days) ✅
+   639→   639→
+   640→   640→### 7.1 — Component Documentation (Storybook-style)
+   641→   641→
+   642→   642→**Objective:** Every component has living docs.
+   643→   643→
+   644→   644→**Deliverables:**
+   645→   645→- `/dev/components/[name]` page per component showing: variants, states, props table, a11y contract, token references, copy/paste code snippet
+   646→   646→- Auto-generated props table from TypeScript types
+   647→   647→
+   648→   648→**Exit criteria (visible):** `/dev/components` index lists all 30 components with green "documented" badges.
+   649→   649→
+   650→   650→---
+   651→   651→
+   652→   652→### 7.2 — Design QA Contract
+   653→   653→
+   654→   654→**Objective:** Publish the binding 30-item QA checklist for future changes.
+   655→   655→
+   656→   656→**Deliverables:**
+   657→   657→- `docs/DESIGN_QA_CONTRACT.md` — 30 checklist items (token usage, contrast, focus rings, RTL, copy, empty states, etc.)
+   658→   658→- ESLint rules enforcing the top 10 items at build time
+   659→   659→
+   660→   660→**Exit criteria (visible):** Running `bun run lint` + `bun run qa:design` passes green on the entire codebase.
+   661→   661→
+   662→   662→---
+   663→   663→
+   664→   664→### 7.3 — Asset Library Export
+   665→   665→
+   666→   666→**Objective:** Package the design assets for any future consumer.
+   667→   667→
+   668→   668→**Deliverables:**
+   669→   669→- `public/assets/icons/` — all 200+ SVGs (individual + `sprite.svg`)
+   670→   670→- `public/assets/illustrations/` — 5 SVG illustrations
+   671→   671→- `public/assets/brand/` — logo set (when client delivers), color palette PNG, favicon set
+   672→   672→- `src/lib/pdf/templates/` — already shipped in 5.1; documented for backend PDF engine consumption
+   673→   673→
+   674→   674→**Exit criteria (visible):** `/dev/assets` page lists every asset with preview + download link.
+   675→   675→
+   676→   676→---
+   677→   677→
+   678→   678→### 7.4 — Final Sign-Off & Responsive Audit
+   679→   679→
+   680→   680→**Objective:** Final verification that the UI is fully workable.
+   681→   681→
+   682→   682→**Deliverables:**
+   683→   683→- Run Agent Browser (or equivalent) on `/` at 375 / 768 / 1280 / 1440 widths — verify sticky footer, no horizontal scroll, no console errors
+   684→   684→- Walk all 8 flows at each width
+   685→   685→- Verify Dev Toolbar role-switch updates nav + dashboard + permissions across all roles
+   686→   686→- Verify bn/en/ar switch on 5 representative screens
+   687→   687→- Sign-off document: `docs/UI_UX_SIGNOFF.md`
+   688→   688→
+   689→   689→**Exit criteria (visible):**
+   690→   690→- `/` route loads cleanly with no errors at every breakpoint
+   691→   691→- All 8 flows complete end-to-end
+   692→   692→- Every persona's dashboard renders with role-appropriate widgets
+   693→   693→- Footer sticks to bottom on short pages, pushes down on long pages
+   694→   694→- Zero unbranded PDFs anywhere in the app
+   695→   695→- Zero tofu across bn/en/ar
+   696→   696→
+   697→   697→---
+   698→   698→
+   699→   699→## 12. Cumulative Visibility Checklist
+   700→   700→
+   701→   701→After every phase, the user can SEE the following in the browser:
+   702→   702→
+   703→   703→| After Phase | What's visible at `/` |
+   704→   704→|---|---|
+   705→   705→| C0 | Branded shell, tokens live, theme toggle, RTL, dev toolbar |
+   706→   706→| C1 | + 30 components in `/dev/components` showcase |
+   707→   707→| C2 | + Dynamic nav (role-aware) + 5 dashboards + 5 state types |
+   708→   708→| C3 | + 40+ module screens threaded by nav (Foundation → Finance) |
+   709→   709→| C4 | + Operations/Communication + mobile flows |
+   710→   710→| C5 | + Branded PDFs + public website |
+   711→   711→| C6 | + 8 clickable end-to-end flows + accessibility verified |
+   712→   712→| C7 | + Component docs + QA contract + responsive audit pass → **FULL WORKABLE UI/UX** |
+   713→   713→
+   714→   714→---
+   715→   715→
+   716→   716→## 13. Risk Lock-Ins Carried Into Code (from Session 0.4)
+   717→   717→
+   718→   718→| Risk | Lock-in | Coding session |
+   719→   719→|---|---|---|
+   720→   720→| R1 | Branch switch opens fresh tab; current tab keeps context | 2.1 |
+   721→   721→| R3 | Empty-permission user sees "Request access" CTA, never blank | 2.3 + 2.4 |
+   722→   722→| R6 | Attendance default-Present + one-tap + optimistic + 30s undo + Idempotency-Key | 3.3 |
+   723→   723→| R10 | Anonymous donation captures email/mobile + PDF + honeypot + reCAPTCHA | 5.2 |
+   724→   724→| R13 | Every PDF references primary.500 + accent.DEFAULT; zero unbranded PDFs | 5.1 |
+   725→   725→
+   726→   726→---
+   727→   727→
+   728→   728→## 14. Do-Not-Do List Enforcement (from Session 0.3)
+   729→   729→
+   730→   730→The 20 anti-patterns (D1–D20) are enforced in code via:
+   731→   731→- **ESLint custom rules** (D1: no module in nav unless enabled; D5: no hover-only interactions; D15: no missing font-family)
+   732→   732→- **Runtime guards** (D16: requester cannot approve own request; D17: public cannot reach protected routes; D18: Zakat funds isolated)
+   733→   733→- **Component contracts** (D8: EmptyState requires CTA on permission screens; D13: dashboard figures require "as of" timestamp)
+   734→   734→- **QA checklist** (D9: attendance <60s for 40 students; D14: no unbranded PDFs)
+   735→   735→
+   736→   736→---
+   737→   737→
+   738→   738→## 15. What This Plan Does NOT Include (out of scope)
+   739→   739→
+   740→   740→- **Backend implementation** — per Handover Sequence, backend comes after designer. This plan uses mock data; the swap path is documented in §2.
+   741→   741→- **Real authentication** — mock auth via Dev Toolbar role-switch. Real NextAuth.js wiring is a backend-integration task.
+   742→   742→- **Real database** — Prisma is available but unused in this phase. Schema design happens during backend integration.
+   743→   743→- **Production deployment** — this plan delivers a dev-server-runnable UI; deployment is a separate concern.
+   744→   744→- **Real-time features** — socket.io integration for live notifications is deferred to backend integration phase.
+   745→   745→
+   746→   746→---
+   747→   747→
+   748→   748→## 16. Next Step
+   749→   749→
+   750→   750→**Begin Phase C0 Session 0.1 immediately.** The FROZEN token JSON is already in hand (`/tmp/MadrashaOS/download/MadrashaOS_Session_1.1_Brand_Kit_Tokens.json`). The first visible artifact — a branded palette card at `/` — should appear within the first 2 hours of coding.
+   751→   751→
+   752→   752→After C0.4, the dev toolbar + mock data layer unlocks parallel work: C1 (components) can proceed while C2.1 (nav model) starts on a separate branch. From C3 onward, sessions can parallelize across module groups once the C1 component library is merged.
+   753→   753→
+   754→   754→**Definition of success:** at the end of C7, a non-technical client authority can open `/`, switch to their role via the dev toolbar, walk through their top-3 daily tasks in ≤3 clicks each, view a branded PDF receipt, and toggle between Bangla / English / Arabic without breaking layout. That is the "full workable UI/UX" deliverable.
+   755→   755→

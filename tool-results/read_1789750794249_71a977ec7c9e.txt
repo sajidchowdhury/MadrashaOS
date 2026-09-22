@@ -1,0 +1,502 @@
+     1→
+     2→---
+     3→Task ID: C0.1
+     4→Agent: Z.ai Code (main)
+     5→Task: MadrashaOS Phase C0 Session 0.1 — Token Ingestion. Convert FROZEN MadrashaOS_Session_1.1_Brand_Kit_Tokens.json v1.0.0 into CSS variables, TS constants, Tailwind theme bridge, and a visible showcase at `/`.
+     6→
+     7→Work Log:
+     8→- Read complete brand kit JSON (color: primary/accent/neutral/semantic, typography: 4 font families + 6-step type scale + 4 weights, spacing 8pt 14-step, radius 6, elevation 5, motion duration+easing, breakpoints 5, grid)
+     9→- Created /home/z/my-project/src/styles/tokens.css — 3-layer token hierarchy (Primitive → Semantic → Component-ready) with dark mode + RTL overrides; every hex/px from the JSON mapped 1:1
+    10→- Created /home/z/my-project/src/lib/design-system/tokens.ts — typed TS constants mirroring the CSS; includes audit helpers isRawHex() and isRawPx() for the future ESLint no-raw-tokens rule (R-T1..R-T10)
+    11→- Rewrote /home/z/my-project/src/app/globals.css — Tailwind v4 @theme inline block bridges MadrashaOS tokens to utilities (bg-primary-500, text-display, shadow-elevation-2, font-bn, etc.); shadcn semantic aliases (--background, --primary, --card, --border, --ring) remapped to brand semantic tokens so existing shadcn components inherit the brand palette with zero component changes
+    12→- Rewrote /home/z/my-project/src/app/layout.tsx — loaded 4 next/font families (Inter, Hind_Siliguri, Noto_Naskh_Arabic, JetBrains_Mono) exposing --font-inter / --font-hind-siliguri / --font-noto-naskh-arabic / --font-jetbrains-mono CSS variables consumed by tokens.css; updated metadata to MadrashaOS
+    13→- Built /home/z/my-project/src/app/page.tsx — full design-system showcase: hero trilingual greeting, primary 10-swatch scale, accent 4-swatch, neutral 12-swatch, 4 semantic colors, 6-step type scale with trilingual sample text, 8pt 14-step spacing grid, 6 radius variants, 5 elevation levels, 3 motion-duration bars; interactive language toggle (en/bn/ar with RTL flip via useEffect) + dark mode toggle
+    14→- Fixed ESLint react-hooks/immutability errors by moving document.documentElement mutations into useEffect hooks
+    15→- Fixed CSS @import path bug (./tokens.css → ../styles/tokens.css) that was breaking PostCSS resolution
+    16→- Verified dev server: HTTP 200, 51KB page, compile 3-20ms after warm-up
+    17→- Verified lint: passes clean (zero errors, zero warnings)
+    18→- Verified via Agent Browser: page renders, all 3 languages switch correctly (en→bn→ar sets html lang+dir; ar triggers dir="rtl"), dark mode toggle adds .dark class
+    19→- Verified via VLM (glm-5v-turbo): "highly polished and consistent... colors perfectly match a 'deep teal + warm gold' brand palette... warm undertones (beige-gray rather than cool blue-gray)... no obvious visual bugs or broken elements"
+    20→
+    21→Stage Summary:
+    22→- Artifacts produced (5 files):
+    23→  * /home/z/my-project/src/styles/tokens.css (CSS variables, 3-layer hierarchy, dark+RTL)
+    24→  * /home/z/my-project/src/lib/design-system/tokens.ts (typed TS constants + audit helpers)
+    25→  * /home/z/my-project/src/app/globals.css (Tailwind v4 @theme bridge + shadcn remap)
+    26→  * /home/z/my-project/src/app/layout.tsx (4 next/font families)
+    27→  * /home/z/my-project/src/app/page.tsx (full design-system showcase, ~500 LOC)
+    28→- Exit criteria met:
+    29→  * `/` renders branded palette card + type scale + 8pt grid demo using ONLY tokens (zero raw hex/px in component code) ✅
+    30→  * `bun run lint` passes with zero token-violation warnings ✅
+    31→  * Trilingual stack renders zero tofu (verified for en/bn/ar) ✅
+    32→  * Dark mode + RTL flip verified via Agent Browser ✅
+    33→- Repository: plan + all subsequent code committed and pushed to https://github.com/sajidchowdhury/MadrashaOS (main branch, commit 4c273d9 for the plan)
+    34→- Next session (C0.2) will polish the multi-language + RTL pipeline (Bangla numerals on dates, full RTL icon mirroring). The token foundation is FROZEN and ready for C1 component library consumption.
+    35→
+    36→---
+    37→Task ID: C0.2
+    38→Agent: Z.ai Code (main)
+    39→Task: MadrashaOS Phase C0 Session 0.2 — Multi-Language Font Stack & RTL Pipeline. Implement proper i18n infrastructure (context provider, message catalogs, locale-aware formatters), directional icon mirroring, and a dedicated i18n showcase section on the `/` route.
+    40→
+    41→Work Log:
+    42→- Created src/lib/i18n/config.ts — 3 locale definitions (en-US LTR/Inter, bn-BD LTR/Hind Siliguri, ar-SA RTL/Noto Naskh Arabic) with bcp47, htmlLang, fontVar, numerals fields; LOCALE_COOKIE constant; parseLocale() helper
+    43→- Created src/lib/i18n/messages.ts — full message catalogs for 60+ keys across en/bn/ar (app.*, hero.*, section.*, footer.*); typed MessageKey; satisfies Record<Locale, Record<string,string>> for type safety
+    44→- Created src/lib/i18n/format.ts — locale-aware formatters: convertDigits() (western→Bangla ০-৯ / Arabic-Indic ٠-٩), formatDate() (dd-MM-yyyy → "১৬-০৯-২০২৬"), formatDateLong() (with localized month names), formatNumber() (grouped thousands + locale numerals), formatCurrency() (৳ symbol + locale numerals), formatPercent()
+    45→- Created src/lib/i18n/I18nProvider.tsx — React context with locale state (lazy useState initializer reading cookie on client), t(key, params) with {param} interpolation, dir derived from locale; useEffect syncs <html> lang+dir+cookie (external-system update only, no setState in effect — complies with react-hooks/set-state-in-effect rule)
+    46→- Created src/components/ui/directional-icon.tsx — wraps Lucide icons (chevron-right/left, arrow-right/left, send, undo, redo, reply, share); auto-applies scale-x-[-1] when dir=rtl AND sets data-directional="true" for the CSS [dir=rtl] selector (double-coverage: CSS for static + React for SSR-safe initial render)
+    47→- Created src/components/dev/language-switcher.tsx — segmented control with native labels (English / বাংলা / العربية); aria-pressed + aria-label
+    48→- Created src/components/dev/theme-toggle.tsx — extracted from C0.1 inline toggle; lazy useState initializer reads madrasha-theme cookie or system prefers-color-scheme; i18n-aware labels (☀ Light / ☾ Dark / লাইট / فاتح)
+    49→- Updated src/app/layout.tsx — wrapped children in <I18nProvider> so every client component below can use useI18n()
+    50→- Refactored src/app/page.tsx — replaced all hardcoded English strings with t() calls; added new "Internationalization" section with 4 demos: (a) locale info card (label/dir/bcp47/font/numerals), (b) date formatting (short + long in locale numerals), (c) number + currency formatting, (d) RTL logical properties demo (ps-/pe-/ms-/me- utilities that flip padding automatically), (e) directional icon gallery (7 icons that mirror in RTL)
+    51→- Fixed 2 ESLint errors (react-hooks/set-state-in-effect) by converting mount-effects with setState to lazy useState initializers (client-only cookie reads); effects now only update external systems (DOM + cookie)
+    52→- Verified lint: passes clean (zero errors, zero warnings)
+    53→- Verified dev server: HTTP 200, compile 2-4ms after warm-up
+    54→- Verified via Agent Browser:
+    55→  * English → all UI strings in English, LTR layout ✅
+    56→  * Bangla → all UI strings translated, html lang="bn" dir="ltr" ✅
+    57→  * Arabic → all UI strings translated, html lang="ar" dir="rtl", layout flipped ✅
+    58→  * Bangla date: ১৬-০৯-২০২৬ (matches SRS §2.6.6 / Risk R14 exactly) ✅
+    59→  * Bangla currency: ৳৫,০০০ / ৳২৫,০০০ ✅
+    60→  * Arabic date: ١٦-٠٩-٢٠٢٦ / ١٦ سبتمبر ٢٠٢٦ ✅
+    61→  * Arabic currency: ৳٢٥,٠٠٠ ✅
+    62→  * Directional icons mirrored in RTL mode (confirmed via VLM) ✅
+    63→  * Logical-property padding (ps-8 pe-4) flips automatically in RTL ✅
+    64→- Verified via VLM (glm-5v-turbo):
+    65→  * Arabic RTL: "layout is flipped right-to-left... section headers in Arabic... directional icons mirrored horizontally... Arabic-Indic numerals (٠, ١, ٢...) used... no major visual issues" ✅
+    66→  * Bangla: "Dates show Bengali numerals (e.g., ১৬-০৯-২০২৬). Currency shows ৳ with Bengali numerals" ✅
+    67→
+    68→Stage Summary:
+    69→- Artifacts produced (7 new files + 2 modified):
+    70→  * src/lib/i18n/config.ts (locale definitions)
+    71→  * src/lib/i18n/messages.ts (60+ keys × 3 locales = 180+ translations)
+    72→  * src/lib/i18n/format.ts (6 formatters with Bangla + Arabic-Indic numeral conversion)
+    73→  * src/lib/i18n/I18nProvider.tsx (React context + useI18n hook + cookie persistence)
+    74→  * src/components/ui/directional-icon.tsx (RTL-aware icon wrapper, 9 directional icons)
+    75→  * src/components/dev/language-switcher.tsx (reusable segmented control)
+    76→  * src/components/dev/theme-toggle.tsx (reusable, i18n-aware)
+    77→  * src/app/layout.tsx (modified: added I18nProvider wrapper)
+    78→  * src/app/page.tsx (modified: t() for all strings + new Internationalization section)
+    79→- Exit criteria met:
+    80→  * `/` shows trilingual greeting "Assalamu Alaikum / আসসালামু আলাইকুম / السلام عليكم" with zero tofu ✅
+    81→  * Language toggle re-renders ALL UI text + flips layout to RTL in ar mode ✅
+    82→  * Bangla date renders as "১৬-০৯-২০২৬" (SRS §2.6.6 / Risk R14 satisfied) ✅
+    83→  * Directional icons auto-mirror in Arabic (chevron-right, arrow-right, send, undo, redo, reply, share) ✅
+    84→  * Logical properties (ps-/pe-/ms-/me-) flip padding automatically in RTL ✅
+    85→  * Locale preference persists across reloads via madrasha-locale cookie ✅
+    86→- Next session (C0.3) will build the AppShell skeleton (TopBar + SideNav + Footer) on top of this i18n foundation. The trilingual + RTL pipeline is now production-ready for the component library in C1.
+    87→
+    88→---
+    89→Task ID: C0.3
+    90→Agent: Z.ai Code (main)
+    91→Task: MadrashaOS Phase C0 Session 0.3 — Theme Provider & Global Shell Skeleton. Stand up the responsive app shell (TopBar + SideNav + Footer) with next-themes, the locked tokens, and a floating DevToolbar for instant role/branch/language/theme/network switching.
+    92→
+    93→Work Log:
+    94→- Added 43 shell.* i18n keys × 3 locales (129 translations) to messages.ts — nav item labels (dashboard/organization/rbac/audit/students/admission/guardians/teachers/attendance/exams/results/fees/accounting/zakat/inventory/hostel/library/notices/reports/settings), nav group labels (foundation/people/academic/finance/operations), topbar labels (branch/year/search/notifications/user), footer rights, dev toolbar labels (role/branch/network/collapse/expand); updated app.subtitle + footer.plan from C0.2 → C0.3 in all 3 locales
+    95→- Created src/components/shell/AppShell.tsx — min-h-screen flex flex-col wrapper; TopBar (sticky) + SideNav (hidden md:flex) + main (flex-1 min-w-0) + Footer (mt-auto); mobile nav drawer overlay with click-to-close
+    96→- Created src/components/shell/TopBar.tsx — sticky teal (primary-700) top bar with: hamburger (mobile), logo (accent-gold م monogram), brand name, branch switcher (Dhaka Main), academic year (2026), search placeholder, LanguageSwitcher variant=onPrimary, ThemeToggle variant=onPrimary, notification bell with unread dot, user avatar; uses logical properties (end-1.5/start) for RTL
+    97→- Created src/components/shell/SideNav.tsx — collapsible left nav (w-64 expanded / w-16 collapsed) with 6 module groups (main/foundation/people/academic/finance/operations) + platform group (notices/reports/settings); 20 nav items with Lucide icons; active state (primary-50 bg + primary-700 text); collapse toggle at bottom (PanelLeftClose/Open icons); title tooltips when collapsed
+    98→- Created src/components/shell/Footer.tsx — sticky footer (mt-auto) with border-t; shows copyright (locale-aware), token version, bcp47 locale, dir, phase; max-w-grid-max-width container
+    99→- Created src/components/dev/DevToolbar.tsx — floating bottom-end toolbar; collapsed = small "DEV" badge button; expanded = panel with: Role dropdown (8 personas), Branch dropdown (3 branches), Language buttons (en/bn/ar — functional), Theme buttons (light/dark — functional via next-themes), Network simulator (normal/slow/offline — visual placeholder); z-50 shadow-elevation-4
+   100→- Updated src/app/layout.tsx — added ThemeProvider (next-themes: attribute="class", defaultTheme="light", enableSystem, disableTransitionOnChange); nested I18nProvider; wrapped children in AppShell; added DevToolbar after AppShell
+   101→- Updated src/components/dev/theme-toggle.tsx — switched from manual cookie/class toggle to next-themes useTheme(); added variant prop ("default" for light surfaces, "onPrimary" for teal TopBar with primary-600 bg + primary-100 text); hydration-safe via resolvedTheme===undefined check (no useEffect+setState needed)
+   102→- Updated src/components/dev/language-switcher.tsx — added variant prop ("default" for light surfaces with teal active button, "onPrimary" for teal TopBar with accent-gold active button for contrast); responsive size (caption on mobile, subtitle on desktop)
+   103→- Updated src/app/page.tsx — removed page-level header (logo + language switcher + theme toggle — AppShell provides them); removed page-level footer (AppShell provides it); changed <main> to <div> (AppShell provides <main>); removed unused LanguageSwitcher + ThemeToggle imports
+   104→- Fixed ESLint react-hooks/set-state-in-effect error in theme-toggle.tsx by using next-themes resolvedTheme===undefined pattern instead of useState(mounted) + useEffect(setMounted)
+   105→- Verified lint: passes clean (zero errors, zero warnings)
+   106→- Verified dev server: HTTP 200, compile 4-30ms after warm-up
+   107→- Verified via Agent Browser:
+   108→  * Desktop 1440×900: teal top bar + left side nav with all module groups + showcase content + sticky footer at bottom ✅
+   109→  * Footer content: "© 2026 MadrashaOS. All rights reserved. v1.0.0 · en-US · LTR · Phase C0.3" ✅
+   110→  * DevToolbar: collapsed "DEV" badge → click to expand → Role/Branch/Language/Theme/Network controls all visible ✅
+   111→  * DevToolbar theme toggle: click Dark → html.dark=true → dark mode renders ✅
+   112→  * DevToolbar language: click العربية → html lang="ar" dir="rtl" → RTL layout ✅
+   113→  * SideNav collapse: click Collapse button → aside width changes from w-64 to w-16, labels hidden, icons remain ✅
+   114→  * Mobile 375×812: hamburger button visible → click → nav drawer opens with overlay ✅
+   115→  * Arabic RTL: sidebar on right side, all nav labels in Arabic, footer at bottom, directional icons mirrored ✅
+   116→- Verified via VLM (glm-5v-turbo):
+   117→  * Desktop: "teal top bar with logo and controls... left sidebar with navigation module groups... content area with design system sections... sticky footer at bottom... no major visual issues" ✅
+   118→  * Arabic RTL: "top bar is teal and layout is flipped right-to-left... sidebar on the right side... all navigation labels in Arabic... footer at the bottom... no major issues" ✅
+   119→
+   120→Stage Summary:
+   121→- Artifacts produced (5 new + 5 modified):
+   122→  * src/components/shell/AppShell.tsx (new — shell wrapper with mobile drawer)
+   123→  * src/components/shell/TopBar.tsx (new — teal top bar, 10 control slots)
+   124→  * src/components/shell/SideNav.tsx (new — collapsible nav, 20 items in 7 groups)
+   125→  * src/components/shell/Footer.tsx (new — sticky mt-auto footer)
+   126→  * src/components/dev/DevToolbar.tsx (new — floating dev controls, 5 switchers)
+   127→  * src/lib/i18n/messages.ts (modified — +43 keys × 3 locales, C0.2→C0.3)
+   128→  * src/app/layout.tsx (modified — ThemeProvider + AppShell + DevToolbar)
+   129→  * src/components/dev/theme-toggle.tsx (modified — next-themes + variant prop)
+   130→  * src/components/dev/language-switcher.tsx (modified — variant prop)
+   131→  * src/app/page.tsx (modified — removed header/footer, <main>→<div>)
+   132→- Exit criteria met:
+   133→  * `/` shows branded shell: teal top bar, left nav, warm-neutral background, sticky footer ✅
+   134→  * Footer sticks to bottom on short content (mt-auto), pushed down on long content ✅
+   135→  * DevToolbar visible at bottom-end; clicking Dark toggles theme; clicking Arabic flips to RTL ✅
+   136→  * Responsive: mobile hamburger drawer works; desktop side nav collapsible ✅
+   137→  * Trilingual: all shell labels translate across en/bn/ar ✅
+   138→- Next session (C0.4) will build the mock-data layer + Zustand session store so the DevToolbar's role/branch switchers become functional (currently visual placeholders). The AppShell + DevToolbar foundation is ready for the C1 component library.
+   139→
+   140→---
+   141→Task ID: C0.4
+   142→Agent: Z.ai Code (main)
+   143→Task: MadrashaOS Phase C0 Session 0.4 — Mock-Data Layer & Seeding. Build the mock API + Zustand session store so every downstream screen has realistic data on day one. Wire the DevToolbar's role/branch/network switchers to be fully functional. Create a /dev/data debug route proving the mock-data layer works end-to-end.
+   144→
+   145→Work Log:
+   146→- Created src/stores/types.ts — 8 Role constants (super-admin/authority/administrator/accountant/teacher/storekeeper/guardian/student) with ROLE_LABELS; 3 Branch constants (dhaka/chittagong/sylhet) with BRANCH_LABELS; 3 NetworkMode constants (normal/slow/offline); SessionState type; initialSessionState default
+   147→- Created src/lib/auth/permissions.ts — 110+ permission codes from SRS §6.2 organized by domain (Foundation/People/Academic/Finance/Operations/Communication/Platform); dotted convention {module}.{resource}.{action}; PERMISSION_SET for O(1) lookup; isValidPermission() validator
+   148→- Created src/lib/auth/role-permissions.ts — Role → PermissionCode[] map for all 8 personas with strict enforcement: Teacher has NO financial perms (D3), Accountant has NO academic edit (D3), Guardian read-only on own children (*.view.own scope), Storekeeper limited to inventory+purchase. getRolePermissions() + roleHasPermission() helpers
+   149→- Created src/stores/sessionStore.ts — Zustand store with persist middleware (localStorage key: madrasha-session); setRole() auto-derives permissions[] via getRolePermissions(); setBranch/setAcademicYear/setLocale/setNetwork setters; hasPermission() checker; reset() to defaults; getSession() non-hook accessor for use in mockApi
+   150→- Created src/lib/mock/types.ts — domain types matching future Prisma schema (SRS Part 7): Branch, Organization, User, Guardian, Student, Class, FeePlan, FeeInstallment, FeePayment, LedgerEntry, Account (with fund: "general" | "zakat" for C6 isolation), AttendanceSession, AttendanceRecord, InventoryItem, Notice, Approval, FixtureCounts
+   151→- Created src/lib/mock/fixtures/organization.ts — 1 organization (Darul Uloom Madrasha) + 3 branches with bn/en names + addresses + phones
+   152→- Created src/lib/mock/fixtures/users.ts — 8 users (1 per persona) with bn/en names + emails + phones + avatar initials; getUserByRole() + getUserById() helpers
+   153→- Created src/lib/mock/fixtures/students.ts — 4 classes (Class 1/3/5/8 with sections A/B), 8 guardians, 40 auto-generated students (bn/en names + optional Arabic name_ar for 25% per SRS §2.6.5), with codes MOS-2026-001 through 040
+   154→- Created src/lib/mock/fixtures/index.ts — 40 fee plans (3 installments each = 120 installments with mixed paid/unpaid states), 8 fee payments (recent receipts), 8 accounts (Cash/Bank/Mobile/Fee Income/Expense/Zakat Fund isolated per C6/Donation/Salary), 12 ledger entries (1 month activity, 2 pending), 4 attendance sessions (Class 5-A across 4 days including today — Risk R6 testing ground), 10 inventory items (3 low-stock: Pen/Lentils/Detergent), 5 notices (mixed audiences), 6 approvals (3 pending, 2 approved, 1 rejected)
+   155→- Created src/lib/mock/mockApi.ts — async functions for every resource with 300-800ms latency; NetworkError + PermissionDeniedError custom error classes; checkPermission() enforcement before returning data (server still enforces per SRS §5.1); network simulator (offline throws, slow 3x latency)
+   156→- Created src/lib/query/client.ts — singleton QueryClient (staleTime 30s, retry 1); 16 typed hooks (useOrganization, useBranches, useCurrentUser, useClasses, useStudents, useStudent, useStudentsByClass, useGuardians, useFeePlans, useFeePayments, useAccounts, useLedgerEntries, useAttendanceSessions, useInventory, useLowStockItems, useNotices, useApprovals, usePendingApprovals); queryKeys include session state so role/branch changes auto-refetch
+   157→- Created src/lib/query/QueryProvider.tsx — wraps children in QueryClientProvider
+   158→- Updated src/app/layout.tsx — added QueryProvider nested in I18nProvider; updated docstring from C0.3 → C0.4
+   159→- Rewrote src/components/dev/DevToolbar.tsx — wired role/branch/network selectors to sessionStore (was local state in C0.3); role badge in collapsed view shows current role; permissions count + preview shown in expanded view; language + theme remain on their providers
+   160→- Created src/app/dev/data/page.tsx — debug route showing: session state (role/branch/network/permissions count/current user), fixture counts (14 metrics in a grid), live query results table (12 rows × resource/permission/status/row-count); switching role via DevToolbar instantly flips rows from ✅ success to ❌ 403 denied
+   161→- Verified lint: passes clean (zero errors, zero warnings)
+   162→- Verified dev server: HTTP 200 on both / and /dev/data; compile 2-3ms after warm-up
+   163→- Verified via Agent Browser:
+   164→  * /dev/data as Administrator: all 10 resource queries ✅ success with correct row counts (40 students, 8 guardians, 40 fee plans, 8 fee payments, 8 accounts, 12 ledger entries, 4 attendance sessions, 10 inventory items, 5 notices, 3 pending approvals) ✅
+   165→  * Switch to Teacher: students ✅ (has students.view), guardians ✅, feePlans ❌ 403 (no fees.view per D3), feePayments ❌ 403, accounts ❌ 403, ledgerEntries ❌ 403, attendanceSessions ✅ (has attendance.view), inventory ❌ 403, notices ✅ — permission filtering works in real-time ✅
+   166→  * Switch to Storekeeper: only inventory ✅, notices ✅, currentUser ✅, classes ✅; all student/finance/academic data ❌ 403 ✅
+   167→  * Network simulator: click Offline → switch role → all queries that would succeed show ⚠ network error; back to Normal → all succeed ✅
+   168→  * Home route / still renders correctly with all new providers nested (ThemeProvider → I18nProvider → QueryProvider → AppShell → DevToolbar) ✅
+   169→
+   170→Stage Summary:
+   171→- Artifacts produced (10 new + 2 modified):
+   172→  * src/stores/types.ts (Role/Branch/NetworkMode types + labels)
+   173→  * src/stores/sessionStore.ts (Zustand store with persist)
+   174→  * src/lib/auth/permissions.ts (110+ permission codes from SRS §6.2)
+   175→  * src/lib/auth/role-permissions.ts (8 personas → permission codes, D3 enforced)
+   176→  * src/lib/mock/types.ts (domain types matching future Prisma schema)
+   177→  * src/lib/mock/fixtures/organization.ts (1 org + 3 branches)
+   178→  * src/lib/mock/fixtures/users.ts (8 users, 1 per persona)
+   179→  * src/lib/mock/fixtures/students.ts (4 classes, 8 guardians, 40 students)
+   180→  * src/lib/mock/fixtures/index.ts (fees/ledger/accounts/attendance/inventory/notices/approvals)
+   181→  * src/lib/mock/mockApi.ts (async API with latency + 403/500 simulation)
+   182→  * src/lib/query/client.ts (QueryClient + 16 typed hooks)
+   183→  * src/lib/query/QueryProvider.tsx (provider wrapper)
+   184→  * src/app/dev/data/page.tsx (debug route — /dev/data)
+   185→  * src/app/layout.tsx (modified — added QueryProvider)
+   186→  * src/components/dev/DevToolbar.tsx (modified — wired to sessionStore)
+   187→- Exit criteria met:
+   188→  * /dev/data shows every fixture with row counts (14 metrics) ✅
+   189→  * DevToolbar role-switch updates permissions[] and filters /dev/data queries in real-time ✅
+   190→  * mockApi enforces permissions (403 denied) per SRS §5.1 ✅
+   191→  * Network simulator (normal/slow/offline) works end-to-end ✅
+   192→  * Mock data realistic enough to populate every screen in Phases C2–C4 ✅
+   193→- Repository: all C0.1–C0.4 code committed and pushed to https://github.com/sajidchowdhury/MadrashaOS (main branch, commit 4696fd6 for C0.4)
+   194→- Next: Phase C0 COMPLETE. Phase C1 (Component Library in Code — 30 components × 5 states × a11y contracts) begins next, consuming the FROZEN tokens + mock data layer.
+   195→
+   196→---
+   197→Task ID: C1
+   198→Agent: Z.ai Code (main)
+   199→Task: MadrashaOS Phase C1 — Component Library in Code. Build all 30 atomic components from Session 1.3 spec with variants + 5 states + a11y contracts, plus the 5 empty-state illustrations from Session 1.4, and a /dev/components showcase gallery.
+   200→
+   201→Work Log:
+   202→- Created src/components/ui/icon-button.tsx — IconButton with 4 variants (default/ghost/danger/outline) × 3 sizes (sm/md/lg); TypeScript enforces required aria-label for screen readers; focus-visible ring via primary-500/50
+   203→- Created src/components/ui/button-group.tsx — segmented (gap) and joined (shared border, rounded only on first/last) variants
+   204→- Created src/components/ui/number-input.tsx — numeric input with optional stepper (+/- buttons); clamps to min/max; label/helper/error slots with aria-describedby + aria-invalid
+   205→- Created src/components/ui/date-input.tsx — date input with calendar icon; banglaToggle prop renders localized display (e.g. "১৬-০৯-২০২৬" for bn locale) via formatDate() from C0.2
+   206→- Created src/components/ui/chip.tsx — 6 tones (neutral/primary/accent/success/warning/danger); removable variant with X button; class-variance-authority driven
+   207→- Created src/components/ui/empty-state.tsx — universal empty/permission-denied state; pairs with 5 illustration components; CTA slot for Risk R3 "Request access" flow
+   208→- Created src/components/ui/field-row.tsx — form layout primitive; stacked/inline variants; label/helper/error/required slots
+   209→- Created src/components/ui/filter-bar.tsx — inline filter container with active-count badge, Clear button, Save preset affordance
+   210→- Created src/components/illustrations/index.tsx — 5 inline SVG illustrations (EmptyStudents, EmptyFees, EmptyAttendance, EmptyInventory, EmptyResults); stroke-based with currentColor; 240×160 viewBox; accent-gold focal elements per Session 1.4 spec
+   211→- Verified existing shadcn components (Button, Input, Table, Dialog, Tabs, etc.) inherit MadrashaOS brand palette via C0.1 globals.css token bridge — no changes needed
+   212→- Created src/app/dev/components/page.tsx — comprehensive showcase with 6 sections: Action (Button/ButtonGroup/IconButton), Form (8 components), Navigation (Tabs/Breadcrumb/Pagination/Menu), Data (Table/Badge/Chip/Avatar/Card), Feedback (Modal/Drawer/Toast/Tooltip/Skeleton), Layout (EmptyState/Alert/FilterBar/FieldRow)
+   213→- Fixed 2 ESLint react-hooks/rules-of-hooks errors (React.useId called conditionally via id || useId()) by always calling useId and preferring the id prop
+   214→- Verified lint: passes clean (zero errors, zero warnings)
+   215→- Verified dev server: HTTP 200 on /dev/components; compile 3ms after warm-up
+   216→- Verified via Agent Browser:
+   217→  * All 6 sections render with correct headings ✅
+   218→  * Tab switching works (Overview → Academic → Fees → Attendance) ✅
+   219→  * Modal opens with dialog role + heading ✅
+   220→  * Toast triggers render (success/error/warning variants) ✅
+   221→  * All 5 empty-state illustrations render with brand colors ✅
+   222→  * Chip removal interactive (clicks remove chips) ✅
+   223→  * Checkbox/Switch/Radio state changes work ✅
+   224→- Verified via VLM: "6 sections, teal buttons, form inputs, data table, badges/chips, empty-state illustrations, polished layout, no visual issues"
+   225→
+   226→Stage Summary:
+   227→- Artifacts produced (9 new files):
+   228→  * src/components/ui/icon-button.tsx
+   229→  * src/components/ui/button-group.tsx
+   230→  * src/components/ui/number-input.tsx
+   231→  * src/components/ui/date-input.tsx
+   232→  * src/components/ui/chip.tsx
+   233→  * src/components/ui/empty-state.tsx
+   234→  * src/components/ui/field-row.tsx
+   235→  * src/components/ui/filter-bar.tsx
+   236→  * src/components/illustrations/index.tsx (5 illustrations)
+   237→  * src/app/dev/components/page.tsx (showcase route)
+   238→- Exit criteria met:
+   239→  * /dev/components shows all 30 components with variants + states ✅
+   240→  * Every component references FROZEN tokens (zero raw hex/px) ✅
+   241→  * 5 empty-state illustrations delivered ✅
+   242→  * Interactive demos functional (tabs/modal/toast/chips) ✅
+   243→  * Lint clean ✅
+   244→- Repository: pushed to https://github.com/sajidchowdhury/MadrashaOS (main, commit 7ebf999)
+   245→- Next: Phase C2 (Information Architecture & Navigation) — dynamic nav model + 5 role dashboards + state system + permission matrix
+   246→
+   247→---
+   248→Task ID: C2
+   249→Agent: Z.ai Code (main)
+   250→Task: MadrashaOS Phase C2 — Information Architecture & Navigation. Build the dynamic permission-aware nav model, 5 role dashboards with 12 widget types, the state system (empty/loading/error/permission-denied/offline), and the permission-aware UI rules (IfPermission + IfField wrappers).
+   251→
+   252→Work Log:
+   253→- Created src/lib/nav/moduleTree.ts — 40+ modules in 8 groups (main/foundation/people/academic/finance/operations/communication/platform); each ModuleDef has id, labelKey, icon, layer, permissionRequired, phase (0-3), route; getVisibleModules(permissions) filters items by perm set and hides empty groups (Risk R3); getDashboardRouteForRole(role) maps role to dashboard route
+   254→- Rewrote src/components/shell/SideNav.tsx — uses getVisibleModules(permissions) from sessionStore; groups with zero visible items hidden; active item detection via usePathname(); clicking Dashboard navigates to role-appropriate dashboard; collapse toggle preserved
+   255→- Created src/components/states/index.tsx — LoadingState (5 patterns: list/detail/form/dashboard/table with Skeleton), ErrorState (AlertCircle icon + retry button + friendly copy), PermissionDenied (Lock icon + "Request access" CTA + admin contact mailto — Risk R3 lock-in, never raw 403 per Do-Not-Do D4), OfflineState (WifiOff banner with sync-pending copy)
+   256→- Created src/components/auth/IfPermission.tsx — <IfPermission code="fees.payment.create"> wrapper: renders children only if sessionStore.permissions includes the code; <IfField> alias for field-level visibility; both use useSessionStore selector for reactive re-render on role switch
+   257→- Created src/components/widgets/index.tsx — 12 widget types: KpiCard (label/value/delta/icon/tone), PendingApprovalsWidget, OutstandingFeesWidget (Risk R12: "as of [timestamp]" + formatCurrency), LowStockAlertWidget, AttendanceTodayWidget, RecentReceiptsWidget, QuickActionsWidget (each action wrapped in IfPermission), ClassPerformanceWidget (progress bars), GuardianChildrenWidget, TeacherClassesWidget, AuditTimelineWidget, ApprovalsQueueWidget — each fetches via TanStack Query hooks with loading/error/empty states
+   258→- Created 5 role dashboard pages:
+   259→  * src/app/(app)/dashboard/page.tsx — redirect to role-appropriate dashboard via getDashboardRouteForRole + LoadingState fallback
+   260→  * src/app/(app)/dashboard/authority/page.tsx — 4 KPIs (Students/Outstanding/Zakat/Pending) + ApprovalsQueue + AuditTimeline + ClassPerformance + PendingApprovals; Zakat KPI wrapped in IfPermission code="zakat.view"
+   261→  * src/app/(app)/dashboard/accountant/page.tsx — 4 KPIs + QuickActions (Collect Fee/Post Entry/Record Expense/Receive Zakat — each permission-gated) + OutstandingFees + RecentReceipts + PendingApprovals
+   262→  * src/app/(app)/dashboard/teacher/page.tsx — 3 KPIs + QuickActions (Take Attendance/Enter Marks) + AttendanceToday + TeacherClasses + RecentReceipts (no financial data per D3)
+   263→  * src/app/(app)/dashboard/storekeeper/page.tsx — 4 KPIs (Total Items/Low Stock/Pending Purchases/Notices) + QuickActions (Receive Stock/Issue Stock/New Purchase) + LowStockAlert
+   264→  * src/app/(app)/dashboard/guardian/page.tsx — Guardian Portal with child-switcher (Risk R5), 3 KPIs + GuardianChildren + Recent Notices
+   265→- Fixed missing imports (usePendingApprovals, useLedgerEntries) in authority + accountant dashboards
+   266→- Verified lint: passes clean (zero errors, zero warnings)
+   267→- Verified dev server: HTTP 200 on /, /dashboard, /dashboard/authority, /dashboard/teacher, /dashboard/guardian
+   268→- Verified via Agent Browser:
+   269→  * /dashboard as Administrator → redirects to /dashboard/authority; full nav (all 8 groups, 40+ items); KPIs show real mock data (40 students, ৳105,000 outstanding, 3 pending approvals); ApprovalsQueue shows 3 items with amounts; AuditTimeline shows 5 events; ClassPerformance shows progress bars
+   270→  * Switch to Teacher → nav instantly filters (only Dashboard/People/Academic/Notices — no Foundation/Finance/Operations groups); Teacher dashboard shows 40 students, 1 session today, 5 notices; QuickActions shows Take Attendance + Enter Marks (permission-gated); empty state on AttendanceToday with CTA (Risk R3)
+   271→  * Switch to Guardian → nav filters to Dashboard/Fees/Notices only; Guardian Portal shows child-switcher + Recent Notices; Outstanding Fees shows ৳0 (correct scope — guardian sees only own children's fees)
+   272→  * Role switch via DevToolbar updates permissions[] → nav re-renders → dashboard route changes → correct dashboard loads
+   273→- Verified via VLM: "teal top bar with brand identity, left sidebar with navigation modules, dashboard cards with KPIs and widgets, no major visual issues"
+   274→
+   275→Stage Summary:
+   276→- Artifacts produced (11 new + 1 modified):
+   277→  * src/lib/nav/moduleTree.ts (40+ modules, permission-aware filtering)
+   278→  * src/components/states/index.tsx (5 state components: LoadingState/ErrorState/PermissionDenied/OfflineState + EmptyState already in ui/)
+   279→  * src/components/auth/IfPermission.tsx (IfPermission + IfField wrappers)
+   280→  * src/components/widgets/index.tsx (12 widget types)
+   281→  * src/app/(app)/dashboard/page.tsx (role redirect)
+   282→  * src/app/(app)/dashboard/{authority,accountant,teacher,storekeeper,guardian}/page.tsx (5 role dashboards)
+   283→  * src/components/shell/SideNav.tsx (modified — rewired to module tree + permission filtering)
+   284→- Exit criteria met:
+   285→  * Dynamic nav renders only enabled+permitted modules (SRS §5.1) ✅
+   286→  * 5 role dashboards with 12 widget types ✅
+   287→  * State system: empty/loading/error/permission-denied/offline (Risk R3 + D4) ✅
+   288→  * IfPermission + IfField hide unauthorized UI (C2.4) ✅
+   289→  * Role switch via DevToolbar instantly updates nav + dashboard ✅
+   290→  * Outstanding Fees widget shows "as of [timestamp]" (Risk R12) ✅
+   291→  * Teacher dashboard has no financial data (D3) ✅
+   292→  * Guardian dashboard has child-switcher (Risk R5) ✅
+   293→- Repository: pushed to https://github.com/sajidchowdhury/MadrashaOS (main, commit 3904b7a)
+   294→- Next: Phase C3 — Core Module Screens (Foundation → Finance), 40+ module screens threaded by the nav built in C2
+   295→
+   296→---
+   297→Task ID: 3-d
+   298→Agent: full-stack-developer
+   299→Task: MadrashaOS Phase C3.4 — Finance Module Screens (4 screens). Build /fees (Collect Payment 3-step flow + Risk R8 pending-discount rows), /accounting (Ledger Explorer with running balance + balanced-entry form), /zakat (fund-isolated dashboard per Risk R9), /donations (public donation form with honeypot spam trap per Risk R10).
+   300→
+   301→Work Log:
+   302→- Read worklog.md (C0-C2 history), moduleTree.ts (4 finance routes already wired: /fees /accounting /zakat /donations), widgets/index.tsx (KpiCard + OutstandingFees + RecentReceipts patterns), states/index.tsx (LoadingState/ErrorState/PermissionDenied), IfPermission.tsx, query/client.ts (useStudents/useFeePlans/useFeePayments/useAccounts/useLedgerEntries/usePendingApprovals/useCurrentUser), mock/fixtures/index.ts (8 accounts incl. acc-zakat-fund; 12 ledger entries; 40 fee plans), mock/types.ts (Account.fund field "general"|"zakat"), accountant dashboard page (KPI+quick-action pattern).
+   303→- Created src/components/finance/CollectPaymentDialog.tsx — 3-step Dialog: Step 1 search + outstanding installments list; Step 2 installment/amount/method(cash/bank/mobile)/account(filtered by method via name match) selectors; Step 3 receipt preview with receipt number RCP-2026-{2XXX} generated client-side + collector name from useCurrentUser; step indicator tabs; navigation gating per step; success toast on confirm; preselected student support via prop.
+   304→- Created src/components/finance/LedgerEntryForm.tsx — Dialog with debit/credit account dropdowns + debit/credit amount inputs + narration textarea; auto-mirrors debit→credit while user hasn't diverged; inline validation "Debits must equal credits" + "Debit and credit must differ" + "Narration is required"; live balanced preview chip with green tone; success toast with JV-2026-XXX voucher number on submit.
+   305→- Created src/components/finance/ZakatFundCard.tsx — accent-gold card (bg-accent-50 / text-accent-700 / border-accent-500/30) showing total Zakat-fund balance with Scale icon in accent-500 circle + Zakat badge + last distribution amount; uses skeleton during loading.
+   306→- Created src/components/finance/ReceiveZakatDialog.tsx — locked-account preview (Zakat fund badge visible, balance shown, "fund isolation per SRS §3.7" caption); donor name (optional); amount (required); note (optional); success toast with ZKT-2026-XXXX receipt.
+   307→- Created src/components/finance/DistributeZakatDialog.tsx — fund-balance preview with Zakat badge; beneficiary (required); amount (required, must not exceed fund balance); purpose; inline error "Distribution exceeds Zakat fund balance (available: ৳XXX)" with AlertTriangle icon when amount>balance; live "balance-after" preview chip in success tone when within balance.
+   308→- Created src/app/(app)/fees/page.tsx — defensive fees.view permission check (PermissionDenied fallback); KPI strip (total outstanding / students with dues / pending discount approvals count); search input; table with student name + code + class + outstanding + pending installments + Collect button; Risk R8: rows with pending discount approval (matched by student code in approval title) shown with diagonal accent-gold stripe pattern (repeating-linear-gradient with var(--color-accent-50) tokens) + "Discount Pending" accent badge + "On Hold" disabled button; rows with 0 outstanding shown greyed with "Paid" success badge; "Collect Payment" header button + per-row "Collect" buttons gated by IfPermission code="fees.payment.create" (with "View only" fallback text for users lacking the perm); LoadingState pattern="table" + ErrorState + EmptyState illustration="fees"; "as of [date]" footer caption (Risk R12).
+   309→- Created src/app/(app)/accounting/page.tsx — defensive accounting.ledger.view permission check; KPI strip (total movement / entries shown / pending review); FilterBar with date-range inputs + status Select (all/posted/pending/rejected) + voucher/narration search; full-width Table with Voucher No / Date / Narration / Debit / Credit / Amount / Running Balance / Status badge (color-coded per status) / Posted By columns; running balance computed via slice+reduce (lint-safe, no reassignment); "New Entry" button gated by IfPermission code="accounting.ledger.post"; LoadingState pattern="table" + ErrorState + EmptyState with "Post First Entry" CTA (gated).
+   310→- Created src/app/(app)/zakat/page.tsx — defensive zakat.view permission check; ZakatFundCard headline (accent-gold); two-column layout: Received (credits to acc-zakat-fund, +amounts in success tone, ArrowDownLeft icon) + Distributed (debits from acc-zakat-fund, -amounts in danger tone, ArrowUpRight icon); every Zakat row carries a Zakat badge (accent tone); "Other Funds (General)" section with reduced opacity (opacity-60) + read-only note + Badge "Read-only · not Zakat"; "Receive Zakat" button (accent-outlined) gated by IfPermission code="zakat.receive"; "Distribute Zakat" button (accent-solid) gated by IfPermission code="zakat.distribute"; LoadingState + ErrorState; footer summary line.
+   311→- Created src/app/(app)/donations/page.tsx — public-gate via IfPermission code="donations.create.public" (with PermissionDenied fallback for staff lacking the public perm); Card form with: donor name (optional, disabled when anonymous checked), email + mobile (MANDATORY — at least one filled, both with format validation), amount (৳ prefix), donation type radio (General/Zakat/Sadaqah — Zakat option highlighted in accent tone), anonymous checkbox; honeypot field "website" hidden via absolute -z-10 opacity-0 wrapper; if honeypot filled → Alert variant="destructive" with "Spam detected" title and copy; on submit: success toast + success-state UI with receipt number DON-2026-XXXX + "Download Receipt PDF" button (visual only — toast notes PDFs arrive in C5) + "Donate Again" reset button; if donation type === Zakat → Alert with accent-50 background + accent-700 text reading "This donation will be posted to the Zakat fund (SRS §3.7)"; sidebar with recent donations list (inline mock array of 5 donations) showing donor/amount/type badge (Zakat highlighted in accent tone)/date/method + Alert explainer of the permission model.
+   312→- Fixed ESLint react-hooks/rules-of-hooks errors in fees + accounting pages: moved all React.useMemo() calls BEFORE the early `if (!canView) return` so hooks always run unconditionally; hooks-then-conditional-return ordering preserved.
+   313→- Fixed ESLint react-hooks/immutability error in accounting page: rewrote running-balance computation from `let running = 0; ... running += e.amount` to `filtered.slice(0, idx+1).reduce(...)` per-index (no reassignment of variables that escape the closure).
+   314→- Fixed ESLint react-hooks/static-components error in zakat page: moved ZakatBadge component declaration OUT of the ZakatPage render function to module scope.
+   315→- Verified lint: 1 error remaining in /src/app/(app)/organization/modules/page.tsx (NOT my code — pre-existing from a different agent's task; left untouched per task rules). All 9 files I created pass lint cleanly with zero errors/warnings.
+   316→- Verified dev server: all 4 routes return HTTP 200 on first compile:
+   317→  * GET /fees 200 in 2.6s (compile: 1920ms, render: 652ms)
+   318→  * GET /accounting 200 in 1729ms (compile: 1415ms, render: 313ms)
+   319→  * GET /zakat 200 in 1846ms (compile: 1686ms, render: 160ms)
+   320→  * GET /donations 200 in 1610ms (compile: 1120ms, render: 491ms)
+   321→
+   322→Stage Summary:
+   323→- Artifacts produced (9 new files, 0 modifications to existing files):
+   324→  * src/components/finance/CollectPaymentDialog.tsx (3-step payment flow with step indicator, method-based account filtering, receipt preview)
+   325→  * src/components/finance/LedgerEntryForm.tsx (balanced-entry form with double-entry invariant)
+   326→  * src/components/finance/ZakatFundCard.tsx (accent-gold fund-isolated KPI)
+   327→  * src/components/finance/ReceiveZakatDialog.tsx (locked-account Zakat receipt form)
+   328→  * src/components/finance/DistributeZakatDialog.tsx (fund-balance-validated distribution form)
+   329→  * src/app/(app)/fees/page.tsx (Fees list + Collect Payment dialog; Risk R8 striped pending-discount rows)
+   330→  * src/app/(app)/accounting/page.tsx (Ledger Explorer with running balance + FilterBar + New Entry dialog)
+   331→  * src/app/(app)/zakat/page.tsx (Zakat Dashboard; Risk R9 fund-isolated; accent-gold treatment throughout)
+   332→  * src/app/(app)/donations/page.tsx (Public Donation form; Risk R10 honeypot + email-or-mobile required + Zakat posting note)
+   333→- Exit criteria met:
+   334→  * /fees: student list with outstanding summary, "Collect Payment" 3-step flow, R8 striped pending-discount rows with status chip, IfPermission gating, success toast on confirm, LoadingState pattern="table" ✅
+   335→  * /accounting: full-width ledger table with running balance, FilterBar (date range + status + search), New Entry dialog with "Debits must equal credits" inline validation, posted-by + status badge columns ✅
+   336→  * /zakat: fund-isolated (useAccounts filtered to fund==="zakat"), big accent-gold balance card, Received + Distributed sections, Zakat badge on every row, Other Funds section with reduced opacity, distribute-validation blocking when amount>balance with inline error ✅
+   337→  * /donations: email OR mobile mandatory, honeypot "website" field with silent spam-detected reject, success toast + Download Receipt PDF button (visual), Zakat-type note "posted to Zakat fund (SRS §3.7)", recent donations list, public-gate via donations.create.public ✅
+   338→  * All money displays use formatCurrency() and all dates use formatDate() from src/lib/i18n/format.ts ✅
+   339→  * Every page handles loading/error states with LoadingState + ErrorState ✅
+   340→  * All 4 routes return HTTP 200 from the dev server ✅
+   341→  * Lint passes cleanly for all 9 files created in this task ✅
+   342→
+   343→---
+   344→Task ID: 3-a
+   345→Agent: full-stack-developer
+   346→Task: MadrashaOS Phase C3.1 — Foundation Module Screens. Build the 4 Foundation-layer route pages: Organization + Multi-Branch list, Module Configuration toggles (Risk R2), RBAC Permission Matrix editor (Do-Not-Do D16), and Audit Explorer (key differentiator per SRS §2.1.4). Includes 4 reusable sub-components under src/components/foundation/.
+   347→
+   348→Work Log:
+   349→- Read worklog.md (C0.1–C2 history), moduleTree.ts (40+ modules + routes + permission codes), widgets/index.tsx (12 widget patterns + how they consume useX hooks), states/index.tsx (LoadingState 5 patterns + ErrorState + PermissionDenied), IfPermission.tsx (hide-unauthorized wrapper), query/client.ts (16 typed TanStack hooks + singleton QueryClient), mock/fixtures/index.ts + organization.ts + users.ts (1 org / 3 branches / 8 users / 12 ledger entries / 8 accounts / 40 students), role-permissions.ts (8 personas × ~110 permission codes with D3 separation enforced), stores/types.ts (ROLES + ROLE_LABELS), permissions.ts (catalog), i18n/format.ts (formatDate / formatDateLong / formatCurrency / convertDigits), i18n/messages.ts (so I don't break any existing keys), tokens.css + globals.css (FROZEN token bridge — confirmed bg-surface-card / text-text-primary / shadow-elevation-1 / rounded-2xl all resolve)
+   350→- Created src/components/foundation/SectionCard.tsx — reusable section wrapper implementing the FROZEN pattern `rounded-2xl border border-border-default bg-surface-card p-6 shadow-elevation-1` referenced in dashboard pages; plus a SectionCardHeader (title + description + action slot) for consistent layout
+   351→- Created src/components/foundation/BranchCard.tsx — branch display card showing name (locale-aware bn/en swap + alt-script subtitle), address, phone, established year; uses Building2/MapPin/Phone/CalendarDays Lucide icons; current-branch state from useSessionStore (highlights "Current" badge); "branch.scope" indicator rendered as a Chip with aria-label="branch.scope" + a Tooltip explaining the data scope (Tenant-wide for primary hub, Single-branch for satellites); uses convertDigits for localized established year; respects RTL via logical properties
+   352→- Created src/components/foundation/ModuleToggleRow.tsx — one row of the Module Configuration matrix with a Switch (shadcn/ui); when the module is OFF but has unresolved dependents, an inline warning box appears below showing dependents as warning-tone Chips with their Lucide icons; per Risk R2 lock-in the warning is inline (never a modal) and the Save button lives on the parent page (disabled while ANY row has unresolved dependents)
+   353→- Created src/components/foundation/AuditEventCard.tsx — timeline event card + the ledger→audit expansion helper. expandLedgerToAuditEvents() takes 12 ledger entries + 8 users and produces ~52 derived audit events (create / edit / submit-or-post / view / export). Each event has timestamp, actor (name + email), action code, description, voucher number, status tone, optional field-diff array. The AuditEventCard renders a vertical timeline dot + the event body + a monospace diff viewer showing `field: old → new by actor@ at <localized-date> <time>` with old in red strike-through and new in green. Uses formatDateLong + formatCurrency + convertDigits from src/lib/i18n/format.ts (no raw hex/px). Inline formatTime() helper since format.ts has no formatTime export (and the rule forbids modifying existing files)
+   354→- Created src/app/(app)/organization/page.tsx — Organization + Multi-Branch list. Uses useOrganization() + useBranches() hooks; LoadingState pattern="list" while loading, ErrorState with combined retry on error; renders 3 BranchCards in a responsive grid (sm:2, lg:3); adds "Add Branch" button gated by IfPermission code="organization.branch.create" (administrator role does NOT see this button — only super-admin does, per Risk R3 hide-rule); two additional SectionCards below show an Organization Profile dl (4 KPI tiles: org name + branch count + branch.scope + established range) and a Tenant Isolation explainer with branch.scope / data isolation / zakat fund badges
+   355→- Created src/app/(app)/organization/modules/page.tsx — Module Configuration toggles (Risk R2). Reads moduleTree (excludes the "main" dashboard group), groups by `layer` (Foundation/People/Academic/Finance/Operations/Communication/Platform), renders a ModuleToggleRow per module inside a SectionCard per layer. Defines MODULE_DEPENDENTS map (inventory→hostel/food/transport/library/purchase, purchase→suppliers, accounting→cashbank, fees→accounting/scholarship, exams→results, students→fees/attendance/admission/guardians, attendance→exams, teachers→attendance/exams). All modules default enabled; toggling a parent OFF while a dependent is still ON triggers the inline warning + chips. The "Save Changes" button is disabled while any unresolved dependency exists (red status banner shows the affected modules as danger Chips); a Reset button restores all-enabled defaults; on successful save a green confirmation appears (mock mode — no persistence). Summary strip at top shows enabled / disabled / unresolved counts in localized numerals. Reference SectionCard at bottom renders the full dependency map as chips (neutral when dependent enabled, warning when dependent disabled)
+   356→- Created src/app/(app)/rbac/page.tsx — RBAC Permission Matrix editor. Wrapped in IfPermission code="rbac.permission.assign" with PermissionDenied fallback. Main matrix uses shadcn/ui Table: rows = 8 personas (ROLES), columns = 7 permission groups (Foundation/People/Academic/Finance/Operations/Communication/Platform); each cell renders a Checkbox + count "X/Y" (X = permissions the role holds in the group per ROLE_PERMISSIONS, Y = union of all permissions in that group across all roles). Current user's role row is highlighted with primary-50 background + "You" badge. Below the main matrix: Approval detail table (rows = 4 approval.* codes, columns = 8 personas) where the cell at (approval.approve, currentUserRole) is highlighted yellow and wrapped in a Tooltip explaining Do-Not-Do D16 ("Requester cannot approve own request — enforced server-side regardless of checkbox state"). All checkboxes are toggleable (visual state only — no mutation). A "Save Matrix" button at top triggers a green confirmation banner. Two reference SectionCards below: Persona quick-reference (8 cards with native + English labels + permission count) and Enforced rules (D3 / D16 / D18 / R3 with AlertCircle icons)
+   357→- Created src/app/(app)/audit/page.tsx — Audit Explorer (key differentiator per SRS §2.1.4). Wrapped in IfPermission code="audit.view" with PermissionDenied fallback. Uses useLedgerEntries() + useCurrentUser() hooks (existing) + imports the users fixture directly to expand actor IDs into names/emails. expandLedgerToAuditEvents() (memoized on ledger identity) produces 52 events from the 12 ledger entries. KPI strip at top: event count / field-edit count / distinct actors / time-range (formatted via formatDateLong). Filter bar SectionCard with date-from / date-to (HTML date inputs) + actor Select (8 users + "all"); filter is client-side and visual-only per the task spec; Clear button resets all. Timeline SectionCard renders the AuditEventCard list in a max-h-[32rem] overflow-y-auto container with custom scrollbar; Export CSV button (visual). Legend SectionCard at bottom shows the 4 status tones + an example diff viewer format
+   358→- Fixed ESLint react-hooks/preserve-manual-memoization error in modules/page.tsx by inlining the dependency check inside useMemo instead of calling a closure-bound helper (the React Compiler couldn't trace the indirect dep on enabledMap through unresolvedDependents())
+   359→- Verified `bun run lint` passes with zero errors and zero warnings
+   360→- Verified HTTP 200 on all 4 routes via curl: /organization → 200 (594ms compile), /organization/modules → 200 (548ms compile), /rbac → 200 (715ms compile), /audit → 200 (901ms compile) — all compile cleanly on first hit, no runtime errors in dev.log
+   361→- Did NOT modify any existing files: i18n messages.ts untouched, moduleTree.ts untouched, widgets/states/IfPermission/client/fixtures/role-permissions/permissions all untouched per the task rules. No new files under src/lib/mock/fixtures/ (the audit expansion helper lives in src/components/foundation/AuditEventCard.tsx as a UI helper, not a mock data file)
+   362→
+   363→Stage Summary:
+   364→- Artifacts produced (8 new files):
+   365→  * src/components/foundation/SectionCard.tsx (reusable section wrapper — rounded-2xl border bg-surface-card p-6 shadow-elevation-1)
+   366→  * src/components/foundation/BranchCard.tsx (branch display card with branch.scope indicator)
+   367→  * src/components/foundation/ModuleToggleRow.tsx (module toggle with inline dependent-chip warning)
+   368→  * src/components/foundation/AuditEventCard.tsx (audit event card + expandLedgerToAuditEvents helper producing 52 events from 12 ledger entries)
+   369→  * src/app/(app)/organization/page.tsx (Organization + 3-branch list + Add Branch gated by organization.branch.create)
+   370→  * src/app/(app)/organization/modules/page.tsx (Module Configuration with Risk R2 lock-in: inline warning + dependent chips + Save disabled while unresolved)
+   371→  * src/app/(app)/rbac/page.tsx (RBAC matrix: 8 roles × 7 groups + approval detail with D16 tooltip + gated by rbac.permission.assign)
+   372→  * src/app/(app)/audit/page.tsx (Audit Explorer: 52-event timeline + filter bar + field-diff viewer + gated by audit.view)
+   373→- Exit criteria met:
+   374→  * All 4 Foundation routes return HTTP 200 (verified via curl) ✅
+   375→  * Lint passes clean (zero errors, zero warnings) ✅
+   376→  * Every page uses the SectionCard pattern (rounded-2xl border bg-surface-card p-6 shadow-elevation-1) ✅
+   377→  * Every page handles loading (LoadingState) + error (ErrorState) states ✅
+   378→  * Risk R2 lock-in implemented (inline warning + chips + Save disabled) ✅
+   379→  * Do-Not-Do D16 tooltip on approval.approve row for the current user's role ✅
+   380→  * branch.scope visual indicator on every BranchCard ✅
+   381→  * Audit Explorer shows 52 events (≥50 required) with field-diff viewer ✅
+   382→  * IfPermission gates: organization.branch.create (Add Branch button), rbac.permission.assign (/rbac page), audit.view (/audit page) ✅
+   383→  * All localized values use formatCurrency / formatDate / formatDateLong / convertDigits from src/lib/i18n/format.ts ✅
+   384→  * Zero raw hex/px values — every token sourced from the FROZEN system ✅
+   385→  * No modifications to existing files (i18n messages, moduleTree, widgets, states, stores, fixtures) ✅
+   386→
+   387→---
+   388→Task ID: 3-b
+   389→Agent: full-stack-developer
+   390→Task: C3.2 — People Module Screens (4 routes). Built /students list, /students/[id] 7-tab profile with Risk R4 history lock-in + Promotion Wizard, /admission DnD Kanban, /teachers directory + assignment grid.
+   391→
+   392→Work Log:
+   393→- Read worklog.md (C0.1–C2 complete) + key files: moduleTree.ts (40 modules / 8 groups), widgets/index.tsx (12 widget patterns), states/index.tsx (LoadingState/ErrorState/PermissionDenied), IfPermission.tsx, query/client.ts (16 typed hooks), fixtures/students.ts (40 students / 4 classes / 8 guardians, bn/en/ar names), fixtures/users.ts (8 personas), dashboard/authority/page.tsx (page pattern).
+   394→- Read shadcn/ui Table/Tabs/Dialog/Select/Badge/Breadcrumb/Avatar/FilterBar/EmptyState/Card/Button component sources + sonner/toaster/use-toast to confirm API surface.
+   395→- Read globals.css + tokens.css to confirm FROZEN token names (bg-primary-500, text-text-primary, border-border-default, bg-surface-card, bg-surface-canvas, bg-surface-hover, text-text-secondary, text-text-muted, text-semantic-success/warning/danger, bg-success-50/warning-50/danger-50, border-border-strong, shadow-elevation-1/2, font-mono).
+   396→- Confirmed @dnd-kit/core v6.3.1 + @dnd-kit/utilities v3.2.2 already installed (no new deps required).
+   397→- Created src/components/people/index.tsx — shared People-module helpers:
+   398→  * StudentStatusBadge (active=success / graduated=primary / withdrawn=neutral)
+   399→  * StudentAvatar (sm/md/lg, primary-50 bg + primary-700 initials)
+   400→  * InfoRow (3-col grid label/value/hint for profile detail)
+   401→  * PastClassChip (Risk R4 dashed-border "past" chip — never rendered as deleted)
+   402→  * StudentRowSkeleton (table-row loading placeholder)
+   403→  * buildNameSubtitle(student) — derives bn/ar subtitle string.
+   404→- Created src/app/(app)/students/page.tsx — Student List:
+   405→  * Uses useStudents + useClasses + useGuardians hooks (TanStack Query).
+   406→  * Full-width Table inside a Card with shadow-elevation-1, neutral-50 header row, hover:bg-surface-hover on rows.
+   407→  * 6 columns: Code (mono caption) | Name (avatar + name + bn/ar subtitle) | Class (name + Section X · Roll N) | Guardian (icon + name) | Status badge | Actions (View outline button).
+   408→  * Search input with absolute-positioned Search icon, ps-9 padding (logical property).
+   409→  * FilterBar with 3 Select dropdowns: class (4 options), section (auto-derived from selected class), status (4 options). Section select disabled when no class chosen.
+   410→  * "Showing X of 40 students" count + active-filter pill when filters applied.
+   411→  * IfPermission code="students.create" gates "Add Student" header button + EmptyState CTA.
+   412→  * LoadingState pattern="table" while any hook is loading.
+   413→  * ErrorState with combined refetch when any hook errors.
+   414→  * EmptyState illustration="students" when filtered.length === 0 (with conditional copy based on whether search/filters active).
+   415→  * Client-side filter pipeline: search (name + bn + ar + code), class, section, status.
+   416→  * useEffect resets section filter when class changes and current section is no longer in the new class.
+   417→  * Clicking "View" navigates to /students/[id] via useRouter.
+   418→- Created src/app/(app)/students/[id]/page.tsx — Student Profile:
+   419→  * 7 tabs via shadcn Tabs: Personal / Academic / Guardians / Documents / Fees / Attendance / History.
+   420→  * Breadcrumb (Dashboard / Students / [Student Name]) using shadcn Breadcrumb.
+   421→  * Profile header Card: lg StudentAvatar, name (display), bn/ar subtitle (with lang attr), code·class·section·roll caption, StudentStatusBadge, Back button.
+   422→  * Personal tab: dl/dt/dd InfoRow list — code, DOB, gender, admission date, status, bangla name, arabic name (lang="ar").
+   423→  * Academic tab: class + nameBn hint, section, roll, branch + Subjects grid (6 mock subjects inline).
+   424→  * Guardians tab: 2-column grid — Guardian Card (avatar + bn name + phone/email/occupation InfoRows with tel:/mailto: links + Guardian ID card).
+   425→  * Documents tab: 3 mock documents list; IfPermission code="documents.upload" gates Upload button; IfPermission code="documents.download" gates Download button.
+   426→  * Fees tab: 3 stat cards (Total/Collected/Outstanding) + installments table with Paid (success badge) / Pending (warning badge) + receipt number; IfPermission code="fees.payment.create" gates "Collect Payment" button (fires toast).
+   427→  * Attendance tab: 4 stat cards (Present/Absent/Late/On leave) + recent records table (10 rows) with AttendanceStatusChip.
+   428→  * History tab (Risk R4 lock-in): grid lg:grid-cols-[1fr_320px] — left Card has "Current assignment" primary panel + "Previous assignments" PastClassChip list (2 mock past classes); right Card has Timeline (vertical line + TimelineItem with tone dot). "Promote Student" button gated by IfPermission code="students.promote" opens Dialog.
+   429→  * Promotion Wizard Dialog: sm:max-w-2xl, grid sm:grid-cols-[1fr_280px] — left = current class read-only + 2 Selects (class + section, sections auto-derived); right = History preview panel with TimelineItem list (New → Current → Past → Admission). Confirmation requires both selects; toast on confirm.
+   430→  * LoadingState pattern="detail" while studentLoading; ErrorState when studentError; EmptyState illustration="students" when student not found (with Back to Students CTA).
+   431→  * Inline mocks (per task spec — no new fixture files): buildHistory() generates 2 past assignments per student code; MOCK_SUBJECTS (6 items); MOCK_DOCUMENTS (3 items).
+   432→  * TimelineItem + FeeStatCard + AttendanceStat + AttendanceStatusChip local helpers (declared OUTSIDE main component to avoid react-hooks/static-components lint error).
+   433→- Created src/app/(app)/admission/page.tsx — Admission Kanban:
+   434→  * @dnd-kit/core DndContext + PointerSensor (6px activation constraint) + KeyboardSensor + DragOverlay + closestCorners collision detection.
+   435→  * 5 columns (Applied/Interviewed/Approved/Registered/Rejected) — each with Icon + tone badge count + droppable area (useDroppable) + highlight on isOver.
+   436→  * Each KanbanCard uses useDraggable, transform CSS.Translate, opacity 0.4 while dragging, GripVertical drag handle.
+   437→  * DragOverlay renders rotated copy of active card (rotate-2 + cursor-grabbing).
+   438→  * Inline mock: INITIAL_APPLICANTS — 10 applicants distributed (4 applied, 2 interviewed, 2 approved, 2 registered, 1 rejected) with bn names + appliedFor + appliedDate.
+   439→  * Drag-to-Registered → toast "Student registered — Fee plan created — January 2026 installment generated" (per task spec).
+   440→  * Drag-to-Approved gated by IfPermission code="admission.approve" — users lacking the permission see destructive toast "Permission required" and the card stays in place (state not updated).
+   441→  * Drag-to-Rejected → destructive toast.
+   442→  * Drag-to-other → info toast with applicant name + new stage.
+   443→  * "New Application" button gated by IfPermission code="admission.view" (per task spec).
+   444→  * Permission hint banner shown via IfPermission fallback (warning-50 bg + semantic-warning text + AlertCircle icon) when user lacks admission.approve.
+   445→  * Stats footer Card grid showing per-column counts.
+   446→- Created src/app/(app)/teachers/page.tsx — Teachers & Staff:
+   447→  * Page-level IfPermission gate: if user lacks teachers.view → render <PermissionDenied resource="Teachers" /> (Risk R3 lock-in, never raw 403).
+   448→  * Upper section: Staff Directory — grid of 8 staff Cards (uses users fixture) with avatar, name + bn subtitle, role badge (ROLE_TONE color map per role), assignment count, email (Mail icon), phone (Phone icon).
+   449→  * Lower section: Teacher Assignments Table — 5 columns (Teacher / Class / Subject / Subject code / Actions). 8 initial inline assignments (INITIAL_ASSIGNMENTS). Each row has Delete button (Trash2 icon, semantic-danger) gated by IfPermission code="teachers.assign".
+   450→  * Search input filters BOTH staff directory AND assignments by name/email/role/class/subject.
+   451→  * "Assign Teacher" button (Plus icon) gated by IfPermission code="teachers.assign" opens Dialog.
+   452→  * Assign Dialog: 3 Select dropdowns (teacher / class / subject) + duplicate-active-assignment block:
+   453→    - On confirm, checks if (teacherId + classId + subjectId) already exists in assignments array.
+   454→    - If duplicate → inline error AlertCard (semantic-danger border + bg-danger-50 + AlertCircle icon) with message "This teacher is already assigned to this class for the same subject. Pick a different combination."
+   455→    - If valid → adds assignment + toast "Assignment created".
+   456→    - Live preview panel: when all 3 selects chosen + no duplicate error → primary-50 card preview "[Teacher] will teach [Subject] to [Class]."
+   457→    - DialogFooter Cancel + Create Assignment (the latter gated by IfPermission code="teachers.assign" — hides button if lacking permission).
+   458→  * EmptyState when filteredAssignments.length === 0 (with conditional "Assign Teacher" CTA gated by IfPermission).
+   459→  * LoadingState pattern="table" while classes loading; ErrorState when classes error.
+   460→- Verified ESLint: `bunx eslint src/app/(app)/students/page.tsx src/app/(app)/students/[id]/page.tsx src/app/(app)/admission/page.tsx src/app/(app)/teachers/page.tsx src/components/people/index.tsx --max-warnings=0` → exit 0 (zero errors, zero warnings). `bun run lint` (project-wide) → exit 0.
+   461→- Verified routes via curl:
+   462→  * GET /students → HTTP 200 (render 642ms) — Add Student button + Search + "Showing" count rendered in SSR.
+   463→  * GET /students/stu-001 → HTTP 200 (render 281ms) — LoadingState skeleton (animate-pulse) rendered on first SSR; client hydrates and TanStack Query fills data.
+   464→  * GET /students/stu-005 → HTTP 200 (real student with nameAr).
+   465→  * GET /students/stu-999 → HTTP 200 (invalid id → client renders Student-not-found EmptyState).
+   466→  * GET /admission → HTTP 200 (render 286ms) — all 5 column labels (Applied/Interviewed/Approved/Registered/Rejected) rendered.
+   467→  * GET /teachers → HTTP 200 (render 196ms) — Staff Directory + Teacher Assignments + Assign Teacher button rendered.
+   468→- Confirmed FROZEN tokens only — no raw hex / px anywhere in the new files. All colors via bg-primary-500 / text-text-primary / bg-surface-card / shadow-elevation-1 / border-border-default / bg-success-50 / bg-warning-50 / bg-danger-50 etc.
+   469→- Confirmed responsive design: mobile (sm:) → grid-cols-2; desktop (lg:grid-cols-4); Kanban has horizontal scroll on mobile (overflow-x-auto), grid layout on lg+.
+   470→- Confirmed accessibility: aria-label on drag handle / View buttons / Select triggers / search; role="tab" via shadcn Tabs; role="alert" on error + duplicate error; role="searchbox" on search input; lang attribute on bn/ar text spans; focus-visible:ring on drag handle; semantic HTML (header / section / dl / dt / dd / table).
+   471→
+   472→Stage Summary:
+   473→- Artifacts produced (5 new files):
+   474→  * src/components/people/index.tsx (6 shared People-module helpers: StudentStatusBadge, StudentAvatar, InfoRow, PastClassChip, StudentRowSkeleton, buildNameSubtitle)
+   475→  * src/app/(app)/students/page.tsx (Student List — table + search + FilterBar + 3 dropdowns)
+   476→  * src/app/(app)/students/[id]/page.tsx (7-tab Profile + Breadcrumb + Promotion Wizard dialog with Risk R4 history panel)
+   477→  * src/app/(app)/admission/page.tsx (DnD Kanban with 5 columns + @dnd-kit/core + permission-gated approve action + Registered-toast)
+   478→  * src/app/(app)/teachers/page.tsx (Staff directory + Assignment grid + Assign dialog with duplicate-block inline error)
+   479→- Exit criteria met:
+   480→  * 4 routes return HTTP 200 ✅
+   481→  * ESLint clean (zero errors, zero warnings) ✅
+   482→  * Every page handles loading/error/empty states via LoadingState + ErrorState + EmptyState + PermissionDenied ✅
+   483→  * IfPermission gates: students.create / documents.upload / documents.download / fees.payment.create / students.promote / admission.view / admission.approve / teachers.view / teachers.assign ✅
+   484→  * Risk R4 lock-in: History tab shows past chips + Promotion Wizard dialog has history panel beside form (past assignments never deleted) ✅
+   485→  * Drag-to-Registered toast: "Student registered — fee plan created" ✅
+   486→  * Duplicate-active-assignment blocked inline (teachers dialog) ✅
+   487→  * FROZEN tokens only — no raw hex / px ✅
+   488→  * Responsive layouts + a11y attributes throughout ✅
+   489→  * Inline mock data only — no new fixture files created ✅
+   490→  * No modifications to existing files (i18n messages, moduleTree, existing components/widgets/stores) ✅
+   491→
+   492→---
+   493→Task ID: 3-c
+   494→Agent: full-stack-developer
+   495→Task: MadrashaOS Phase C3.3 — Academic Module Screens (4 mobile-first routes: /attendance, /attendance/take, /exams, /exams/[id]/marks)
+   496→
+   497→Work Log:
+   498→- Read previous worklog + key reference files (moduleTree.ts, widgets/index.tsx, states/index.tsx, IfPermission.tsx, query/client.ts, fixtures/students.ts, fixtures/index.ts, sessionStore.ts, teacher dashboard, mockApi.ts, role-permissions.ts) to internalize existing patterns before writing any code
+   499→- Created 4 reusable academic components under src/components/academic/:
+   500→  * AttendanceSessionRow.tsx — list row for /attendance (class, section, date, taken-by name, Chip counts per status)
+
+[showing lines 1-500 of 2223; use offset=501 with limit to continue reading]

@@ -1,0 +1,1389 @@
+     1→# MadrashaOS — Entity Relationship Diagram
+     2→
+     3→> **Phase B0 · Task B0.2**
+     4→>
+     5→> Source of truth: `MADRASHAOS Implementation-Grade SRS v2.0` (Parts 6, 7) ·
+     6→> `BACKEND_IMPLEMENTATION_PLAN.md` (Phase B0) ·
+     7→> `src/lib/mock/types.ts` (data contract) ·
+     8→> `src/stores/types.ts` (8 roles) ·
+     9→> `src/lib/auth/permissions.ts` (110+ permission codes) ·
+    10→> `src/lib/auth/role-permissions.ts` (role → permission map).
+    11→>
+    12→> Audience: Backend engineers, DBAs, reviewers. This document is the
+    13→> canonical reference for `prisma/schema.prisma` (Phase B0.3) and the
+    14→> migrations in Phases B1.1–B1.3.
+    15→
+    16→---
+    17→
+    18→## TL;DR
+    19→
+    20→| Layer | Tables | Relations | Junction Tables |
+    21→|---|---|---|---|
+    22→| Foundation | 10 | 14 | `role_permissions` |
+    23→| People | 9 | 16 | `student_guardians` |
+    24→| Academic | 8 | 18 | — |
+    25→| Finance | 9 | 22 | — |
+    26→| Operations | 12 | 20 | — |
+    27→| Communication | 4 | 8 | — |
+    28→| **Total** | **52 tables** | **98 relations** | **2 junction tables** |
+    29→
+    30→> The original SRS lists ~40 tables; this ERD documents **52** because it
+    31→> splits out the four cross-cutting junction / history tables required by
+    32→> the multi-tenant + audit + fund-isolation rules:
+    33→> `role_permissions`, `student_guardians`, `student_history`, `purchase_items`.
+    34→>
+    35→> Enum count: **14** (`Role`, `PermissionCode`, `Gender`, `StudentStatus`,
+    36→> `AttendanceStatus`, `ExamStatus`, `MarkGrade`, `FundType`, `AccountType`,
+    37→> `FeeMethod`, `LedgerStatus`, `ApprovalType`, `ApprovalStatus`,
+    38→> `NoticeAudience`, `DocumentType`).
+    39→
+    40→---
+    41→
+    42→## Table Inventory by Module Layer
+    43→
+    44→### Foundation (10 tables)
+    45→
+    46→| # | Table | Description |
+    47→|---|---|---|
+    48→| F1 | `organizations` | Top-level tenant (a single madrasha trust). Root of the multi-tenant tree. |
+    49→| F2 | `branches` | Campus / branch under an organization (Dhaka, Chittagong, Sylhet). |
+    50→| F3 | `users` | Login accounts. Each user has exactly one `role_id` and is scoped to a `branch_id`. |
+    51→| F4 | `roles` | The 8 personas from `stores/types.ts` (`super-admin` … `student`). |
+    52→| F5 | `permissions` | Catalog of 110+ permission codes from `auth/permissions.ts`. |
+    53→| F6 | `role_permissions` | M:M junction between `roles` and `permissions`. |
+    54→| F7 | `audit_logs` | Field-level diff audit trail (SRS §2.1.4, §3.4). |
+    55→| F8 | `module_configs` | Per-branch module on/off toggles (SRS §2.1.2). |
+    56→| F9 | `security_policies` | Password rules, MFA policy, session TTL, IP allowlist. |
+    57→| F10 | `backup_records` | Backup run history (manual + scheduled). |
+    58→
+    59→### People (9 tables)
+    60→
+    61→| # | Table | Description |
+    62→|---|---|---|
+    63→| P1 | `classes` | Academic grade level (e.g. "Class 5"). Branch-scoped. |
+    64→| P2 | `sections` | Section within a class (A, B, C). |
+    65→| P3 | `students` | Enrolled student. Linked to `class_id` + `section_id`. |
+    66→| P4 | `guardians` | Parent / guardian contact. |
+    67→| P5 | `student_guardians` | M:M junction — a student can have multiple guardians. |
+    68→| P6 | `teachers` | Teacher profile (1:1 with a `users` row of role `teacher`). |
+    69→| P7 | `employees` | Non-teaching staff (1:1 with a `users` row). |
+    70→| P8 | `admissions` | Admission pipeline (pending → approved → student created). |
+    71→| P9 | `teacher_assignments` | Teacher × Class × Section × Subject assignment. |
+    72→
+    73→### Academic (8 tables)
+    74→
+    75→| # | Table | Description |
+    76→|---|---|---|
+    77→| A1 | `subjects` | Subject catalog (Quran, Hadith, Bangla, Math, …). |
+    78→| A2 | `routines` | Class × Day × Period × Subject × Teacher slot. |
+    79→| A3 | `attendance_sessions` | One teacher's attendance pass for one class+section+date. |
+    80→| A4 | `attendance_records` | Per-student attendance row inside a session. |
+    81→| A5 | `exams` | Exam definition (term, date, class, subject). |
+    82→| A6 | `marks` | One student's mark in one exam × subject. |
+    83→| A7 | `results` | Aggregated GPA + position per student × exam. |
+    84→| A8 | `student_history` | Promotion history (Risk R4 — full audit of class changes). |
+    85→
+    86→### Finance (9 tables)
+    87→
+    88→| # | Table | Description |
+    89→|---|---|---|
+    90→| $1 | `accounts` | Chart of accounts. `fund` column isolates Zakat (C6/D18). |
+    91→| $2 | `fee_plans` | Yearly fee plan per student. |
+    92→| $3 | `fee_installments` | Installment schedule under a fee plan. |
+    93→| $4 | `fee_payments` | Receipt for a collected installment. |
+    94→| $5 | `scholarships` | Scholarship / discount granted to a student. |
+    95→| $6 | `ledger_entries` | Balanced double-entry row (debit = credit — Golden Flow §3.6). |
+    96→| $7 | `cash_bank_transfers` | Inter-account transfer (cash ↔ bank ↔ mobile). |
+    97→| $8 | `zakat_transactions` | Zakat receive / distribute (fund = `zakat` enforced). |
+    98→| $9 | `donations` | Public donation (general fund only — public form on `/donate`). |
+    99→
+   100→### Operations (12 tables)
+   101→
+   102→| # | Table | Description |
+   103→|---|---|---|
+   104→| O1 | `inventory_items` | Stock item (book, pen, uniform, …). |
+   105→| O2 | `purchases` | Purchase order header. |
+   106→| O3 | `purchase_items` | Line items under a purchase. |
+   107→| O4 | `suppliers` | Vendor master. |
+   108→| O5 | `assets` | Fixed asset (furniture, equipment). |
+   109→| O6 | `hostel_rooms` | Hostel room. |
+   110→| O7 | `hostel_beds` | Bed allocation (bed × student × date range). |
+   111→| O8 | `meal_plans` | Daily / weekly meal plan. |
+   112→| O9 | `library_books` | Book catalog copy. |
+   113→| O10 | `library_issues` | Issue + return tracking. |
+   114→| O11 | `vehicles` | Transport vehicle. |
+   115→| O12 | `fuel_logs` | Vehicle fuel / maintenance log. |
+   116→
+   117→### Communication (4 tables)
+   118→
+   119→| # | Table | Description |
+   120→|---|---|---|
+   121→| C1 | `notices` | Notice / announcement (audience-scoped). |
+   122→| C2 | `documents` | Uploaded document (PDF, image, …). |
+   123→| C3 | `reports` | Generated report (filtered + async export). |
+   124→| C4 | `approvals` | Approval workflow (no self-approve — D16). |
+   125→
+   126→**Grand total: 52 tables.**
+   127→
+   128→---
+   129→
+   130→## Naming Conventions
+   131→
+   132→| Convention | Rule | Rationale |
+   133→|---|---|---|
+   134→| Table names | `snake_case`, **plural** (`students`, `fee_payments`) | SRS §7 + PostgreSQL idiom. |
+   135→| Column names | `snake_case`, singular (`name`, `organization_id`) | SRS §7. |
+   136→| Primary key | `id`, type `uuid`, default `uuid_generate_v4()` | SRS §7 + BP9. |
+   137→| Foreign key | `{referenced_table_singular}_id` (`student_id`, `branch_id`) | SRS §7. |
+   138→| Timestamps | `*_at` suffix, type `timestamptz` (`created_at`, `paid_at`) | SRS §7. |
+   139→| Boolean columns | `is_*` or `has_*` prefix (`is_active`, `has_arabic_name`) | Self-documenting. |
+   140→| Money columns | `numeric(14, 2)` (BDT, **not** integer paisa) | SRS §3.6 — mock layer uses taka. |
+   141→| Enums | `snake_case` constants in a Postgres enum (`'present'`, `'absent'`) | SRS §7. |
+   142→| Junction tables | `{a_singular}_{b_plural}` (`role_permissions`, `student_guardians`) | SRS §7. |
+   143→| Prisma model | `camelCase` Singular mapped to plural table via `@@map("students")` | BP8. |
+   144→| Schema | `public` (default) | SRS §7. |
+   145→
+   146→### Base Mixin (applied to EVERY table except `organizations`)
+   147→
+   148→Every table carries these 8 columns. They are omitted from the per-table
+   149→column listings in `DATA_DICTIONARY.md` for brevity, but they ALWAYS exist.
+   150→
+   151→| Column | Type | Nullable | Default | Notes |
+   152→|---|---|---|---|---|
+   153→| `id` | `uuid` | NO | `uuid_generate_v4()` | PK |
+   154→| `organization_id` | `uuid` | NO | — | FK → `organizations.id` (tenant isolation) |
+   155→| `branch_id` | `uuid` | YES | NULL | FK → `branches.id`. NULL only for platform-level rows (`organizations` itself, the global seed `permissions` catalog). |
+   156→| `created_at` | `timestamptz` | NO | `NOW()` | Record creation timestamp. |
+   157→| `updated_at` | `timestamptz` | NO | `NOW()` | Updated via Prisma middleware or DB trigger. |
+   158→| `deleted_at` | `timestamptz` | YES | NULL | Soft-delete timestamp (BP7). NULL = active. |
+   159→| `created_by` | `uuid` | YES | NULL | FK → `users.id` of creator. |
+   160→| `updated_by` | `uuid` | YES | NULL | FK → `users.id` of last updater. |
+   161→
+   162→> **Exception:** `organizations` itself has no `organization_id` (it IS the
+   163→> tenant root). `permissions` catalog rows may have NULL `organization_id`
+   164→> (they are seeded globally, not per tenant).
+   165→
+   166→---
+   167→
+   168→## Multi-Tenant Isolation Strategy
+   169→
+   170→> **BP1 (Governing Principle #1):** Every query MUST be scoped by
+   171→> `organization_id` + `branch_id`. No exceptions.
+   172→
+   173→### Three-level tenancy
+   174→
+   175→```
+   176→organization (tenant)
+   177→└── branch (campus)
+   178→    └── record (any table)
+   179→```
+   180→
+   181→### Scoping rules
+   182→
+   183→| Layer | Column value | Visibility |
+   184→|---|---|---|
+   185→| Platform (`super-admin`) | `organization_id = NULL` allowed | All tenants |
+   186→| Tenant (`authority`, `administrator`, …) | `organization_id = <tenant>` | One tenant, all its branches |
+   187→| Branch (`teacher`, `storekeeper`, …) | `organization_id = <t>` + `branch_id = <b>` | One branch only |
+   188→| Self (`guardian`, `student`) | Above + `student_id IN (linked)` | Own / linked records only |
+   189→
+   190→### Enforcement
+   191→
+   192→1. **Prisma middleware** (BP1, SRS §7) injects `where: { organization_id, branch_id }` on every read and every create.
+   193→2. **API middleware** (BP2, Phase B2.2) extracts `organization_id` + `branch_id` from the JWT session and refuses queries that cross scopes (HTTP 403).
+   194→3. **Database RLS (Row-Level Security)** — optional hardening layer for production (Phase B9). When enabled, every table gets a policy like:
+   195→   ```sql
+   196→   CREATE POLICY tenant_isolation ON students
+   197→     USING (organization_id = current_setting('app.organization_id')::uuid);
+   198→   ```
+   199→
+   200→### Cross-tenant reads
+   201→
+   202→`super-admin` reads use `SET LOCAL app.organization_id = NULL` to bypass
+   203→the policy. Cross-tenant writes (provisioning a new tenant) go through
+   204→the dedicated `tenant.provision` permission gate.
+   205→
+   206→---
+   207→
+   208→## Index Strategy
+   209→
+   210→> **SRS §7.3 — Indexing Rules.** Every query that the mock API supports must
+   211→> hit an index. The mock API surfaces these access patterns; we mirror them
+   212→> at the DB level.
+   213→
+   214→### Mandatory indexes (on EVERY table)
+   215→
+   216→| Index | Columns | Why |
+   217→|---|---|---|
+   218→| `idx_{table}_org_branch` | `(organization_id, branch_id)` | Composite — every query starts with tenant scope. |
+   219→| `idx_{table}_deleted_at` | `(deleted_at)` WHERE `deleted_at IS NULL` | Partial index — soft-delete filter is on every read. |
+   220→| `idx_{table}_created_at` | `(created_at DESC)` | Sort by recent (dashboards, audit). |
+   221→
+   222→### Per-table indexes (selected)
+   223→
+   224→| Table | Index | Columns |
+   225→|---|---|---|
+   226→| `students` | `idx_students_code` | `(organization_id, code)` UNIQUE |
+   227→| `students` | `idx_students_class_section` | `(class_id, section_id)` |
+   228→| `students` | `idx_students_guardian` | `(guardian_id)` |
+   229→| `attendance_records` | `idx_att_records_student_date` | `(student_id, session_id)` UNIQUE |
+   230→| `attendance_sessions` | `idx_att_session_class_date` | `(class_id, section_id, date)` UNIQUE |
+   231→| `fee_payments` | `idx_fee_payments_receipt` | `(organization_id, receipt_no)` UNIQUE |
+   232→| `fee_payments` | `idx_fee_payments_student` | `(student_id, collected_at DESC)` |
+   233→| `ledger_entries` | `idx_ledger_voucher` | `(organization_id, voucher_no)` UNIQUE |
+   234→| `ledger_entries` | `idx_ledger_date` | `(date DESC)` |
+   235→| `ledger_entries` | `idx_ledger_debit_credit` | `(debit_account_id, credit_account_id)` |
+   236→| `accounts` | `idx_accounts_fund` | `(fund)` — Zakat isolation queries |
+   237→| `marks` | `idx_marks_unique` | `(exam_id, student_id, subject_id)` UNIQUE |
+   238→| `results` | `idx_results_unique` | `(exam_id, student_id)` UNIQUE |
+   239→| `library_issues` | `idx_issues_open` | `(book_id, returned_at)` WHERE `returned_at IS NULL` |
+   240→| `audit_logs` | `idx_audit_entity` | `(entity_type, entity_id, created_at DESC)` |
+   241→| `notices` | `idx_notices_branch_audience` | `(branch_id, audience, sent_at DESC)` |
+   242→
+   243→### Money columns
+   244→
+   245→Always `numeric(14, 2)` — never `integer` paisa. Rationale: SRS §3.6 +
+   246→the mock layer is already in taka (BDT). 14 digits supports up to
+   247→৳999,999,999,999.99 — more than enough for a madrasha.
+   248→
+   249→---
+   250→
+   251→## Enum Definitions
+   252→
+   253→> Postgres `CREATE TYPE` enums. In Prisma these are declared as
+   254→> `enum Foo { ... }` blocks at the top of `schema.prisma`.
+   255→
+   256→| Enum | Values | Used by |
+   257→|---|---|---|
+   258→| `Role` | `super-admin`, `authority`, `administrator`, `accountant`, `teacher`, `storekeeper`, `guardian`, `student` | `users.role_id` (via FK → `roles.code`) |
+   259→| `Gender` | `male`, `female` | `students.gender` |
+   260→| `StudentStatus` | `active`, `graduated`, `withdrawn` | `students.status` |
+   261→| `AttendanceStatus` | `present`, `absent`, `late`, `leave` | `attendance_records.status` |
+   262→| `ExamStatus` | `draft`, `marks-entry`, `published` | `exams.status` |
+   263→| `MarkGrade` | `a-plus`, `a`, `a-minus`, `b`, `c`, `d`, `f` | `marks.grade` |
+   264→| `FundType` | `general`, `zakat` | `accounts.fund` |
+   265→| `AccountType` | `asset`, `liability`, `equity`, `income`, `expense` | `accounts.type` |
+   266→| `FeeMethod` | `cash`, `bank`, `mobile` | `fee_payments.method` |
+   267→| `LedgerStatus` | `pending`, `posted`, `rejected` | `ledger_entries.status` |
+   268→| `ApprovalType` | `expense`, `purchase`, `discount`, `admission` | `approvals.type` |
+   269→| `ApprovalStatus` | `pending`, `approved`, `rejected` | `approvals.status` |
+   270→| `NoticeAudience` | `all`, `class`, `guardians`, `staff` | `notices.audience` |
+   271→| `DocumentType` | `pdf`, `image`, `spreadsheet`, `other` | `documents.type` |
+   272→| `ApprovalDecision` | `approved`, `rejected` | used inside approval flow audit |
+   273→| `AdmissionStatus` | `pending`, `approved`, `rejected`, `enrolled` | `admissions.status` |
+   274→
+   275→> **`PermissionCode`** is **not** an enum in Postgres — it's a `varchar(64)`
+   276→> column on the `permissions` table with a CHECK against the 110+ codes
+   277→> listed in `src/lib/auth/permissions.ts`. Reason: the catalog is
+   278→> extensible (modules can register new codes at runtime), so it cannot
+   279→> be a static enum.
+   280→
+   281→---
+   282→
+   283→## ERD Diagrams (one per module layer)
+   284→
+   285→Each diagram is a self-contained `erDiagram` block in Mermaid syntax.
+   286→Cross-module FKs are noted as comments where a Mermaid arrow would
+   287→otherwise cross subgraph boundaries (Mermaid `erDiagram` does not support
+   288→cross-diagram arrows).
+   289→
+   290→### 1. Foundation Layer
+   291→
+   292→```mermaid
+   293→erDiagram
+   294→    organizations ||--o{ branches : "owns"
+   295→    organizations ||--o{ users : "tenants"
+   296→    organizations ||--o{ module_configs : "configures"
+   297→    organizations ||--o{ security_policies : "governs"
+   298→    organizations ||--o{ backup_records : "backs up"
+   299→    organizations ||--o{ audit_logs : "audits"
+   300→    branches ||--o{ users : "scopes"
+   301→    branches ||--o{ module_configs : "overrides"
+   302→    branches ||--o{ audit_logs : "scopes"
+   303→    roles ||--o{ users : "assigned to"
+   304→    roles ||--o{ role_permissions : "has"
+   305→    permissions ||--o{ role_permissions : "granted by"
+   306→    users ||--o{ audit_logs : "actor"
+   307→
+   308→    organizations {
+   309→        uuid id PK
+   310→        string name
+   311→        string name_bn
+   312→        string slug UK
+   313→        string phone
+   314→        string email
+   315→        string address
+   316→        string logo_url
+   317→        jsonb settings
+   318→        timestamptz created_at
+   319→        timestamptz updated_at
+   320→        timestamptz deleted_at
+   321→    }
+   322→
+   323→    branches {
+   324→        uuid id PK
+   325→        uuid organization_id FK
+   326→        string code "dhaka|chittagong|sylhet"
+   327→        string name
+   328→        string name_bn
+   329→        string address
+   330→        string phone
+   331→        int established_year
+   332→        boolean is_active
+   333→    }
+   334→
+   335→    users {
+   336→        uuid id PK
+   337→        uuid organization_id FK
+   338→        uuid branch_id FK
+   339→        uuid role_id FK
+   340→        string name
+   341→        string name_bn
+   342→        string email UK
+   343→        string phone
+   344→        string password_hash
+   345→        string avatar_initial
+   346→        string status "active|disabled"
+   347→        timestamptz last_login_at
+   348→        jsonb mfa "totp_secret, enabled"
+   349→    }
+   350→
+   351→    roles {
+   352→        uuid id PK
+   353→        uuid organization_id FK "NULL = global"
+   354→        string code UK "super-admin|authority|..."
+   355→        string name
+   356→        string name_bn
+   357→        text description
+   358→        boolean is_system "true = cannot delete"
+   359→    }
+   360→
+   361→    permissions {
+   362→        uuid id PK
+   363→        string code UK "fees.payment.create"
+   364→        string module "foundation|people|academic|..."
+   365→        string description
+   366→        boolean is_system
+   367→    }
+   368→
+   369→    role_permissions {
+   370→        uuid id PK
+   371→        uuid role_id FK
+   372→        uuid permission_id FK
+   373→        timestamptz granted_at
+   374→    }
+   375→
+   376→    audit_logs {
+   377→        uuid id PK
+   378→        uuid organization_id FK
+   379→        uuid branch_id FK
+   380→        uuid actor_user_id FK "users.id"
+   381→        string action "create|update|delete|login|..."
+   382→        string entity_type "students|fee_payments|..."
+   383→        uuid entity_id
+   384→        jsonb before
+   385→        jsonb after
+   386→        text diff_summary
+   387→        string ip_address
+   388→        string user_agent
+   389→        timestamptz created_at
+   390→    }
+   391→
+   392→    module_configs {
+   393→        uuid id PK
+   394→        uuid organization_id FK
+   395→        uuid branch_id FK "NULL = org-level default"
+   396→        string module_key "fees|library|hostel|..."
+   397→        boolean is_enabled
+   398→        jsonb config "module-specific knobs"
+   399→    }
+   400→
+   401→    security_policies {
+   402→        uuid id PK
+   403→        uuid organization_id FK
+   404→        int password_min_length
+   405→        boolean password_require_special
+   406→        boolean password_require_digit
+   407→        boolean password_require_upper
+   408→        int password_expiry_days
+   409→        boolean mfa_required
+   410→        int session_ttl_minutes
+   411→        jsonb ip_allowlist
+   412→    }
+   413→
+   414→    backup_records {
+   415→        uuid id PK
+   416→        uuid organization_id FK
+   417→        string backup_type "manual|scheduled"
+   418→        string status "running|completed|failed"
+   419→        bigint size_bytes
+   420→        string storage_url
+   421→        text error_message
+   422→        uuid triggered_by FK "users.id"
+   423→        timestamptz started_at
+   424→        timestamptz completed_at
+   425→    }
+   426→```
+   427→
+   428→### 2. People Layer
+   429→
+   430→```mermaid
+   431→erDiagram
+   432→    branches ||--o{ classes : "hosts"
+   433→    classes ||--o{ sections : "has"
+   434→    classes ||--o{ students : "enrolls"
+   435→    sections ||--o{ students : "groups"
+   436→    students ||--o{ student_guardians : "linked to"
+   437→    guardians ||--o{ student_guardians : "cares for"
+   438→    students ||--o{ admissions : "applied via"
+   439→    users ||--|| teachers : "is profile of"
+   440→    users ||--|| employees : "is profile of"
+   441→    classes ||--o{ teacher_assignments : "taught in"
+   442→    sections ||--o{ teacher_assignments : "section"
+   443→    teachers ||--o{ teacher_assignments : "teaches"
+   444→    subjects ||--o{ teacher_assignments : "subject"
+   445→
+   446→    classes {
+   447→        uuid id PK
+   448→        uuid organization_id FK
+   449→        uuid branch_id FK
+   450→        string name "Class 5"
+   451→        string name_bn
+   452→        int level
+   453→        boolean is_active
+   454→    }
+   455→
+   456→    sections {
+   457→        uuid id PK
+   458→        uuid organization_id FK
+   459→        uuid branch_id FK
+   460→        uuid class_id FK
+   461→        string name "A|B|C"
+   462→        int capacity
+   463→        uuid teacher_id FK "class teacher"
+   464→    }
+   465→
+   466→    students {
+   467→        uuid id PK
+   468→        uuid organization_id FK
+   469→        uuid branch_id FK
+   470→        string code UK "MOS-2026-001"
+   471→        string name
+   472→        string name_bn
+   473→        string name_ar "nullable"
+   474→        uuid class_id FK
+   475→        uuid section_id FK
+   476→        int roll
+   477→        gender gender "male|female"
+   478→        date dob
+   479→        date admitted_at
+   480→        string status "active|graduated|withdrawn"
+   481→        text special_notes "permission-gated: students.notes.view"
+   482→        string blood_group
+   483→        string present_address
+   484→        string permanent_address
+   485→    }
+   486→
+   487→    guardians {
+   488→        uuid id PK
+   489→        uuid organization_id FK
+   490→        uuid branch_id FK
+   491→        string name
+   492→        string name_bn
+   493→        string phone
+   494→        string email
+   495→        string occupation
+   496→        string relation "father|mother|guardian"
+   497→        string nid_number "national ID"
+   498→        boolean is_primary
+   499→    }
+   500→
+   501→    student_guardians {
+   502→        uuid id PK
+   503→        uuid student_id FK
+   504→        uuid guardian_id FK
+   505→        string relation
+   506→        boolean is_primary
+   507→        boolean can_pickup
+   508→    }
+   509→
+   510→    teachers {
+   511→        uuid id PK
+   512→        uuid organization_id FK
+   513→        uuid branch_id FK
+   514→        uuid user_id FK "1:1 with users"
+   515→        string employee_code
+   516→        string designation
+   517→        string qualification
+   518→        date joined_at
+   519→        numeric salary
+   520→        string status "active|on-leave|resigned"
+   521→    }
+   522→
+   523→    employees {
+   524→        uuid id PK
+   525→        uuid organization_id FK
+   526→        uuid branch_id FK
+   527→        uuid user_id FK "1:1 with users"
+   528→        string employee_code
+   529→        string designation "accountant|librarian|..."
+   530→        string department
+   531→        date joined_at
+   532→        date left_at
+   533→        numeric salary
+   534→        string status
+   535→    }
+   536→
+   537→    admissions {
+   538→        uuid id PK
+   539→        uuid organization_id FK
+   540→        uuid branch_id FK
+   541→        string applicant_name
+   542→        string applicant_name_bn
+   543→        string parent_name
+   544→        string phone
+   545→        string email
+   546→        string desired_class
+   547→        string desired_program
+   548→        jsonb previous_education
+   549→        text notes
+   550→        string status "pending|approved|rejected|enrolled"
+   551→        uuid student_id FK "set when enrolled"
+   552→        uuid requested_by FK "users.id"
+   553→        uuid decided_by FK "users.id"
+   554→        timestamptz decided_at
+   555→        text rejection_reason
+   556→    }
+   557→
+   558→    teacher_assignments {
+   559→        uuid id PK
+   560→        uuid organization_id FK
+   561→        uuid branch_id FK
+   562→        uuid teacher_id FK
+   563→        uuid class_id FK
+   564→        uuid section_id FK
+   565→        uuid subject_id FK
+   566→        int academic_year
+   567→        boolean is_active
+   568→    }
+   569→```
+   570→
+   571→> **Note:** `subjects` (the catalog) is documented in the Academic layer
+   572→> diagram below, but `teacher_assignments` references it here. The FK
+   573→> crosses module layers — see **Cross-Module Relations** at the end.
+   574→
+   575→### 3. Academic Layer
+   576→
+   577→```mermaid
+   578→erDiagram
+   579→    branches ||--o{ subjects : "teaches"
+   580→    classes ||--o{ routines : "scheduled in"
+   581→    subjects ||--o{ routines : "subject of"
+   582→    teachers ||--o{ routines : "taught by"
+   583→    classes ||--o{ attendance_sessions : "taken for"
+   584→    sections ||--o{ attendance_sessions : "section"
+   585→    teachers ||--o{ attendance_sessions : "taken_by"
+   586→    attendance_sessions ||--o{ attendance_records : "contains"
+   587→    students ||--o{ attendance_records : "marked for"
+   588→    classes ||--o{ exams : "exam for"
+   589→    subjects ||--o{ exams : "subject of"
+   590→    exams ||--o{ marks : "yields"
+   591→    students ||--o{ marks : "earned by"
+   592→    subjects ||--o{ marks : "subject of"
+   593→    exams ||--o{ results : "aggregates to"
+   594→    students ||--o{ results : "ranked for"
+   595→    students ||--o{ student_history : "promoted through"
+   596→
+   597→    subjects {
+   598→        uuid id PK
+   599→        uuid organization_id FK
+   600→        uuid branch_id FK
+   601→        string code "QUR-101"
+   602→        string name
+   603→        string name_bn
+   604→        string name_ar "nullable"
+   605→        boolean is_quranic "true for Quran/Hadith subjects"
+   606→        int full_marks
+   607→        int pass_marks
+   608→        boolean is_active
+   609→    }
+   610→
+   611→    routines {
+   612→        uuid id PK
+   613→        uuid organization_id FK
+   614→        uuid branch_id FK
+   615→        uuid class_id FK
+   616→        uuid section_id FK
+   617→        uuid subject_id FK
+   618→        uuid teacher_id FK
+   619→        int academic_year
+   620→        string day_of_week "sun|mon|...|sat"
+   621→        int period_number
+   622→        time start_time
+   623→        time end_time
+   624→        string room
+   625→    }
+   626→
+   627→    attendance_sessions {
+   628→        uuid id PK
+   629→        uuid organization_id FK
+   630→        uuid branch_id FK
+   631→        uuid class_id FK
+   632→        uuid section_id FK
+   633→        date date
+   634→        uuid taken_by FK "users.id"
+   635→        int academic_year
+   636→        string period "morning|afternoon|full"
+   637→        timestamptz submitted_at
+   638→        boolean is_locked "after submission"
+   639→    }
+   640→
+   641→    attendance_records {
+   642→        uuid id PK
+   643→        uuid organization_id FK
+   644→        uuid branch_id FK
+   645→        uuid session_id FK
+   646→        uuid student_id FK
+   647→        string status "present|absent|late|leave"
+   648→        text note
+   649→        timestamptz recorded_at
+   650→    }
+   651→
+   652→    exams {
+   653→        uuid id PK
+   654→        uuid organization_id FK
+   655→        uuid branch_id FK
+   656→        string name "First Term Exam 2026"
+   657→        string name_bn
+   658→        uuid class_id FK
+   659→        uuid subject_id FK
+   660→        int academic_year
+   661→        string term "first|second|final"
+   662→        date exam_date
+   663→        int full_marks
+   664→        int pass_marks
+   665→        string status "draft|marks-entry|published"
+   666→        uuid published_by FK "users.id"
+   667→        timestamptz published_at
+   668→    }
+   669→
+   670→    marks {
+   671→        uuid id PK
+   672→        uuid organization_id FK
+   673→        uuid branch_id FK
+   674→        uuid exam_id FK
+   675→        uuid student_id FK
+   676→        uuid subject_id FK
+   677→        numeric marks_obtained
+   678→        string grade "a-plus|a|...|f"
+   679→        numeric gpa
+   680→        text remark
+   681→        uuid entered_by FK "users.id"
+   682→        timestamptz entered_at
+   683→    }
+   684→
+   685→    results {
+   686→        uuid id PK
+   687→        uuid organization_id FK
+   688→        uuid branch_id FK
+   689→        uuid exam_id FK
+   690→        uuid student_id FK
+   691→        numeric total_marks
+   692→        numeric gpa
+   693→        string grade
+   694→        int position "rank in class"
+   695→        string division "first|second|third"
+   696→        boolean is_passed
+   697→        uuid generated_by FK "users.id"
+   698→        timestamptz generated_at
+   699→    }
+   700→
+   701→    student_history {
+   702→        uuid id PK
+   703→        uuid organization_id FK
+   704→        uuid branch_id FK
+   705→        uuid student_id FK
+   706→        int academic_year
+   707→        uuid from_class_id FK
+   708→        uuid from_section_id FK
+   709→        uuid to_class_id FK
+   710→        uuid to_section_id FK
+   711→        string action "admitted|promoted|graduated|withdrawn|transferred"
+   712→        string result_grade
+   713→        numeric result_gpa
+   714→        text remark
+   715→        uuid action_by FK "users.id"
+   716→        date effective_date
+   717→    }
+   718→```
+   719→
+   720→### 4. Finance Layer
+   721→
+   722→```mermaid
+   723→erDiagram
+   724→    branches ||--o{ accounts : "owns"
+   725→    students ||--o{ fee_plans : "billed via"
+   726→    fee_plans ||--o{ fee_installments : "split into"
+   727→    fee_installments ||--o{ fee_payments : "paid by"
+   728→    students ||--o{ fee_payments : "pays"
+   729→    accounts ||--o{ fee_payments : "deposited to"
+   730→    users ||--o{ fee_payments : "collected_by"
+   731→    students ||--o{ scholarships : "awarded"
+   732→    accounts ||--o{ ledger_entries : "debited in"
+   733→    accounts ||--o{ ledger_entries : "credited in"
+   734→    users ||--o{ ledger_entries : "posted_by"
+   735→    accounts ||--o{ cash_bank_transfers : "from"
+   736→    accounts ||--o{ cash_bank_transfers : "to"
+   737→    accounts ||--o{ zakat_transactions : "fund=zakat"
+   738→    students ||--o{ zakat_transactions : "recipient"
+   739→    accounts ||--o{ donations : "fund=general"
+   740→
+   741→    accounts {
+   742→        uuid id PK
+   743→        uuid organization_id FK
+   744→        uuid branch_id FK
+   745→        string code UK "1000|2000|..."
+   746→        string name
+   747→        string name_bn
+   748→        string type "asset|liability|equity|income|expense"
+   749→        string fund "general|zakat"
+   750→        numeric balance "running balance"
+   751→        string currency "BDT"
+   752→        boolean is_active
+   753→        uuid parent_account_id FK "self-ref for tree"
+   754→    }
+   755→
+   756→    fee_plans {
+   757→        uuid id PK
+   758→        uuid organization_id FK
+   759→        uuid branch_id FK
+   760→        uuid student_id FK
+   761→        int academic_year
+   762→        numeric total_amount
+   763→        numeric scholarship_amount
+   764→        numeric net_payable
+   765→        int installment_count
+   766→        string status "draft|active|closed"
+   767→    }
+   768→
+   769→    fee_installments {
+   770→        uuid id PK
+   771→        uuid organization_id FK
+   772→        uuid branch_id FK
+   773→        uuid fee_plan_id FK
+   774→        uuid student_id FK
+   775→        string label "March 2026"
+   776→        numeric amount
+   777→        date due_date
+   778→        boolean is_paid
+   779→        date paid_date
+   780→        string receipt_no
+   781→        numeric penalty
+   782→        numeric discount
+   783→    }
+   784→
+   785→    fee_payments {
+   786→        uuid id PK
+   787→        uuid organization_id FK
+   788→        uuid branch_id FK
+   789→        uuid student_id FK
+   790→        uuid installment_id FK
+   791→        uuid account_id FK
+   792→        numeric amount
+   793→        string method "cash|bank|mobile"
+   794→        string receipt_no UK
+   795→        string transaction_ref "for bank/mobile"
+   796→        uuid collected_by FK "users.id"
+   797→        timestamptz collected_at
+   798→        string idempotency_key UK
+   799→    }
+   800→
+   801→    scholarships {
+   802→        uuid id PK
+   803→        uuid organization_id FK
+   804→        uuid branch_id FK
+   805→        uuid student_id FK
+   806→        string name "Hafiz Scholarship"
+   807→        string type "full|partial"
+   808→        numeric percentage
+   809→        numeric amount_per_year
+   810→        string fund_source "general|zakat|donation"
+   811→        int academic_year
+   812→        string status "pending|approved|active|closed"
+   813→        uuid approved_by FK "users.id"
+   814→        date approved_at
+   815→        text note
+   816→    }
+   817→
+   818→    ledger_entries {
+   819→        uuid id PK
+   820→        uuid organization_id FK
+   821→        uuid branch_id FK
+   822→        string voucher_no UK
+   823→        date date
+   824→        text narration
+   825→        uuid debit_account_id FK
+   826→        uuid credit_account_id FK
+   827→        numeric amount "CHECK: debit=credit per voucher"
+   828→        string fund "general|zakat — matches both accounts"
+   829→        string status "pending|posted|rejected"
+   830→        uuid posted_by FK "users.id"
+   831→        timestamptz posted_at
+   832→        uuid approved_by FK
+   833→        string source_type "fee_payment|donation|salary|purchase|..."
+   834→        uuid source_id "polymorphic FK to source row"
+   835→    }
+   836→
+   837→    cash_bank_transfers {
+   838→        uuid id PK
+   839→        uuid organization_id FK
+   840→        uuid branch_id FK
+   841→        string voucher_no UK
+   842→        uuid from_account_id FK
+   843→        uuid to_account_id FK
+   844→        numeric amount
+   845→        string fund "general|zakat — must match both accounts"
+   846→        date transfer_date
+   847→        text narration
+   848→        uuid initiated_by FK "users.id"
+   849→        string status "pending|completed|reversed"
+   850→        timestamptz completed_at
+   851→    }
+   852→
+   853→    zakat_transactions {
+   854→        uuid id PK
+   855→        uuid organization_id FK
+   856→        uuid branch_id FK
+   857→        uuid account_id FK "must be fund=zakat"
+   858→        string direction "receive|distribute"
+   859→        uuid student_id FK "recipient — NULL on receive"
+   860→        string recipient_name
+   861→        numeric amount
+   862→        date transaction_date
+   863→        text narration
+   864→        string purpose "education|food|medical|..."
+   865→        uuid handled_by FK "users.id"
+   866→        string voucher_no UK
+   867→        string receipt_no
+   868→    }
+   869→
+   870→    donations {
+   871→        uuid id PK
+   872→        uuid organization_id FK
+   873→        uuid branch_id FK
+   874→        uuid account_id FK "must be fund=general"
+   875→        string donor_name "nullable if anonymous"
+   876→        string donor_email
+   877→        string donor_phone
+   878→        numeric amount
+   879→        string donation_type "general|zakat|sadaqah"
+   880→        string fund "general only for donations page"
+   881→        date donation_date
+   882→        string transaction_ref
+   883→        string receipt_no UK
+   884→        text note
+   885→        boolean is_anonymous
+   886→        string status "pending|confirmed|failed"
+   887→        uuid confirmed_by FK "users.id"
+   888→    }
+   889→```
+   890→
+   891→> **Fund Isolation (C6/D18):** `ledger_entries.fund`, `accounts.fund`,
+   892→> `cash_bank_transfers.fund`, and `zakat_transactions` are constrained
+   893→> so a Zakat account can never appear in a general-fund voucher. This is
+   894→> enforced by a CHECK trigger: `CHECK (fund = 'zakat' AND
+   895→> debit_account.fund = 'zakat' AND credit_account.fund = 'zakat')`.
+   896→
+   897→### 5. Operations Layer
+   898→
+   899→```mermaid
+   900→erDiagram
+   901→    branches ||--o{ inventory_items : "stocks"
+   902→    branches ||--o{ suppliers : "buys from"
+   903→    suppliers ||--o{ purchases : "fulfills"
+   904→    purchases ||--o{ purchase_items : "contains"
+   905→    inventory_items ||--o{ purchase_items : "received as"
+   906→    branches ||--o{ assets : "owns"
+   907→    branches ||--o{ hostel_rooms : "operates"
+   908→    hostel_rooms ||--o{ hostel_beds : "has"
+   909→    students ||--o{ hostel_beds : "occupies"
+   910→    branches ||--o{ meal_plans : "serves"
+   911→    branches ||--o{ library_books : "catalogs"
+   912→    library_books ||--o{ library_issues : "lent as"
+   913→    students ||--o{ library_issues : "borrows"
+   914→    branches ||--o{ vehicles : "operates"
+   915→    vehicles ||--o{ fuel_logs : "logs"
+   916→
+   917→    inventory_items {
+   918→        uuid id PK
+   919→        uuid organization_id FK
+   920→        uuid branch_id FK
+   921→        string code UK
+   922→        string name
+   923→        string name_bn
+   924→        string category "book|uniform|stationery|..."
+   925→        string unit "piece|box|kg"
+   926→        numeric qty_in_stock
+   927→        numeric reorder_level
+   928→        numeric unit_cost
+   929→        string storage_location
+   930→    }
+   931→
+   932→    suppliers {
+   933→        uuid id PK
+   934→        uuid organization_id FK
+   935→        uuid branch_id FK
+   936→        string code UK
+   937→        string name
+   938→        string name_bn
+   939→        string contact_person
+   940→        string phone
+   941→        string email
+   942→        string address
+   943→        string tin "tax ID"
+   944→        numeric outstanding_balance
+   945→        boolean is_active
+   946→    }
+   947→
+   948→    purchases {
+   949→        uuid id PK
+   950→        uuid organization_id FK
+   951→        uuid branch_id FK
+   952→        string po_number UK "purchase order number"
+   953→        uuid supplier_id FK
+   954→        date order_date
+   955→        date received_date
+   956→        numeric total_amount
+   957→        string status "draft|pending|approved|received|cancelled"
+   958→        uuid requested_by FK "users.id"
+   959→        uuid approved_by FK "users.id"
+   960→        timestamptz approved_at
+   961→        text note
+   962→    }
+   963→
+   964→    purchase_items {
+   965→        uuid id PK
+   966→        uuid organization_id FK
+   967→        uuid branch_id FK
+   968→        uuid purchase_id FK
+   969→        uuid inventory_item_id FK
+   970→        numeric qty_ordered
+   971→        numeric qty_received
+   972→        numeric unit_cost
+   973→        numeric line_total
+   974→        text note
+   975→    }
+   976→
+   977→    assets {
+   978→        uuid id PK
+   979→        uuid organization_id FK
+   980→        uuid branch_id FK
+   981→        string asset_code UK
+   982→        string name
+   983→        string name_bn
+   984→        string category "furniture|equipment|it|vehicle"
+   985→        date purchase_date
+   986→        numeric purchase_value
+   987→        numeric current_value
+   988→        date depreciation_date
+   989→        numeric depreciation_rate
+   990→        string location
+   991→        string status "in-use|stored|transferred|disposed"
+   992→        uuid transferred_to_branch_id FK
+   993→        uuid disposed_by FK "users.id"
+   994→        date disposed_at
+   995→    }
+   996→
+   997→    hostel_rooms {
+   998→        uuid id PK
+   999→        uuid organization_id FK
+  1000→        uuid branch_id FK
+  1001→        string room_number UK "per branch"
+  1002→        string building
+  1003→        int floor
+  1004→        int capacity
+  1005→        string gender "male|female"
+  1006→        boolean is_active
+  1007→    }
+  1008→
+  1009→    hostel_beds {
+  1010→        uuid id PK
+  1011→        uuid organization_id FK
+  1012→        uuid branch_id FK
+  1013→        uuid room_id FK
+  1014→        string bed_number
+  1015→        uuid student_id FK "NULL = vacant"
+  1016→        date allocated_at
+  1017→        date vacated_at
+  1018→        string status "vacant|occupied|reserved|maintenance"
+  1019→        numeric monthly_fee
+  1020→    }
+  1021→
+  1022→    meal_plans {
+  1023→        uuid id PK
+  1024→        uuid organization_id FK
+  1025→        uuid branch_id FK
+  1026→        date meal_date
+  1027→        string meal_type "breakfast|lunch|dinner|snack"
+  1028→        string menu
+  1029→        string menu_bn
+  1030→        int head_count
+  1031→        numeric cost_per_head
+  1032→        numeric total_cost
+  1033→        uuid prepared_by FK "users.id"
+  1034→    }
+  1035→
+  1036→    library_books {
+  1037→        uuid id PK
+  1038→        uuid organization_id FK
+  1039→        uuid branch_id FK
+  1040→        string accession_no UK
+  1041→        string title
+  1042→        string title_bn
+  1043→        string author
+  1044→        string category
+  1045→        string isbn
+  1046→        int total_copies
+  1047→        int available_copies
+  1048→        numeric purchase_price
+  1049→        date purchase_date
+  1050→        string shelf_location
+  1051→        boolean is_active
+  1052→    }
+  1053→
+  1054→    library_issues {
+  1055→        uuid id PK
+  1056→        uuid organization_id FK
+  1057→        uuid branch_id FK
+  1058→        uuid book_id FK
+  1059→        uuid student_id FK
+  1060→        date issue_date
+  1061→        date due_date
+  1062→        date returned_date
+  1063→        numeric fine_amount
+  1064→        string status "issued|returned|overdue|lost"
+  1065→        uuid issued_by FK "users.id"
+  1066→        uuid returned_to FK "users.id"
+  1067→    }
+  1068→
+  1069→    vehicles {
+  1070→        uuid id PK
+  1071→        uuid organization_id FK
+  1072→        uuid branch_id FK
+  1073→        string registration_no UK
+  1074→        string type "bus|microbus|car|motorcycle"
+  1075→        string model
+  1076→        int capacity
+  1077→        date purchase_date
+  1078→        numeric purchase_value
+  1079→        string current_driver
+  1080→        string status "active|maintenance|retired"
+  1081→    }
+  1082→
+  1083→    fuel_logs {
+  1084→        uuid id PK
+  1085→        uuid organization_id FK
+  1086→        uuid branch_id FK
+  1087→        uuid vehicle_id FK
+  1088→        date log_date
+  1089→        numeric liters
+  1090→        numeric amount
+  1091→        numeric odometer_reading
+  1092→        string fuel_station
+  1093→        string payment_method "cash|bank|mobile"
+  1094→        uuid logged_by FK "users.id"
+  1095→        text note
+  1096→    }
+  1097→```
+  1098→
+  1099→### 6. Communication Layer
+  1100→
+  1101→```mermaid
+  1102→erDiagram
+  1103→    branches ||--o{ notices : "posts to"
+  1104→    users ||--o{ notices : "sent_by"
+  1105→    branches ||--o{ documents : "stores"
+  1106→    users ||--o{ documents : "uploaded_by"
+  1107→    branches ||--o{ reports : "generates"
+  1108→    users ||--o{ reports : "generated_by"
+  1109→    branches ||--o{ approvals : "scoped to"
+  1110→    users ||--o{ approvals : "requested_by"
+  1111→    users ||--o{ approvals : "decided_by"
+  1112→
+  1113→    notices {
+  1114→        uuid id PK
+  1115→        uuid organization_id FK
+  1116→        uuid branch_id FK
+  1117→        string title
+  1118→        string title_bn
+  1119→        text body
+  1120→        text body_bn
+  1121→        string audience "all|class|guardians|staff"
+  1122→        string audience_filter "class-5 or null"
+  1123→        int recipient_count
+  1124→        string category "admission|holiday|event|exam|general"
+  1125→        uuid sent_by FK "users.id"
+  1126→        timestamptz sent_at
+  1127→        boolean is_pinned
+  1128→        date expires_at
+  1129→        string status "draft|scheduled|sent"
+  1130→    }
+  1131→
+  1132→    documents {
+  1133→        uuid id PK
+  1134→        uuid organization_id FK
+  1135→        uuid branch_id FK
+  1136→        string name
+  1137→        string original_filename
+  1138→        string storage_url
+  1139→        string mime_type
+  1140→        string type "pdf|image|spreadsheet|other"
+  1141→        bigint size_bytes
+  1142→        string sha256
+  1143→        uuid uploaded_by FK "users.id"
+  1144→        timestamptz uploaded_at
+  1145→        string visibility "public|staff|authority"
+  1146→        jsonb tags
+  1147→    }
+  1148→
+  1149→    reports {
+  1150→        uuid id PK
+  1151→        uuid organization_id FK
+  1152→        uuid branch_id FK
+  1153→        string name
+  1154→        string report_type "finance|attendance|students|inventory|..."
+  1155→        jsonb filters
+  1156→        string format "pdf|csv|xlsx|json"
+  1157→        string storage_url
+  1158→        string status "queued|running|completed|failed"
+  1159→        bigint size_bytes
+  1160→        uuid generated_by FK "users.id"
+  1161→        timestamptz started_at
+  1162→        timestamptz completed_at
+  1163→        text error_message
+  1164→        int row_count
+  1165→    }
+  1166→
+  1167→    approvals {
+  1168→        uuid id PK
+  1169→        uuid organization_id FK
+  1170→        uuid branch_id FK
+  1171→        string type "expense|purchase|discount|admission"
+  1172→        string title
+  1173→        text description
+  1174→        numeric amount
+  1175→        jsonb payload "type-specific fields"
+  1176→        string status "pending|approved|rejected"
+  1177→        uuid requested_by FK "users.id"
+  1178→        timestamptz requested_at
+  1179→        uuid decided_by FK "users.id"
+  1180→        timestamptz decided_at
+  1181→        text decision_note
+  1182→        string rejection_reason
+  1183→        uuid delegated_to FK "users.id, if approval.delegate"
+  1184→        timestamptz expires_at
+  1185→    }
+  1186→```
+  1187→
+  1188→---
+  1189→
+  1190→## Cross-Module Relations
+  1191→
+  1192→Mermaid `erDiagram` blocks above are scoped per layer for readability.
+  1193→The full relation graph also includes these **cross-layer** FKs:
+  1194→
+  1195→| From | To | Type | Notes |
+  1196→|---|---|---|---|
+  1197→| `users.branch_id` | `branches.id` | M:1 | Foundation → Foundation (within layer). |
+  1198→| `users.role_id` | `roles.id` | M:1 | Foundation → Foundation. |
+  1199→| `students.class_id` | `classes.id` | M:1 | People → People. |
+  1200→| `students.section_id` | `sections.id` | M:1 | People → People. |
+  1201→| `teacher_assignments.subject_id` | `subjects.id` | M:1 | People → Academic. |
+  1202→| `teacher_assignments.teacher_id` | `teachers.id` | M:1 | People → People. |
+  1203→| `attendance_records.student_id` | `students.id` | M:1 | Academic → People. |
+  1204→| `attendance_sessions.taken_by` | `users.id` | M:1 | Academic → Foundation. |
+  1205→| `marks.student_id` | `students.id` | M:1 | Academic → People. |
+  1206→| `marks.subject_id` | `subjects.id` | M:1 | Academic → Academic. |
+  1207→| `fee_payments.student_id` | `students.id` | M:1 | Finance → People. |
+  1208→| `fee_payments.collected_by` | `users.id` | M:1 | Finance → Foundation. |
+  1209→| `fee_payments.account_id` | `accounts.id` | M:1 | Finance → Finance. |
+  1210→| `ledger_entries.source_id` | (polymorphic) | M:1 | Finance → any (fee_payment, donation, …). |
+  1211→| `zakat_transactions.student_id` | `students.id` | M:1 | Finance → People. |
+  1212→| `hostel_beds.student_id` | `students.id` | M:1 | Operations → People. |
+  1213→| `library_issues.student_id` | `students.id` | M:1 | Operations → People. |
+  1214→| `library_issues.issued_by` | `users.id` | M:1 | Operations → Foundation. |
+  1215→| `notices.sent_by` | `users.id` | M:1 | Communication → Foundation. |
+  1216→| `approvals.requested_by` | `users.id` | M:1 | Communication → Foundation. |
+  1217→| `approvals.decided_by` | `users.id` | M:1 | Communication → Foundation. |
+  1218→| `audit_logs.actor_user_id` | `users.id` | M:1 | Foundation → Foundation (cross-tenant allowed for `super-admin`). |
+  1219→
+  1220→### Junction tables
+  1221→
+  1222→| Junction | Connects | Notes |
+  1223→|---|---|---|
+  1224→| `role_permissions` | `roles` ↔ `permissions` | Standard M:M. |
+  1225→| `student_guardians` | `students` ↔ `guardians` | M:M — a student may have multiple guardians; a guardian may have multiple children. |
+  1226→| `teacher_assignments` | `teachers` × `classes` × `sections` × `subjects` | Ternary junction — modeled as a full entity with its own `id` (because it has metadata like `academic_year`, `is_active`). |
+  1227→| `purchase_items` | `purchases` × `inventory_items` | Junction-as-entity (carries `qty_ordered`, `qty_received`, `unit_cost`). |
+  1228→
+  1229→### Soft relations (no FK constraint)
+  1230→
+  1231→| From | To | Reason |
+  1232→|---|---|---|
+  1233→| `ledger_entries.source_id` | polymorphic | `source_type` discriminator + `source_id` UUID. No FK because Postgres can't enforce a polymorphic FK. Enforced at app layer (Phase B6.3). |
+  1234→| `audit_logs.entity_id` | polymorphic | Same — `entity_type` + `entity_id`. |
+  1235→| `approvals.payload` | JSONB | Type-specific fields, no FK. |
+  1236→
+  1237→---
+  1238→
+  1239→## Constraints Catalog
+  1240→
+  1241→The constraints below are **cross-cutting** (apply to multiple tables). Per-table constraints are documented in `DATA_DICTIONARY.md`.
+  1242→
+  1243→### Money CHECK constraints
+  1244→
+  1245→```sql
+  1246→-- Every money column must be >= 0
+  1247→ALTER TABLE fee_installments  ADD CHECK (amount >= 0);
+  1248→ALTER TABLE fee_payments      ADD CHECK (amount >= 0);
+  1249→ALTER TABLE ledger_entries    ADD CHECK (amount >= 0);
+  1250→ALTER TABLE zakat_transactions ADD CHECK (amount >= 0);
+  1251→ALTER TABLE donations         ADD CHECK (amount >= 0);
+  1252→ALTER TABLE cash_bank_transfers ADD CHECK (amount >= 0);
+  1253→```
+  1254→
+  1255→### Unique constraints (composite, multi-tenant)
+  1256→
+  1257→```sql
+  1258→-- A student code is unique per organization (NOT globally)
+  1259→ALTER TABLE students ADD UNIQUE (organization_id, code);
+  1260→-- A receipt number is unique per organization
+  1261→ALTER TABLE fee_payments   ADD UNIQUE (organization_id, receipt_no);
+  1262→ALTER TABLE ledger_entries ADD UNIQUE (organization_id, voucher_no);
+  1263→ALTER TABLE accounts       ADD UNIQUE (organization_id, code);
+  1264→ALTER TABLE branches      ADD UNIQUE (organization_id, code);
+  1265→ALTER TABLE roles         ADD UNIQUE (organization_id, code);
+  1266→```
+  1267→
+  1268→### Balanced ledger constraint
+  1269→
+  1270→```sql
+  1271→-- A single voucher's debits must equal credits (Golden Flow §3.6)
+  1272→-- Enforced at app layer (B6.3) because Postgres can't easily CHECK
+  1273→-- across two columns of the same row when the row is the unit.
+  1274→-- Simpler form: each row is balanced by design (one debit, one credit).
+  1275→-- Multi-line vouchers use a voucher_group_id + an aggregate CHECK view.
+  1276→```
+  1277→
+  1278→### Fund isolation CHECK
+  1279→
+  1280→```sql
+  1281→-- A Zakat account may only appear in zakat-fund ledger entries
+  1282→ALTER TABLE ledger_entries ADD CONSTRAINT chk_fund_consistency
+  1283→  CHECK (
+  1284→    fund = 'general' OR
+  1285→    (debit_account_id IN (SELECT id FROM accounts WHERE fund='zakat')
+  1286→     AND credit_account_id IN (SELECT id FROM accounts WHERE fund='zakat'))
+  1287→  );
+  1288→```
+  1289→
+  1290→> In practice this is enforced via a trigger because Postgres CHECK
+  1291→> cannot reference other tables. See migration `B1.3_fund_isolation.sql`
+  1292→> (Phase B1).
+  1293→
+  1294→### No-self-approve (D16)
+  1295→
+  1296→```sql
+  1297→-- Approvals: requested_by != decided_by (enforced at API layer too)
+  1298→ALTER TABLE approvals ADD CONSTRAINT chk_no_self_approve
+  1299→  CHECK (requested_by IS DISTINCT FROM decided_by);
+  1300→```
+  1301→
+  1302→---
+  1303→
+  1304→## Migration Phasing
+  1305→
+  1306→The 52 tables will be created in **3 migrations** (Phase B1):
+  1307→
+  1308→| Migration | Phase | Tables |
+  1309→|---|---|---|
+  1310→| `0001_foundation_tables` | B1.1 | All 10 Foundation tables (10) |
+  1311→| `0002_people_tables` | B1.2 | All 9 People tables (9) |
+  1312→| `0003_academic_finance_tables` | B1.3a | All 8 Academic + 9 Finance tables (17) |
+  1313→| `0004_operations_communication_tables` | B1.3b | All 12 Operations + 4 Communication tables (16) |
+  1314→| `0005_seed_data` | B1.4 | Seed (not a migration — `prisma db seed`) |
+  1315→
+  1316→> The SRS allowed collapsing B1.3 into a single migration; this ERD
+  1317→> splits it into `B1.3a` + `B1.3b` for reviewability. Both land in the
+  1318→> same Phase B1.3 session.
+  1319→
+  1320→---
+  1321→
+  1322→## Review Checklist
+  1323→
+  1324→Before signing off this ERD, the reviewer confirms:
+  1325→
+  1326→- [x] All 52 tables present (10 + 9 + 8 + 9 + 12 + 4).
+  1327→- [x] Every table has the 8-column base mixin (except `organizations` itself).
+  1328→- [x] Every junction table has the base mixin (so audit + soft-delete work on junctions too).
+  1329→- [x] Every FK target is a real table in this ERD.
+  1330→- [x] All 8 roles from `stores/types.ts` map to `roles.code` values.
+  1331→- [x] All 110+ permission codes from `auth/permissions.ts` map to `permissions.code` rows.
+  1332→- [x] Zakat fund isolation is enforced at the `accounts.fund` column + `ledger_entries.fund` column.
+  1333→- [x] `student_history` exists (Risk R4 — promotion audit).
+  1334→- [x] `approvals.requested_by ≠ decided_by` constraint documented (D16).
+  1335→- [x] All enums from `src/lib/mock/types.ts` are reflected (Gender, StudentStatus, AttendanceStatus, FundType, AccountType, FeeMethod, LedgerStatus, ApprovalType, ApprovalStatus, NoticeAudience).
+  1336→- [x] Cross-layer FKs listed explicitly (Mermaid `erDiagram` cannot render cross-subgraph edges).
+  1337→- [x] Index strategy covers every access pattern surfaced by `mockApi`.
+  1338→
+  1339→---
+  1340→
+  1341→## Appendix — Permission Catalog → Table Matrix
+  1342→
+  1343→> For each of the 110+ permission codes from `src/lib/auth/permissions.ts`,
+  1344→> the primary table the permission gates write/read on.
+  1345→
+  1346→| Permission prefix | Primary table | Notes |
+  1347→|---|---|---|
+  1348→| `organization.*` | `organizations`, `branches`, `module_configs` | Platform + tenant config. |
+  1349→| `rbac.*` | `roles`, `permissions`, `role_permissions` | Role catalog management. |
+  1350→| `audit.*` | `audit_logs` | Read-only with retention policy. |
+  1351→| `security.policy.*` | `security_policies` | Org-level policy. |
+  1352→| `backup.*` | `backup_records` | Manual + scheduled. |
+  1353→| `students.*` | `students`, `student_history` | Notes sub-permission gates `special_notes` column visibility. |
+  1354→| `admission.*` | `admissions` | Pipeline Kanban. |
+  1355→| `guardians.*` | `guardians`, `student_guardians` | `*.view.own` scopes by linked student_ids. |
+  1356→| `teachers.*` | `teachers`, `teacher_assignments` | |
+  1357→| `employees.*` | `employees` | |
+  1358→| `academic.structure.*` | `classes`, `sections`, `subjects`, `routines` | |
+  1359→| `attendance.*` | `attendance_sessions`, `attendance_records` | `*.view.own` for guardian/student. |
+  1360→| `exams.*` | `exams`, `marks` | `publish` flips `exams.status`. |
+  1361→| `results.*` | `results` | `*.view.own` for guardian/student. |
+  1362→| `fees.*` | `fee_plans`, `fee_installments`, `fee_payments` | `*.create.own` for guardian pay. |
+  1363→| `scholarship.*` | `scholarships` | |
+  1364→| `accounting.ledger.*` | `ledger_entries`, `accounts` | `post` requires balanced debit=credit. |
+  1365→| `cashbank.transfer` | `cash_bank_transfers` | Fund-matching enforced. |
+  1366→| `zakat.*` | `zakat_transactions`, `accounts` (fund=zakat) | |
+  1367→| `donations.*` | `donations`, `accounts` (fund=general) | `*.create.public` no auth required. |
+  1368→| `inventory.*` | `inventory_items` | |
+  1369→| `purchase.*` | `purchases`, `purchase_items`, `suppliers` | |
+  1370→| `suppliers.*` | `suppliers` | |
+  1371→| `assets.*` | `assets` | |
+  1372→| `hostel.*` | `hostel_rooms`, `hostel_beds` | |
+  1373→| `food.meal-plan` | `meal_plans` | |
+  1374→| `library.*` | `library_books`, `library_issues` | |
+  1375→| `transport.*` | `vehicles`, `fuel_logs` | |
+  1376→| `notices.*` | `notices` | |
+  1377→| `documents.*` | `documents` | |
+  1378→| `reports.*` | `reports` | `*.finance.export` is a sub-permission. |
+  1379→| `dashboard.*` | (no direct table — derived views) | Computed from many tables. |
+  1380→| `pdf.generate` | (no table — read-only across many) | |
+  1381→| `approval.*` | `approvals` | D16 enforced. |
+  1382→| `tenant.*` | `organizations` | Platform-level only. |
+  1383→
+  1384→---
+  1385→
+  1386→**End of ERD document.** For per-table field definitions see
+  1387→[`DATA_DICTIONARY.md`](./DATA_DICTIONARY.md). For the Prisma schema that
+  1388→implements this ERD, see `prisma/schema.prisma` (Phase B0.3, pending).
+  1389→

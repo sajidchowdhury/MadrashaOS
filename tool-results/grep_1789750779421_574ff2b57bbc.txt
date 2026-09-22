@@ -1,0 +1,302 @@
+3:Task ID: C0.1
+21:Stage Summary:
+29:  * `/` renders branded palette card + type scale + 8pt grid demo using ONLY tokens (zero raw hex/px in component code) ✅
+30:  * `bun run lint` passes with zero token-violation warnings ✅
+31:  * Trilingual stack renders zero tofu (verified for en/bn/ar) ✅
+32:  * Dark mode + RTL flip verified via Agent Browser ✅
+37:Task ID: C0.2
+55:  * English → all UI strings in English, LTR layout ✅
+56:  * Bangla → all UI strings translated, html lang="bn" dir="ltr" ✅
+57:  * Arabic → all UI strings translated, html lang="ar" dir="rtl", layout flipped ✅
+58:  * Bangla date: ১৬-০৯-২০২৬ (matches SRS §2.6.6 / Risk R14 exactly) ✅
+59:  * Bangla currency: ৳৫,০০০ / ৳২৫,০০০ ✅
+60:  * Arabic date: ١٦-٠٩-٢٠٢٦ / ١٦ سبتمبر ٢٠٢٦ ✅
+61:  * Arabic currency: ৳٢٥,٠٠٠ ✅
+62:  * Directional icons mirrored in RTL mode (confirmed via VLM) ✅
+63:  * Logical-property padding (ps-8 pe-4) flips automatically in RTL ✅
+65:  * Arabic RTL: "layout is flipped right-to-left... section headers in Arabic... directional icons mirrored horizontally... Arabic-Indic numerals (٠, ١, ٢...) used... no major visual issues" ✅
+66:  * Bangla: "Dates show Bengali numerals (e.g., ১৬-০৯-২০২৬). Currency shows ৳ with Bengali numerals" ✅
+68:Stage Summary:
+80:  * `/` shows trilingual greeting "Assalamu Alaikum / আসসালামু আলাইকুম / السلام عليكم" with zero tofu ✅
+81:  * Language toggle re-renders ALL UI text + flips layout to RTL in ar mode ✅
+82:  * Bangla date renders as "১৬-০৯-২০২৬" (SRS §2.6.6 / Risk R14 satisfied) ✅
+83:  * Directional icons auto-mirror in Arabic (chevron-right, arrow-right, send, undo, redo, reply, share) ✅
+84:  * Logical properties (ps-/pe-/ms-/me-) flip padding automatically in RTL ✅
+85:  * Locale preference persists across reloads via madrasha-locale cookie ✅
+89:Task ID: C0.3
+108:  * Desktop 1440×900: teal top bar + left side nav with all module groups + showcase content + sticky footer at bottom ✅
+109:  * Footer content: "© 2026 MadrashaOS. All rights reserved. v1.0.0 · en-US · LTR · Phase C0.3" ✅
+110:  * DevToolbar: collapsed "DEV" badge → click to expand → Role/Branch/Language/Theme/Network controls all visible ✅
+111:  * DevToolbar theme toggle: click Dark → html.dark=true → dark mode renders ✅
+112:  * DevToolbar language: click العربية → html lang="ar" dir="rtl" → RTL layout ✅
+113:  * SideNav collapse: click Collapse button → aside width changes from w-64 to w-16, labels hidden, icons remain ✅
+114:  * Mobile 375×812: hamburger button visible → click → nav drawer opens with overlay ✅
+115:  * Arabic RTL: sidebar on right side, all nav labels in Arabic, footer at bottom, directional icons mirrored ✅
+117:  * Desktop: "teal top bar with logo and controls... left sidebar with navigation module groups... content area with design system sections... sticky footer at bottom... no major visual issues" ✅
+118:  * Arabic RTL: "top bar is teal and layout is flipped right-to-left... sidebar on the right side... all navigation labels in Arabic... footer at the bottom... no major issues" ✅
+120:Stage Summary:
+133:  * `/` shows branded shell: teal top bar, left nav, warm-neutral background, sticky footer ✅
+134:  * Footer sticks to bottom on short content (mt-auto), pushed down on long content ✅
+135:  * DevToolbar visible at bottom-end; clicking Dark toggles theme; clicking Arabic flips to RTL ✅
+136:  * Responsive: mobile hamburger drawer works; desktop side nav collapsible ✅
+137:  * Trilingual: all shell labels translate across en/bn/ar ✅
+141:Task ID: C0.4
+160:- Created src/app/dev/data/page.tsx — debug route showing: session state (role/branch/network/permissions count/current user), fixture counts (14 metrics in a grid), live query results table (12 rows × resource/permission/status/row-count); switching role via DevToolbar instantly flips rows from ✅ success to ❌ 403 denied
+164:  * /dev/data as Administrator: all 10 resource queries ✅ success with correct row counts (40 students, 8 guardians, 40 fee plans, 8 fee payments, 8 accounts, 12 ledger entries, 4 attendance sessions, 10 inventory items, 5 notices, 3 pending approvals) ✅
+165:  * Switch to Teacher: students ✅ (has students.view), guardians ✅, feePlans ❌ 403 (no fees.view per D3), feePayments ❌ 403, accounts ❌ 403, ledgerEntries ❌ 403, attendanceSessions ✅ (has attendance.view), inventory ❌ 403, notices ✅ — permission filtering works in real-time ✅
+166:  * Switch to Storekeeper: only inventory ✅, notices ✅, currentUser ✅, classes ✅; all student/finance/academic data ❌ 403 ✅
+167:  * Network simulator: click Offline → switch role → all queries that would succeed show ⚠ network error; back to Normal → all succeed ✅
+168:  * Home route / still renders correctly with all new providers nested (ThemeProvider → I18nProvider → QueryProvider → AppShell → DevToolbar) ✅
+170:Stage Summary:
+188:  * /dev/data shows every fixture with row counts (14 metrics) ✅
+189:  * DevToolbar role-switch updates permissions[] and filters /dev/data queries in real-time ✅
+190:  * mockApi enforces permissions (403 denied) per SRS §5.1 ✅
+191:  * Network simulator (normal/slow/offline) works end-to-end ✅
+192:  * Mock data realistic enough to populate every screen in Phases C2–C4 ✅
+197:Task ID: C1
+217:  * All 6 sections render with correct headings ✅
+218:  * Tab switching works (Overview → Academic → Fees → Attendance) ✅
+219:  * Modal opens with dialog role + heading ✅
+220:  * Toast triggers render (success/error/warning variants) ✅
+221:  * All 5 empty-state illustrations render with brand colors ✅
+222:  * Chip removal interactive (clicks remove chips) ✅
+223:  * Checkbox/Switch/Radio state changes work ✅
+226:Stage Summary:
+239:  * /dev/components shows all 30 components with variants + states ✅
+240:  * Every component references FROZEN tokens (zero raw hex/px) ✅
+241:  * 5 empty-state illustrations delivered ✅
+242:  * Interactive demos functional (tabs/modal/toast/chips) ✅
+243:  * Lint clean ✅
+248:Task ID: C2
+275:Stage Summary:
+285:  * Dynamic nav renders only enabled+permitted modules (SRS §5.1) ✅
+286:  * 5 role dashboards with 12 widget types ✅
+287:  * State system: empty/loading/error/permission-denied/offline (Risk R3 + D4) ✅
+288:  * IfPermission + IfField hide unauthorized UI (C2.4) ✅
+289:  * Role switch via DevToolbar instantly updates nav + dashboard ✅
+290:  * Outstanding Fees widget shows "as of [timestamp]" (Risk R12) ✅
+291:  * Teacher dashboard has no financial data (D3) ✅
+292:  * Guardian dashboard has child-switcher (Risk R5) ✅
+297:Task ID: 3-d
+322:Stage Summary:
+334:  * /fees: student list with outstanding summary, "Collect Payment" 3-step flow, R8 striped pending-discount rows with status chip, IfPermission gating, success toast on confirm, LoadingState pattern="table" ✅
+335:  * /accounting: full-width ledger table with running balance, FilterBar (date range + status + search), New Entry dialog with "Debits must equal credits" inline validation, posted-by + status badge columns ✅
+336:  * /zakat: fund-isolated (useAccounts filtered to fund==="zakat"), big accent-gold balance card, Received + Distributed sections, Zakat badge on every row, Other Funds section with reduced opacity, distribute-validation blocking when amount>balance with inline error ✅
+337:  * /donations: email OR mobile mandatory, honeypot "website" field with silent spam-detected reject, success toast + Download Receipt PDF button (visual), Zakat-type note "posted to Zakat fund (SRS §3.7)", recent donations list, public-gate via donations.create.public ✅
+338:  * All money displays use formatCurrency() and all dates use formatDate() from src/lib/i18n/format.ts ✅
+339:  * Every page handles loading/error states with LoadingState + ErrorState ✅
+340:  * All 4 routes return HTTP 200 from the dev server ✅
+341:  * Lint passes cleanly for all 9 files created in this task ✅
+344:Task ID: 3-a
+363:Stage Summary:
+374:  * All 4 Foundation routes return HTTP 200 (verified via curl) ✅
+375:  * Lint passes clean (zero errors, zero warnings) ✅
+376:  * Every page uses the SectionCard pattern (rounded-2xl border bg-surface-card p-6 shadow-elevation-1) ✅
+377:  * Every page handles loading (LoadingState) + error (ErrorState) states ✅
+378:  * Risk R2 lock-in implemented (inline warning + chips + Save disabled) ✅
+379:  * Do-Not-Do D16 tooltip on approval.approve row for the current user's role ✅
+380:  * branch.scope visual indicator on every BranchCard ✅
+381:  * Audit Explorer shows 52 events (≥50 required) with field-diff viewer ✅
+382:  * IfPermission gates: organization.branch.create (Add Branch button), rbac.permission.assign (/rbac page), audit.view (/audit page) ✅
+383:  * All localized values use formatCurrency / formatDate / formatDateLong / convertDigits from src/lib/i18n/format.ts ✅
+384:  * Zero raw hex/px values — every token sourced from the FROZEN system ✅
+385:  * No modifications to existing files (i18n messages, moduleTree, widgets, states, stores, fixtures) ✅
+388:Task ID: 3-b
+472:Stage Summary:
+480:  * 4 routes return HTTP 200 ✅
+481:  * ESLint clean (zero errors, zero warnings) ✅
+482:  * Every page handles loading/error/empty states via LoadingState + ErrorState + EmptyState + PermissionDenied ✅
+483:  * IfPermission gates: students.create / documents.upload / documents.download / fees.payment.create / students.promote / admission.view / admission.approve / teachers.view / teachers.assign ✅
+484:  * Risk R4 lock-in: History tab shows past chips + Promotion Wizard dialog has history panel beside form (past assignments never deleted) ✅
+485:  * Drag-to-Registered toast: "Student registered — fee plan created" ✅
+486:  * Duplicate-active-assignment blocked inline (teachers dialog) ✅
+487:  * FROZEN tokens only — no raw hex / px ✅
+488:  * Responsive layouts + a11y attributes throughout ✅
+489:  * Inline mock data only — no new fixture files created ✅
+490:  * No modifications to existing files (i18n messages, moduleTree, existing components/widgets/stores) ✅
+493:Task ID: 3-c
+564:Stage Summary:
+577:  * /attendance: list of 4 recent sessions (Class 5-A across 4 days), each row with class/section/date/present-absent counts/taken-by name, "Take Attendance" primary button gated by attendance.take, FilterBar with class + date filters, LoadingState pattern="table", formatDate() used for localized dates ✅
+578:  * /attendance/take: mobile-first at 375px, class+section+date header, 12-student roster (useStudentsByClass("cls-5","A")), default status=Present, one-tap cycle Present→Absent→Late→Leave→Present, sticky Present All + Submit, optimistic useState, 30s undo window via ToastAction, OfflineState banner + queue when sessionStore.network==="offline", Idempotency-Key indicator (Key icon + Tooltip), elapsed timer turning red >60s, IfPermission code="attendance.take" gates page, success toast "Submitted — X Present, Y Absent" + Undo option, Chip component for status indicators ✅
+579:  * /exams: 4 inline mock exams (Mid-term/Final/Quiz 1/Quiz 2), each row with name/date/class/subject/status, Enter Marks button gated by exams.enter-marks, Publish button gated by exams.publish with AlertDialog confirm "Publishing locks the paper. Continue?", Badge for status (Draft=neutral, Active=primary, Published=success) ✅
+580:  * /exams/[id]/marks: mobile-first at 375px, exam name+class+subject at top, one student at a time via StudentMarkCard, NumberInput with stepper, Next button advances (swipe-next pattern), Progress bar showing "Student X of 12", validation "Mark exceeds full marks (100)" blocks Next when marks>full_marks, "Save & Submit" at end, IfPermission code="exams.enter-marks" gates page ✅
+593:Task ID: 4-b
+614:Stage Summary:
+628:  * /notices: 5-notice list (useNotices), each row with title (en + bn subtitle), audience badge, recipient count, sent date, sent-by name; FilterBar (audience All/Guardians/Staff/Class-specific); "Compose Notice" button gated by IfPermission code="notices.compose"; Composer Dialog with title (en+bn), body (en+bn), audience selector, class dropdown, **Risk R11 live recipient-count Chip**, "Preview Recipients" Drawer, "Send Notice" button gated by IfPermission code="notices.send" with success toast; formatDate() for dates ✅
+629:  * /documents: 6 inline-mock documents table (Name/Type/Size/Category/Uploaded By/Uploaded At/Actions); "Upload Document" button gated by IfPermission code="documents.upload"; Upload Dialog with drag-drop area + Category dropdown + **60MB validation (inline error + Upload disabled when exceeded)** + **"Signed URL expires in 10:00" countdown**; "Download" button per row gated by IfPermission code="documents.download"; FilterBar with type filter + category filter; formatDate() + formatNumber() + formatFileSize() ✅
+630:  * /reports: 6 inline-mock report-type cards (Student Summary, Fee Collection, Ledger Statement, Attendance Report, Zakat Statement, Inventory Valuation) with name/description/"Generate" button/last-generated date; "Generate" opens filter Dialog with date range (from/to DateInput) + branch filter + format radio (PDF/Excel); on generate shows toast "Report queued — download will be available in /documents"; **finance reports gated by IfPermission code="reports.finance.view" — Teacher role sees denied cards (Do-Not-Do D3)**; recent reports table (5 mock reports with status badges + download links); formatDate() for dates ✅
+644:Task ID: 4-c
+669:Stage Summary:
+680:  * TopBar notification bell flyout with 5 recent notices + unread badge + "View all" link ✅
+681:  * TopBar user menu flyout with Profile/Settings/Logout + user name + role header ✅
+682:  * LanguageSwitcher hover/active/focus states verified on teal background ✅
+683:  * MobileBottomActionBar visible only on /attendance/take, /exams/[id]/marks, /fees (md:hidden) ✅
+684:  * Mobile drawer has Close (X) button at top ✅
+685:  * /dev/shell documents 4 viewport sizes side-by-side via live iframes (375/768/1280/1440) ✅
+686:  * /dev/shell lists FROZEN breakpoint tokens (--breakpoint-sm/md/lg/xl/2xl + grid-max-width/gutter/margin) ✅
+687:  * /dev/shell documents which elements appear/hide at each breakpoint (13-row table) ✅
+688:  * Guardian dashboard: cards stack vertically on mobile (grid-cols-1) → grid-cols-3 on md+ ✅
+689:  * Guardian dashboard: child-switcher is a segmented control on mobile (not a dropdown) ✅
+690:  * Guardian dashboard: Pay Now CTA on Outstanding Fees card (mobile-only, sticky) ✅
+691:  * Guardian dashboard: notices list scrollable (max-h-64 overflow-y-auto) ✅
+692:  * HTTP 200 on all required routes (/ + /dashboard/guardian + /dev/shell + /attendance/take) ✅
+693:  * Lint clean on all 8 touched files (zero errors, zero warnings) ✅
+694:  * FROZEN tokens only — no raw hex/px ✅
+695:  * Existing functionality preserved (no broken routes/stores/components) ✅
+698:Task ID: 4-a
+716:Stage Summary:
+737:Task ID: 5-c
+743:- Built Part 3 first: src/components/dev/TypographyChecker.tsx — a client component that (a) waits for document.fonts.ready, (b) scans each per-locale test string's characters against the known tofu set (U+25A1, U+FFFD, U+0000), (c) uses document.fonts.check(fontSpec, char) to verify the assigned webfont can actually render each glyph (catching the "missing glyph" case even when the source has no tofu codepoint), (d) scans the mixed-script string "Ahmad আহমদ أحمد · 2026-০৯-١٦ · ৳5,000 / ৳৫,০০০ / ৳٥٬٠٠٠", and (e) hooks a MutationObserver on the rendered test spans so the check re-runs if React re-renders. Renders a green ✅ "No tofu detected" badge or a red ❌ "Tofu found in [locale] [context]" badge with per-hit table. Uses a hidden sr-only div with explicit lang/dir/style for each locale's font so the browser actually exercises the font-rendering path.
+744:- Built Part 1 + Part 4: src/app/dev/typography/page.tsx — comprehensive typography audit route with 7 sections: (1) TypographyChecker live tofu check, (2) Type Scale × 3 Scripts table — 6 type-scale steps (caption/body/subtitle/title/headline/display) × 3 scripts side-by-side using per-cell lang/dir/font-class attributes (Inter for en, Hind Siliguri for bn, Noto Naskh Arabic for ar with dir=rtl), (3) Numerals / Currency / Dates cards showing Western 0-9 / Bangla ০-৯ / Arabic-Indic ٠-٩, ৳5,000 / ৳৫,০০০ / ৳٥٬٠٠٠, and 16-09-2026 / ১৬-০৯-২০২৬ / ١٦-٠٩-٢٠٢٦ — all rendered via formatCurrency()/formatDate()/convertDigits() to verify the formatters end-to-end, (4) Mixed-Script Strings card showing "Ahmad আহমদ أحمد · 2026-০৯-١٦ · ৳5,000 / ৳৫,০০০ / ৳٥٬٠٠٠" rendered with the var(--font-default) chained stack + a <pre> showing the raw source, (5) Long-Text Wrapping card with a paragraph per locale, (6) Font-Family CSS Stacks table mirroring tokens.css (var(--font-en/bn/ar) → var(--font-inter/hind-siliguri/noto-naskh-arabic)), and (7) Summary table: Script | Font | Sample | Tofu Check (all 3 locales ✅ No tofu). Plus a "Run Full Audit" button that fetches every route × locale client-side, scans the returned HTML for U+25A1/U+FFFD/U+0000, and shows a streaming-progress table with green/red/amber status per cell. After completion, shows a summary banner: "21 routes × 3 locales = 63 combinations · 0 tofu found · ✅ clean" or "❌ review required".
+749:- Verified the audit script: `bun run scripts/typography-audit.ts` → Phase 1: 3/3 formatter checks passed (Bangla date "১৬-০৯-২০২৬", Bangla currency "৳৫,০০০", Arabic digits "١٢٣"). Phase 2: 108/108 cells OK, 0 cells with errors, 0 cells with tofu. Phase 3: "36 routes checked × 3 locales = 108 combinations · 0 tofu found · ✅ Typography audit PASSED". Exit code 0. Also verified `bun run audit:typography` works (uses the package.json script).
+753:Stage Summary:
+755:  - `src/components/dev/TypographyChecker.tsx` (300 lines) — client-side zero-tofu verification component using document.fonts.check() + MutationObserver. Embeddable in any page; renders a green ✅ or red ❌ badge.
+762:- **Audit script output**: 36 routes × 3 locales = 108 combinations · 0 tofu found · 3/3 formatters passed · exit code 0 · ✅ PASSED.
+764:  - Part 1: All 3 scripts side-by-side for every text style ✅; 6 type scale steps × 3 scripts ✅; all numerals (Western/Bangla/Arabic-Indic) ✅; currency (৳5000/৳৫,০০০/৳٥٬٠٠٠) ✅; dates (16-09-2026/১৬-০৯-২০২৬/١٦-٠٩-٢٠٢٦) ✅; mixed-script strings ✅; long-text wrapping in all 3 scripts ✅; font-family CSS stacks shown ✅.
+765:  - Part 2: All routes defined ✅; all 3 locales ✅; URL constructed as `?lang=XX` ✅; HTML fetched ✅; tofu scanned (U+25A1, U+FFFD, U+0000) ✅; formatter validations (Bangla date, Bangla currency, Arabic digits) ✅; summary report "X routes × 3 locales = Y combinations · Z tofu found" ✅; exit code 0/1 logic ✅; runnable via `bun run scripts/typography-audit.ts` ✅.
+766:  - Part 3: Comprehensive test strings in all 3 locales ✅; MutationObserver-based re-check ✅; green ✅ / red ❌ badge ✅; embeddable in any page ✅.
+767:  - Part 4: TypographyChecker embedded ✅; summary table (Script | Font | Sample | Tofu Check) ✅; "Run Full Audit" button ✅; results table with green/red status per route × locale ✅.
+768:  - Part 5: `audit:typography` script added to package.json ✅.
+771:Task ID: 5-a
+827:Stage Summary:
+845:  * 6 branded PDF templates created (FeeReceipt, MarkSheet, ResultSheet, Certificate, LedgerStatement, OutstandingFeesReport) ✅
+846:  * Every PDF uses primary.500 (#0E5C5C) + accent.DEFAULT (#C9A961) + neutral.0 (#FFFFFF) per Risk R13 — FROZEN hex values hardcoded in brand.ts as the documented exception to the no-raw-hex rule ✅
+847:  * Arabic + Bangla glyphs supported via registered NotoNaskhArabic + HindSiliguri fonts (Risk R14 mitigation — falls back to Helvetica if CDN unreachable, with a console.warn) ✅
+848:  * MarkSheet hides position when `rankingEnabled=false` per Risk R7 ✅
+849:  * OutstandingFeesReport shows "as of [date]" banner per Risk R12 ✅
+850:  * Certificate has diagonal "PHASE 3 PLACEHOLDER" watermark per task spec ✅
+851:  * /dev/pdfs showcase lists all 6 templates with thumbnail previews + Preview/Download buttons ✅
+852:  * /dev/pdfs/[template] renders the full PDF inline via PDFViewer ✅
+853:  * Trigger buttons added to /fees (Print Receipt), /accounting (Download Statement), /students/[id] Academic tab (Download Mark Sheet) ✅
+854:  * `bun run lint` passes with zero errors, zero warnings ✅
+855:  * All 10 routes (showcase + 6 templates + 3 trigger pages) verified via curl returning HTTP 200 ✅
+863:Task ID: 5-b
+895:  * /dashboard SSR: contains aria-label="Dev Toolbar" + "Main navigation" + "Branch" + "Academic Year" + "Notifications" + "Language switcher" markers (AppShell + DevToolbar present) ✅
+896:  * /public SSR: ZERO DevToolbar markers, ZERO "Branch" switcher, ZERO "Main navigation" — instead has "Public Visitor" badge + aria-label="Primary" public navbar ✅
+897:  * / SSR (root showcase): ZERO AppShell markers, ZERO DevToolbar, ZERO PublicLayout — pure showcase page (intentional) ✅
+901:Stage Summary:
+915:  * Root layout restructured — no AppShell, no DevToolbar ✅
+916:  * (app)/layout.tsx wraps all back-office routes in AppShell + DevToolbar ✅
+917:  * (public)/layout.tsx wraps all public routes in PublicLayout (no AppShell, no DevToolbar) ✅
+918:  * PublicLayout: sticky white navbar + 7 nav links + LanguageSwitcher + ThemeToggle + mobile hamburger drawer + footer ✅
+919:  * 7 public pages created (Home, Programs, Admission, Notices, Events, Contact, Donate) ✅
+920:  * Home page has Hero + Stats + Programs preview + Recent notices ✅
+921:  * Programs page has 6 programs with name, description, duration, Apply button ✅
+922:  * Admission page has form (name, parent, phone, email, desired class) + toast "Application received" ✅
+923:  * Notices page has 5 mock notices with title, date, body ✅
+924:  * Events page has 4 upcoming events with date, time, location ✅
+925:  * Contact page has form + contact info ✅
+926:  * Donate page has presets (৳500/৳1000/৳5000/custom) + type (General/Zakat/Sadaqah) + Zakat note "posted to Zakat fund (SRS §3.7)" + honeypot + reCAPTCHA placeholder + success screen with Download Receipt button ✅
+927:  * Honeypot fields on Admission, Contact, Donate — silent spam-detected reject ✅
+928:  * `bun run lint` passes with zero errors, zero warnings ✅
+929:  * All 11 routes verified via curl returning HTTP 200 ✅
+930:  * Existing routes (/, /dashboard, /students, /dev/components) still work after layout restructure ✅
+933:Task ID: 6-a
+953:- Created /home/z/my-project/src/components/dev/FlowOverlay.tsx (230 LOC) — exports FlowHighlighter (pulsing ring overlay that polls the DOM every 500ms + listens to scroll/resize for the current step's targetSelector and draws a fixed-position ring with a "Click here" pill) + FlowCelebration (modal overlay with "Flow complete! ✅" + flow name + click count + Back-to-flows / Stay-on-page buttons) + FlowOverlay wrapper.
+956:- Ran `bun run lint` — zero errors, zero warnings ✅.
+957:- Ran `bunx tsc --noEmit` (scoped to new files) — zero type errors ✅.
+959:  * GET /dev/flows → HTTP 200 (4.4s compile, 184ms render on first hit; sub-100ms subsequent) ✅
+960:  * GET /dashboard → HTTP 200 ✅
+961:  * GET /dashboard/teacher → HTTP 200 ✅
+962:  * GET /dashboard/accountant → HTTP 200 ✅
+963:  * GET /dashboard/authority → HTTP 200 ✅
+964:  * GET /dashboard/guardian → HTTP 200 ✅
+965:  * GET /attendance/take → HTTP 200 ✅
+966:  * GET /fees → HTTP 200 ✅
+967:  * GET /accounting → HTTP 200 ✅
+968:  * GET /admission → HTTP 200 ✅
+969:  * GET /public/donate → HTTP 200 ✅
+970:- /dev/flows HTML grep confirms all 8 flow names render in the catalog: "Teacher takes attendance", "Accountant collects", "expense", "Guardian views", "Authority approves", "Administrator admits", "Public donation", "Role-aware dashboard" ✅
+981:- Flow 1 (Teacher → Take Attendance) — bypassable via /attendance list ✅
+982:- Flow 2 (Accountant → Collect Fee) — bypassable via /fees header button ✅
+986:- Flow 6 (Administrator → Admit a Student) — ✅ completable (drag-and-drop Kanban works via @dnd-kit)
+987:- Flow 7 (Public Donation) — ✅ completable (donation form submit + success state)
+988:- Flow 8 (Any role → Dashboard redirect) — ✅ completable (role-aware redirect via getDashboardRouteForRole)
+990:Stage Summary:
+999:  * 8 flows defined with id, name, description, role, steps[], estimatedClicks ✅
+1000:  * /dev/flows route renders all 8 flows as cards with Start Flow button ✅
+1001:  * Start Flow sets role via sessionStore + navigates to first step ✅
+1002:  * Progress indicator "Step X of N" with checkmarks for completed steps ✅
+1003:  * Next Step button advances through the flow ✅
+1004:  * Flow complete celebration shows "Flow complete! ✅" ✅
+1005:  * DevToolbar "Flows" section shows current active flow + step progress ✅
+1006:  * Start Flow dropdown lists all 8 flows ✅
+1007:  * Active flow shows current step + Next button + Exit Flow button ✅
+1008:  * Highlights the next CTA on the current page (pulsing ring around target button) ✅
+1009:  * Walkthrough store exposes startFlow(id), nextStep(), exitFlow(), getCurrentStep() ✅
+1010:  * 5 flows (1, 2, 6, 7, 8) complete end-to-end; 3 flows (3, 4, 5) blocked by dead-end widget buttons (documented, NOT fixed per task rules) ✅
+1011:  * `bun run lint` passes with zero errors, zero warnings ✅
+1012:  * All 11 routes verified via curl returning HTTP 200 ✅
+1023:Task ID: 6-b
+1043:  * 3 daily tasks per persona with: name, required permission code, click count (manual trace), click path, status badge (✅ ≤3 / ⚠ 4-5 / ❌ >5 or unreachable), notes panel
+1048:  * Super Admin: Provision tenant (❌ Phase 3), Configure security (❌ /security route missing), Monitor tenant health (✅ /audit 1 click)
+1049:  * Authority: Approve expenses (✅ 1 click — ApprovalsQueue widget), View authority dashboard (✅ 1 click), Sign off results (❌ /results route missing)
+1050:  * Administrator: Manage students (✅ 1 click), Configure organization (✅ 1 click), Manage users/roles (✅ 1 click)
+1051:  * Accountant: Collect fees (✅ 2 clicks), Record expenses (✅ 2 clicks), Reconcile ledger (✅ 1 click)
+1052:  * Teacher: Take attendance (✅ 3 clicks), Enter marks (⚠ 4 clicks — drill-down), View own classes (✅ 0 clicks — TeacherClasses widget)
+1053:  * Storekeeper: Receive stock (✅ 2 clicks), Issue stock (✅ 2 clicks), Track low-stock alerts (✅ 0 clicks — dashboard widget)
+1054:  * Guardian: View child attendance (✅ 2 clicks), View + pay fees (✅ 2 clicks), Read notices (✅ 1 click)
+1055:  * Student: View own attendance (✅ 0 clicks — dashboard widget, Attendance nav item HIDDEN because student has attendance.view.own only), View own results (✅ 0 clicks — same pattern), Read notices (✅ 1 click)
+1060:  1. Color contrast ≥ 4.5:1 on text (1.4.3) — ✅ Pass
+1061:  2. Focus-visible rings on all interactive (2.4.7) — ✅ Pass (global :focus-visible rule in globals.css)
+1062:  3. aria-labels on icon-only buttons (4.1.2) — ✅ Pass (TopBar + DevToolbar + SideNav all carry aria-label; IconButton enforces aria-label via TypeScript)
+1063:  4. Semantic HTML (main/header/nav/footer) (1.3.1) — ✅ Pass (AppShell uses <header>, <nav aria-label="Main navigation">, <main>, <footer>)
+1065:  6. Screen reader labels (alt + sr-only) (1.1.1 + 4.1.2) — ✅ Pass (Illustrations have role="img" + aria-label; Toaster uses role="status"; ErrorState uses role="alert")
+1067:  8. Reflow at 320px viewport (1.4.10) — ✅ Pass (Mobile-first from C4.1; AppShell hides SideNav below md and shows hamburger drawer)
+1068:  9. Target size ≥ 24×24 CSS px (2.5.5) — ✅ Pass (Button default h-9 = 36px; IconButton size-9 = 36px; Attendance roster rows 44px tall)
+1069:  10. Status messages (role=status) (4.1.3) — ✅ Pass (was previously partial — FIXED in this task by adding role=status + aria-live=polite + aria-label to all 5 LoadingState patterns)
+1107:Stage Summary:
+1115:  * /dev/walkthroughs created with 8 personas × 3 tasks + click counts + status ✅
+1116:  * /dev/a11y created with WCAG 2.1 AA criteria + Lighthouse mock ✅
+1117:  * Focus rings verified globally (globals.css :focus-visible) ✅
+1118:  * Hover states added to new dev pages (hover:shadow-elevation-2 transition-shadow) ✅
+1119:  * Loading skeletons verified on 17 existing pages ✅
+1120:  * Empty states verified on 12 existing pages ✅
+1121:  * Error states verified on 14 existing pages ✅
+1122:  * Micro-interactions: cards in /dev/walkthroughs + /dev/a11y have hover:shadow-elevation-2 ✅
+1123:  * EmptyState illustrations lazy-loaded via next/dynamic with ssr:false ✅
+1124:  * PDF viewer code-split verified (subagent 5-a) ✅
+1125:  * Performance optimizations documented in /dev/walkthroughs ✅
+1126:  * FROZEN tokens only — no raw hex/px in styling values ✅
+1127:  * `bun run lint` passes with zero errors, zero warnings ✅
+1128:  * All 14 routes verified via curl returning HTTP 200 ✅
+1137:Task ID: C7.1 / 7-a
+1147:- Created /home/z/my-project/src/app/dev/components/[name]/page.tsx — async server component (Next 16 params = Promise). Uses generateStaticParams + generateMetadata for full SSG. Renders 6 sections per component: (1) Header with category badge + "Documented ✅" pill + quick-stats dl (variants/states/props/tokens counts), (2) Live Preview (ComponentLivePreview with all variants rendered live), (3) States (pills for each documented state + interactive re-render), (4) Props table (auto-generated, 5 columns: name/type/default/required/description), (5) A11y Contract (role + ARIA attributes + keyboard interactions in 3-col grid), (6) Token References table (path/kind/value/preview with color swatches via inline backgroundColor style — FROZEN hex values pulled through resolveTokensWithSemantic), (7) Code Snippet in a dark <pre> with Copy button. Back link to /dev/components.
+1152:    • Each card shows displayName + "{n} variants · {n} props" + a green ✅ "Documented" badge
+1164:- ✅ Used ONLY FROZEN tokens (zero raw hex/px in component code; only the `<pre>` code block uses neutral-900/neutral-50 which are valid Tailwind theme keys)
+1165:- ✅ Did NOT modify i18n messages, moduleTree, stores, or fixtures
+1166:- ✅ Did NOT modify existing component files (button.tsx, icon-button.tsx, etc.) — only READ them
+1167:- ✅ Ran `bun run lint` — zero new errors/warnings in my files
+1168:- ✅ Dev server verified on port 3000 via curl — HTTP 200 on index and detail pages
+1199:Task ID: 7-b
+1275:Stage Summary:
+1284:  * 30-item checklist organized into 6 categories with ID/Category/Rule/How-to-check/Pass-fail-criteria per item ✅
+1285:  * Bun audit script scans src/components/ + src/app/ for raw hex + raw px in className, reports violations, exits 0/1 ✅
+1286:  * ESLint custom rule warns on raw hex + raw px in className attributes, excludes tokens.css + pdf/templates/ ✅
+1287:  * package.json has qa:design script mapped to bun run scripts/design-qa.ts ✅
+1288:  * /dev/qa page shows 30-item checklist with category badges + status badges + Run QA Audit button + summary "30 items · X pass · Y fail" ✅
+1289:  * Run QA Audit button executes the script server-side via /api/dev/qa-audit and shows results inline ✅
+1290:  * FROZEN tokens only — no raw hex/px in component code (only in tokens.css + pdf/templates/ + informational notes that have been token-referenced) ✅
+1291:  * FROZEN token files (tokens.css, tokens.ts) NOT modified ✅
+1292:  * i18n messages, moduleTree, stores, fixtures NOT modified ✅
+1293:  * bun run lint passes with zero errors, 56 warnings (all from new madrasha/no-raw-tokens rule) ✅
+1294:  * bun run scripts/design-qa.ts runs and exits 1 with 65 violations ✅
+1304:Task ID: 7-c
+1322:- Ran the script: bun run scripts/export-icons.ts → "[export-icons] Scanned 183 .ts/.tsx files; found 158 unique Lucide icons. ✅ Wrote 158 icons, 0 skipped."
+1363:Stage Summary:
+1377:  * public/assets/icons/ populated with individual SVG files for every Lucide icon used in the app (158 icons) ✅
+1378:  * scripts/export-icons.ts imports Lucide icons, exports each as SVG, creates sprite.svg with <symbol> elements, creates icon-catalog.json ✅
+1379:  * Script run successfully (zero failures, 0 skipped) ✅
+1380:  * public/assets/illustrations/ populated with 5 standalone SVG files (empty-students, empty-fees, empty-attendance, empty-inventory, empty-results) ✅
+1381:  * public/assets/brand/color-palette.json is machine-readable (all color tokens + hex values + contrast pairs + usage notes) ✅
+1382:  * public/assets/brand/favicon.svg is a teal circle with gold "م" monogram ✅
+1383:  * public/assets/brand/logo-mock.svg is a horizontal logo lockup mockup (monogram + "MadrashaOS" wordmark + Bangla subtitle) ✅
+1384:  * /dev/assets route renders a 4-tab gallery (Icons / Illustrations / Brand / PDF Templates) with summary at top showing "X icons · 5 illustrations · Y brand assets · 6 PDF templates" ✅
+1385:  * Each asset card shows preview, name, file size, download link ✅
+1386:  * PDF Templates tab links to /dev/pdfs/[template] for each of the 6 templates ✅
+1387:  * docs/PDF_TEMPLATES.md documents all 6 templates: name, purpose, props, branded colors used, font requirements ✅
+1388:  * Documents templates at src/lib/pdf/templates/ using @react-pdf/renderer ✅
+1389:  * Documents the swap path: backend can reuse client-side templates OR implement server-side PDF generation using same brand constants from src/lib/pdf/brand.ts ✅
+1390:  * FROZEN tokens only in component code (zero raw hex/px in page.tsx) ✅
+
+[Showing results with pagination = limit: 300]
