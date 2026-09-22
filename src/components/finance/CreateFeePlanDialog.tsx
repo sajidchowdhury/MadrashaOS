@@ -1,31 +1,34 @@
 "use client";
 
 /**
- * MadrashaOS — Create Fee Plan Dialog
+ * MadrashaOS — Create Fee Plan Dialog (Class-wise + Components)
  *
  * Route: used on /fees
  *
- * Creates a fee plan for a student for an academic year via
- * POST /api/v1/fees/plans. Auto-generates evenly-split installments
- * with due dates spread across the year.
+ * Creates fee plans for ALL students in a class in one go — the typical
+ * madrasha workflow where the fee structure is the same for every
+ * student in a class:
  *
- * Fields:
- *   - Student (dropdown from useStudents)
- *   - Academic year (default current year)
- *   - Total amount (BDT)
- *   - Scholarship amount (optional, default 0)
- *   - Installment count (1-12, default 3)
+ *   - Monthly/Tuition fee (per month, required)
+ *   - Hostel fee (per month, optional)
+ *   - Bus/Transport fee (per month, optional)
+ *   - Other fee (per month, optional, with custom label)
  *
- * Installments are auto-calculated:
- *   amount = (total - scholarship) / count
- *   due dates: spread evenly starting Jan 15 of the academic year
+ * The dialog computes the monthly total per student, then creates N
+ * monthly installments (default 12) for every active student in the
+ * selected class via POST /api/v1/fees/plans/bulk.
  *
- * Permission gate: fees.plan.edit (checked by parent via IfPermission)
+ * Students who already have a plan for that academic year are SKIPPED
+ * (not overwritten) — so per-student overrides survive a re-bulk.
+ *
+ * For per-student overrides (e.g. reducing fees for a specific student),
+ * the admin can use the per-row "Edit Plan" action after bulk creation.
  */
 
 import * as React from "react";
 import {
   Wallet, Plus, XCircle, AlertCircle, Save, CalendarDays,
+  Home, Bus, BookOpen, Package, Users,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -37,16 +40,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useStudents, queryClient } from "@/lib/query/client";
+import { useClasses, queryClient } from "@/lib/query/client";
 
-type Student = {
+type ClassItem = {
   id: string;
-  code: string;
   name: string;
-  nameBn?: string;
-  className?: string;
-  section?: string;
+  sections?: string[];
 };
 
 type CreateFeePlanDialogProps = {
@@ -55,103 +56,101 @@ type CreateFeePlanDialogProps = {
 };
 
 const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 export function CreateFeePlanDialog({
   open, onOpenChange,
 }: CreateFeePlanDialogProps) {
   const { toast } = useToast();
-  const { data: students } = useStudents();
+  const { data: classes } = useClasses();
 
-  const studentList = (students ?? []) as Student[];
+  const classList = (classes ?? []) as ClassItem[];
 
-  const [selectedStudentId, setSelectedStudentId] = React.useState("");
+  const [selectedClassId, setSelectedClassId] = React.useState("");
   const [academicYear, setAcademicYear] = React.useState(
     new Date().getFullYear(),
   );
-  const [totalAmount, setTotalAmount] = React.useState<string>("");
-  const [scholarshipAmount, setScholarshipAmount] = React.useState<string>("0");
-  const [installmentCount, setInstallmentCount] = React.useState(3);
-  const [notes, setNotes] = React.useState("");
+  const [monthlyTuition, setMonthlyTuition] = React.useState<string>("");
+  const [hostelFee, setHostelFee] = React.useState<string>("0");
+  const [busFee, setBusFee] = React.useState<string>("0");
+  const [otherFee, setOtherFee] = React.useState<string>("0");
+  const [otherLabel, setOtherLabel] = React.useState<string>("");
+  const [months, setMonths] = React.useState(12);
+  const [startMonth, setStartMonth] = React.useState(1);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   // Reset form when dialog opens
   React.useEffect(() => {
     if (open) {
-      setSelectedStudentId("");
+      setSelectedClassId("");
       setAcademicYear(new Date().getFullYear());
-      setTotalAmount("");
-      setScholarshipAmount("0");
-      setInstallmentCount(3);
-      setNotes("");
+      setMonthlyTuition("");
+      setHostelFee("0");
+      setBusFee("0");
+      setOtherFee("0");
+      setOtherLabel("");
+      setMonths(12);
+      setStartMonth(1);
       setError(null);
     }
   }, [open]);
 
-  // Compute installment preview
-  const total = Number(totalAmount) || 0;
-  const scholarship = Number(scholarshipAmount) || 0;
-  const netPayable = Math.max(0, total - scholarship);
-  const perInstallment = installmentCount > 0 ? netPayable / installmentCount : 0;
+  // Compute totals
+  const tuition = Number(monthlyTuition) || 0;
+  const hostel = Number(hostelFee) || 0;
+  const bus = Number(busFee) || 0;
+  const other = Number(otherFee) || 0;
+  const monthlyTotal = tuition + hostel + bus + other;
+  const totalPerStudent = monthlyTotal * months;
 
-  // Auto-generate due dates: spread evenly starting Jan 15
+  const selectedClass = classList.find((c) => c.id === selectedClassId);
+
+  // Installment preview labels
   const installmentPreview = React.useMemo(() => {
-    if (installmentCount <= 0 || perInstallment <= 0) return [];
-    const items: { label: string; amount: number; dueDate: string }[] = [];
-    const interval = 12 / installmentCount; // months between installments
-    for (let i = 0; i < installmentCount; i++) {
-      const monthIndex = Math.floor(i * interval);
-      const month = MONTH_NAMES[monthIndex] ?? "Jan";
-      items.push({
-        label: `${month} ${academicYear}`,
-        amount: Math.round(perInstallment * 100) / 100,
-        dueDate: `${academicYear}-${String(monthIndex + 1).padStart(2, "0")}-15`,
-      });
+    if (months <= 0 || monthlyTotal <= 0) return [];
+    const items: string[] = [];
+    for (let i = 0; i < Math.min(months, 4); i++) {
+      const monthIdx = (startMonth - 1 + i) % 12;
+      const yearOffset = Math.floor((startMonth - 1 + i) / 12);
+      const year = academicYear + yearOffset;
+      items.push(`${MONTH_NAMES[monthIdx]} ${year}`);
     }
     return items;
-  }, [installmentCount, perInstallment, academicYear]);
-
-  const selectedStudent = studentList.find((s) => s.id === selectedStudentId);
+  }, [months, monthlyTotal, startMonth, academicYear]);
 
   async function handleSubmit() {
     setError(null);
-    if (!selectedStudentId) {
-      setError("Please select a student.");
+    if (!selectedClassId) {
+      setError("Please select a class.");
       return;
     }
-    if (total <= 0) {
-      setError("Total amount must be greater than 0.");
+    if (tuition <= 0 && hostel <= 0 && bus <= 0 && other <= 0) {
+      setError("At least one fee component must be greater than 0.");
       return;
     }
-    if (scholarship > total) {
-      setError("Scholarship amount cannot exceed total amount.");
-      return;
-    }
-    if (installmentCount < 1 || installmentCount > 12) {
-      setError("Installment count must be between 1 and 12.");
+    if (months < 1 || months > 12) {
+      setError("Months must be between 1 and 12.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/v1/fees/plans", {
+      const res = await fetch("/api/v1/fees/plans/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          student_id: selectedStudentId,
+          class_id: selectedClassId,
           academic_year: academicYear,
-          total_amount: total,
-          scholarship_amount: scholarship,
-          installment_count: installmentCount,
-          notes: notes.trim() || undefined,
-          installments: installmentPreview.map((i) => ({
-            label: i.label,
-            amount: i.amount,
-            due_date: i.dueDate,
-          })),
+          monthly_tuition: tuition,
+          hostel_fee: hostel,
+          bus_fee: bus,
+          other_fee: other,
+          other_label: otherLabel.trim() || undefined,
+          months,
+          start_month: startMonth,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -160,10 +159,24 @@ export function CreateFeePlanDialog({
         setSubmitting(false);
         return;
       }
-      toast({
-        title: "Fee plan created",
-        description: `${selectedStudent?.name ?? "Student"} — ${installmentCount} installment(s), ৳${netPayable.toLocaleString()}`,
-      });
+
+      const result = data?.data ?? {};
+      const created = result.created ?? 0;
+      const skipped = result.skipped ?? 0;
+      const totalStudents = result.total_students ?? 0;
+
+      if (created > 0) {
+        toast({
+          title: "Fee plans created",
+          description: `${created} plan(s) created for ${selectedClass?.name ?? "class"} · ৳${monthlyTotal}/mo × ${months} months${skipped > 0 ? ` · ${skipped} already had plans` : ""}`,
+        });
+      } else if (skipped > 0) {
+        toast({
+          title: "No new plans created",
+          description: `All ${totalStudents} students in ${selectedClass?.name ?? "class"} already have fee plans for ${academicYear}.`,
+        });
+      }
+
       // Invalidate fee-related queries so the table refreshes
       queryClient.invalidateQueries({ queryKey: ["fee-plans"] });
       queryClient.invalidateQueries({ queryKey: ["fee-payments"] });
@@ -181,38 +194,42 @@ export function CreateFeePlanDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-primary-500" />
-            Create Fee Plan
+            Create Fee Plan (Class-wise)
           </DialogTitle>
           <DialogDescription>
-            Set up a fee plan for a student for the academic year. Installments
-            are auto-generated and evenly split.
+            Set the monthly fee structure once and apply it to all students
+            in a class. Students with existing plans are skipped — their
+            per-student overrides are preserved.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Student selection */}
+          {/* Class selection */}
           <div className="space-y-1.5">
-            <Label htmlFor="fee-student">Student *</Label>
-            <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-              <SelectTrigger id="fee-student" className="w-full">
-                <SelectValue placeholder="Select student" />
+            <Label htmlFor="fee-class">Class *</Label>
+            <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+              <SelectTrigger id="fee-class" className="w-full">
+                <SelectValue placeholder="Select class" />
               </SelectTrigger>
               <SelectContent>
-                {studentList.length === 0 && (
+                {classList.length === 0 && (
                   <div className="px-3 py-2 text-caption text-text-muted">
-                    No students found. Add students first.
+                    No classes found. Create classes first.
                   </div>
                 )}
-                {studentList.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name} ({s.code}){s.className ? ` · ${s.className}` : ""}
+                {classList.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                    {c.sections && c.sections.length > 0
+                      ? ` (Sections: ${c.sections.join(", ")})`
+                      : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Academic year + installment count */}
+          {/* Academic year + months */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="fee-year">Academic Year</Label>
@@ -226,92 +243,177 @@ export function CreateFeePlanDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="fee-installments">Installments (1-12)</Label>
+              <Label htmlFor="fee-months">Months (1-12)</Label>
               <Input
-                id="fee-installments"
+                id="fee-months"
                 type="number"
                 min={1}
                 max={12}
-                value={installmentCount}
+                value={months}
                 onChange={(e) =>
-                  setInstallmentCount(
-                    Math.max(1, Math.min(12, Number(e.target.value) || 1)),
-                  )
+                  setMonths(Math.max(1, Math.min(12, Number(e.target.value) || 1)))
                 }
               />
             </div>
           </div>
 
-          {/* Amounts */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="fee-total">Total Amount (BDT) *</Label>
+          {/* --- Fee Components --- */}
+          <div className="space-y-2">
+            <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">
+              Monthly Fee Components (BDT/month)
+            </p>
+
+            {/* Tuition */}
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-50">
+                <BookOpen className="h-4 w-4 text-primary-600" />
+              </div>
+              <Label htmlFor="fee-tuition" className="w-24 shrink-0 text-body">
+                Tuition *
+              </Label>
               <Input
-                id="fee-total"
+                id="fee-tuition"
                 type="number"
                 min={0}
-                placeholder="12000"
-                value={totalAmount}
-                onChange={(e) => setTotalAmount(e.target.value)}
+                placeholder="500"
+                value={monthlyTuition}
+                onChange={(e) => setMonthlyTuition(e.target.value)}
+                className="flex-1"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fee-scholarship">Scholarship (BDT)</Label>
+
+            {/* Hostel */}
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-50">
+                <Home className="h-4 w-4 text-accent-600" />
+              </div>
+              <Label htmlFor="fee-hostel" className="w-24 shrink-0 text-body">
+                Hostel
+              </Label>
               <Input
-                id="fee-scholarship"
+                id="fee-hostel"
                 type="number"
                 min={0}
                 placeholder="0"
-                value={scholarshipAmount}
-                onChange={(e) => setScholarshipAmount(e.target.value)}
+                value={hostelFee}
+                onChange={(e) => setHostelFee(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+
+            {/* Bus */}
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-success-50">
+                <Bus className="h-4 w-4 text-semantic-success" />
+              </div>
+              <Label htmlFor="fee-bus" className="w-24 shrink-0 text-body">
+                Bus
+              </Label>
+              <Input
+                id="fee-bus"
+                type="number"
+                min={0}
+                placeholder="0"
+                value={busFee}
+                onChange={(e) => setBusFee(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+
+            {/* Other */}
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-100">
+                <Package className="h-4 w-4 text-text-secondary" />
+              </div>
+              <Label htmlFor="fee-other" className="w-24 shrink-0 text-body">
+                Other
+              </Label>
+              <Input
+                id="fee-other"
+                type="number"
+                min={0}
+                placeholder="0"
+                value={otherFee}
+                onChange={(e) => setOtherFee(e.target.value)}
+                className="flex-1"
+              />
+              <Input
+                aria-label="Other fee label"
+                placeholder="label (e.g. Exam)"
+                value={otherLabel}
+                onChange={(e) => setOtherLabel(e.target.value)}
+                className="w-32"
               />
             </div>
           </div>
 
-          {/* Notes */}
+          {/* Start month */}
           <div className="space-y-1.5">
-            <Label htmlFor="fee-notes">Notes (optional)</Label>
-            <Input
-              id="fee-notes"
-              placeholder="e.g. Annual tuition fee"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+            <Label htmlFor="fee-start">Start Month</Label>
+            <Select value={String(startMonth)} onValueChange={(v) => setStartMonth(Number(v))}>
+              <SelectTrigger id="fee-start" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_NAMES.map((m, i) => (
+                  <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Installment preview */}
-          {installmentPreview.length > 0 && total > 0 && (
-            <div className="rounded-md border border-border-default bg-surface-hover p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-caption font-semibold uppercase tracking-wide text-text-muted">
+          {/* Summary */}
+          {monthlyTotal > 0 && (
+            <div className="rounded-md border border-primary-200 bg-primary-50 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-caption font-semibold uppercase tracking-wide text-primary-700">
                 <CalendarDays className="h-3.5 w-3.5" />
-                Installment Preview
+                Summary
               </div>
               <div className="space-y-1">
-                <div className="flex justify-between text-caption text-text-secondary">
-                  <span>Net payable:</span>
+                <div className="flex justify-between text-body">
+                  <span className="text-text-secondary">Monthly per student:</span>
                   <span className="font-mono font-medium text-text-primary">
-                    ৳{netPayable.toLocaleString()}
+                    ৳{monthlyTotal.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between text-caption text-text-secondary">
-                  <span>Per installment ({installmentCount}×):</span>
+                <div className="flex justify-between text-body">
+                  <span className="text-text-secondary">Total per student ({months} mo):</span>
                   <span className="font-mono font-medium text-text-primary">
-                    ৳{perInstallment.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    ৳{totalPerStudent.toLocaleString()}
                   </span>
                 </div>
+                {selectedClass && (
+                  <div className="flex items-center justify-between pt-1 text-caption text-primary-700">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      Applies to all active students in {selectedClass.name}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {installmentPreview.map((inst, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 rounded-md border border-border-default bg-surface-card px-2 py-1 text-caption text-text-secondary"
-                  >
-                    {inst.label} · ৳{inst.amount.toLocaleString()}
-                  </span>
-                ))}
-              </div>
+              {installmentPreview.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {installmentPreview.map((label) => (
+                    <Badge key={label} variant="outline" className="bg-surface-card font-normal">
+                      {label} · ৳{monthlyTotal.toLocaleString()}
+                    </Badge>
+                  ))}
+                  {months > 4 && (
+                    <Badge variant="outline" className="bg-surface-card">
+                      +{months - 4} more
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
           )}
+
+          {/* Tip about per-student overrides */}
+          <div className="rounded-md border border-border-default bg-surface-hover px-3 py-2 text-caption text-text-secondary">
+            <strong className="text-text-primary">Tip:</strong> After bulk creation,
+            you can edit individual student plans to reduce fees for specific
+            students (e.g. scholarships).
+          </div>
 
           {error && (
             <div
@@ -331,7 +433,7 @@ export function CreateFeePlanDialog({
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
             <Save className="h-4 w-4" />
-            {submitting ? "Creating…" : "Create Fee Plan"}
+            {submitting ? "Creating…" : `Create for ${selectedClass?.name ?? "Class"}`}
           </Button>
         </DialogFooter>
       </DialogContent>
