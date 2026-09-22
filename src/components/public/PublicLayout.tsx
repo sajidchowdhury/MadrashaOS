@@ -24,7 +24,7 @@ import {
   ArrowRight, MapPin, Clock, ExternalLink,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/I18nProvider";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { useCmsStore } from "@/stores/cmsStore";
 import { tokenVersion } from "@/lib/design-system/tokens";
 import { DynamicIcon } from "./DynamicIcon";

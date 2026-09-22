@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 
 export function ThemeToggle({

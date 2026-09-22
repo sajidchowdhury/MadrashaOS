@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { Inter, Hind_Siliguri, Noto_Naskh_Arabic, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { QueryProvider } from "@/lib/query/QueryProvider";
 
