@@ -38,7 +38,10 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
-  style: ["normal", "italic"],
+  // NOTE: do NOT add style: ["normal", "italic"] here — Turbopack dev mode
+  // cannot reliably resolve the Inter italic variant and logs:
+  //   "Could not resolve font for Inter, fontWeight 400, fontStyle italic"
+  // The italic variant is provided by the @font-face rule in globals.css.
 });
 
 const hindSiliguri = Hind_Siliguri({
