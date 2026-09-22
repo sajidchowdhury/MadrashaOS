@@ -37,6 +37,7 @@ import {
   useStudents, useFeePlans, usePendingApprovals, useFeePayments,
 } from "@/lib/query/client";
 import { CollectPaymentDialog } from "@/components/finance/CollectPaymentDialog";
+import { CreateFeePlanDialog } from "@/components/finance/CreateFeePlanDialog";
 import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
 
 type Row = {
@@ -63,6 +64,7 @@ export default function FeesPage() {
   const { data: feePayments } = useFeePayments();
 
   const [collectOpen, setCollectOpen] = React.useState(false);
+  const [createPlanOpen, setCreatePlanOpen] = React.useState(false);
   const [preselectedStudentId, setPreselectedStudentId] = React.useState<string | undefined>();
   const [search, setSearch] = React.useState("");
 
@@ -139,12 +141,20 @@ export default function FeesPage() {
               Outstanding installments per student. Collect payments in three guided steps.
             </p>
           </div>
-          <IfPermission code="fees.payment.create">
-            <Button data-mobile-cta-target onClick={() => openCollect(undefined)}>
-              <Wallet className="h-4 w-4" />
-              Collect Payment
-            </Button>
-          </IfPermission>
+          <div className="flex flex-wrap gap-2">
+            <IfPermission code="fees.plan.edit">
+              <Button variant="outline" onClick={() => setCreatePlanOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Create Fee Plan
+              </Button>
+            </IfPermission>
+            <IfPermission code="fees.payment.create">
+              <Button data-mobile-cta-target onClick={() => openCollect(undefined)}>
+                <Wallet className="h-4 w-4" />
+                Collect Payment
+              </Button>
+            </IfPermission>
+          </div>
         </header>
 
         {/* KPI strip */}
@@ -322,6 +332,11 @@ export default function FeesPage() {
         open={collectOpen}
         onOpenChange={setCollectOpen}
         preselectedStudentId={preselectedStudentId}
+      />
+
+      <CreateFeePlanDialog
+        open={createPlanOpen}
+        onOpenChange={setCreatePlanOpen}
       />
     </div>
   );
