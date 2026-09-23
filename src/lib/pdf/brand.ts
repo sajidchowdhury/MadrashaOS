@@ -144,12 +144,27 @@ export function registerPdfFonts(): void {
           fontWeight: 400,
         },
         {
+          src: "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.18/files/inter-latin-400-italic.woff",
+          fontWeight: 400,
+          fontStyle: "italic",
+        },
+        {
           src: "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.18/files/inter-latin-600-normal.woff",
           fontWeight: 600,
         },
         {
+          src: "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.18/files/inter-latin-600-italic.woff",
+          fontWeight: 600,
+          fontStyle: "italic",
+        },
+        {
           src: "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.18/files/inter-latin-700-normal.woff",
           fontWeight: 700,
+        },
+        {
+          src: "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.18/files/inter-latin-700-italic.woff",
+          fontWeight: 700,
+          fontStyle: "italic",
         },
       ],
     });
