@@ -18,7 +18,7 @@
  */
 
 import * as React from "react";
-import { Calculator, Plus, Search, Download } from "lucide-react";
+import { Calculator, Plus, Search, Download, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ import { formatCurrency, formatDate } from "@/lib/i18n/format";
 import { useLedgerEntries, useAccounts } from "@/lib/query/client";
 import { users } from "@/lib/mock/fixtures/users";
 import { LedgerEntryForm } from "@/components/finance/LedgerEntryForm";
+import { AccountFormDialog } from "@/components/finance/AccountFormDialog";
 import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
 
 type StatusFilter = "all" | "posted" | "pending" | "rejected";
@@ -55,6 +56,7 @@ export default function AccountingPage() {
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [search, setSearch] = React.useState("");
   const [entryOpen, setEntryOpen] = React.useState(false);
+  const [accountOpen, setAccountOpen] = React.useState(false);
 
   const accountName = (id: string) => accounts?.find((a) => a.id === id)?.name ?? id;
   const postedBy = (id: string) => users.find((u) => u.id === id)?.name ?? id;
@@ -135,6 +137,10 @@ export default function AccountingPage() {
               fileName={`ledger-statement-${fromDate || "all"}-to-${toDate || "now"}.pdf`}
             />
             <IfPermission code="accounting.ledger.post">
+              <Button variant="outline" onClick={() => setAccountOpen(true)}>
+                <Landmark className="h-4 w-4" />
+                Add Account
+              </Button>
               <Button onClick={() => setEntryOpen(true)}>
                 <Plus className="h-4 w-4" />
                 New Entry
@@ -305,9 +311,93 @@ export default function AccountingPage() {
             Running balance is cumulative in chronological order.
           </p>
         )}
+
+        {/* ---------- Chart of Accounts ---------- */}
+        <section aria-labelledby="accounts-heading">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 id="accounts-heading" className="flex items-center gap-2 text-subtitle font-semibold text-text-primary">
+              <Landmark className="h-4 w-4 text-primary-500" />
+              Chart of Accounts ({accounts?.length ?? 0})
+            </h2>
+            <IfPermission code="accounting.ledger.post">
+              <Button size="sm" variant="outline" onClick={() => setAccountOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add Account
+              </Button>
+            </IfPermission>
+          </div>
+
+          {accounts && accounts.length > 0 ? (
+            <div className="overflow-hidden rounded-lg border border-border-default bg-surface-card">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-neutral-50">
+                    <TableHead className="px-4">Code</TableHead>
+                    <TableHead className="px-4">Name</TableHead>
+                    <TableHead className="px-4">Type</TableHead>
+                    <TableHead className="px-4">Fund</TableHead>
+                    <TableHead className="px-4 text-end">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.map((a) => (
+                    <TableRow key={a.id} className="hover:bg-surface-hover">
+                      <TableCell className="px-4 py-2 font-mono text-caption font-semibold text-text-primary">
+                        {a.code}
+                      </TableCell>
+                      <TableCell className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-body font-medium text-text-primary">{a.name}</span>
+                          {a.isCash && (
+                            <Badge variant="outline" className="bg-success-50 text-semantic-success">Cash</Badge>
+                          )}
+                          {a.isBank && (
+                            <Badge variant="outline" className="bg-primary-50 text-primary-700">Bank</Badge>
+                          )}
+                        </div>
+                        {a.nameBn && (
+                          <p className="text-caption text-text-muted" lang="bn">{a.nameBn}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-4 py-2">
+                        <Badge variant="outline" className="capitalize">
+                          {a.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-2 text-caption text-text-secondary">
+                        {a.fund ?? "general"}
+                      </TableCell>
+                      <TableCell className="px-4 py-2 text-end font-mono text-body">
+                        <span className={Number(a.balance) > 0 ? "text-semantic-success" : "text-text-muted"}>
+                          {formatCurrency(Number(a.balance), locale)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border-default bg-surface-card p-6 text-center">
+              <Landmark className="mx-auto mb-2 h-8 w-8 text-text-muted" />
+              <p className="text-body font-medium text-text-primary">No accounts yet</p>
+              <p className="mt-1 text-caption text-text-secondary">
+                Add accounts (Cash, Bank, Fee Income, Salary Expense, …) before
+                creating ledger entries.
+              </p>
+              <IfPermission code="accounting.ledger.post">
+                <Button size="sm" className="mt-3" onClick={() => setAccountOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Add Account
+                </Button>
+              </IfPermission>
+            </div>
+          )}
+        </section>
       </div>
 
       <LedgerEntryForm open={entryOpen} onOpenChange={setEntryOpen} />
+      <AccountFormDialog open={accountOpen} onOpenChange={setAccountOpen} />
     </div>
   );
 }
