@@ -225,16 +225,22 @@ The "Add Teacher" dialog was added in commit `e2165f6`. The Assign Teacher dropd
 ### Where to find it
 - **Page:** `/hostel` (`src/app/(app)/hostel/page.tsx`)
 - **API:** `GET/POST /api/v1/hostel/rooms`, `POST /api/v1/hostel/beds/[id]/allocate`, `POST /api/v1/hostel/beds/[id]/deallocate`
+- **Fee integration:** `POST /api/v1/fees/plans/bulk` (hostel_fee is now conditional on allocation)
 
 ### Business logic
 - **Room/Bed model:** `HostelRoom` has rooms, each with `HostelBed` rows. Beds have `student_id?`, `status` (vacant/occupied), `allocated_at`, `vacated_at`, and `monthly_fee` (the actual per-bed charge).
 - **Allocate** (`POST /api/v1/hostel/beds/[id]/allocate`): Links a student to a bed, sets `status='occupied'`, records `monthly_fee`.
 - **Deallocate:** Frees the bed, sets `vacated_at`.
+- **Fee plan integration (fixed):** When creating a class-wise fee plan with a `hostel_fee` component, the bulk fee endpoint now:
+  1. Queries `HostelBed` for all students in the class.
+  2. For students with an active allocation (`status='occupied' AND vacated_at IS NULL`): uses `HostelBed.monthly_fee` if > 0, otherwise falls back to the request body's `hostel_fee`.
+  3. For day scholars (no active bed): sets `hostel_fee = 0` — they don't pay hostel.
+  4. Each student's fee plan notes include their bed/room number if allocated.
+  5. Response includes `boarders` + `day_scholars` counts + per-group monthly totals.
+  6. Toast shows the breakdown (e.g. "8 boarders ৳1,500/mo, 2 day scholars ৳1,000/mo").
 
-### Status: ❌ Broken — hostel fee not connected to fee plans
-**Critical bug:** The bulk fee plan API (`POST /api/v1/fees/plans/bulk`) does NOT consult `HostelBed` allocations. When you set a `hostel_fee` in the Create Fee Plan dialog, it applies that fee to **ALL students in the class** — including day scholars who have no bed allocation.
-
-**What needs to happen:** The bulk fee endpoint should query `HostelBed` per student and only add `hostel_fee` (or use `HostelBed.monthly_fee`) for students with an active allocation (`status='occupied' AND vacated_at IS NULL`).
+### Status: ✅ Active & sufficient (fixed)
+The hostel fee bug is resolved. Day scholars are no longer charged the hostel fee. The `HostelBed.monthly_fee` field is respected per bed — if you set a different fee on a specific bed (e.g. a premium room), that amount is used instead of the class template.
 
 ---
 
@@ -478,10 +484,10 @@ All mutations are audited.
 | 5 | Madrasha Profile | ✅ Active | Organization + branch management |
 | 6 | Classes & Sections | ✅ Active | Create class + sections in one flow |
 | 7 | Subjects | ✅ Active | Full CRUD, Quranic flag, categories |
-| 8 | Fee Plans (Class-wise) | ⚠️ Needs fix | Hostel fee applied to ALL students (bug) |
+| 8 | Fee Plans (Class-wise) | ✅ Fixed | Hostel fee now conditional on bed allocation |
 | 9 | Fee Collection | ✅ Active | Wired to ledger (Golden Flow) |
 | 10 | Teacher Assignment | ✅ Active | Add Teacher + Assign (class+subject) |
-| 11 | Hostel Management | ❌ Broken | Bed allocation exists but fee not linked |
+| 11 | Hostel Management | ✅ Fixed | Hostel fee now conditional on bed allocation |
 | 12 | Attendance | ✅ Active | Take attendance → real API |
 | 13 | Inventory Sale to Students | ❌ Missing | No sale model, no fee link |
 | 14 | Salary Payment (Payroll) | ✅ Active | POST /payroll/pay + ledger + payslip (implemented) |
@@ -499,23 +505,19 @@ All mutations are audited.
 
 ## Critical Gaps (Priority Order)
 
-### 1. ❌ Hostel Fee Bug — CHARGES DAY SCHOLARS
-**Impact:** When creating class-wise fee plans with a hostel component, ALL students (including day scholars) are charged the hostel fee.
-**Fix:** In `fees/plans/bulk/route.ts`, query `HostelBed` per student and only add `hostel_fee` (or use `HostelBed.monthly_fee`) for students with an active allocation.
-
-### 2. ❌ Inventory Sale to Students — MISSING
+### 1. ❌ Inventory Sale to Students — MISSING
 **Impact:** When a student buys something from the inventory (book, uniform, supplies), there's no way to charge them or add it to their fee.
 **Fix:** Add an `InventorySale` model with `student_id` + `amount` + ledger posting + optional `FeeInstallment` link.
 
-### 3. ❌ Library Frontend — MOCK DATA
+### 2. ❌ Library Frontend — MOCK DATA
 **Impact:** The library page shows 8 hardcoded mock books and doesn't call the real API. Issue/return don't persist.
 **Fix:** Wire the `/library` page to `useQuery` (books) + `fetch` (issue/return).
 
-### 4. ⚠️ Library Fines — NOT LINKED TO FEES
+### 3. ⚠️ Library Fines — NOT LINKED TO FEES
 **Impact:** When a book is returned with a fine, the fine is stored on the `LibraryIssue` row but never added to the student's fee outstanding.
 **Fix:** In `library/return/route.ts`, when `fine_amount > 0`, create a `FeeInstallment` for the student.
 
-### 5. ⚠️ Approvals — NOT GATING OPERATIONS
+### 4. ⚠️ Approvals — NOT GATING OPERATIONS
 **Impact:** The Approval entity exists but doesn't gate fee discounts, salary, or admissions. Only purchase uses it (indirectly via `Purchase.status`).
 **Fix:** Hook salary payment, fee-discount-above-threshold, and purchase receive into checking for an `Approval` row with `status='approved'`.
 
@@ -542,7 +544,6 @@ If you follow this workflow, everything works end-to-end:
 ## What Blocks the Full Workflow
 
 - ❌ **Cannot charge students for inventory purchases** — no sale model
-- ❌ **Hostel fee overcharges day scholars** — bulk fee bug
 - ❌ **Library page is fake** — mock data, no real issue/return
 - ❌ **Library fines don't reach student fees** — disconnected
 

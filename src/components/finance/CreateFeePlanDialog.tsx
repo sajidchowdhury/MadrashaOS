@@ -164,11 +164,22 @@ export function CreateFeePlanDialog({
       const created = result.created ?? 0;
       const skipped = result.skipped ?? 0;
       const totalStudents = result.total_students ?? 0;
+      const boarders = result.boarders ?? 0;
+      const dayScholars = result.day_scholars ?? 0;
 
       if (created > 0) {
+        const dayScholarMonthly = tuition + bus + other;
+        const breakdown =
+          boarders > 0 && dayScholars > 0
+            ? ` · ${boarders} boarder(s) ৳${monthlyTotal}/mo, ${dayScholars} day scholar(s) ৳${dayScholarMonthly}/mo`
+            : boarders > 0
+              ? ` · ${boarders} boarder(s) ৳${monthlyTotal}/mo`
+              : dayScholars > 0
+                ? ` · ${dayScholars} day scholar(s) ৳${dayScholarMonthly}/mo`
+                : "";
         toast({
           title: "Fee plans created",
-          description: `${created} plan(s) created for ${selectedClass?.name ?? "class"} · ৳${monthlyTotal}/mo × ${months} months${skipped > 0 ? ` · ${skipped} already had plans` : ""}`,
+          description: `${created} plan(s) for ${selectedClass?.name ?? "class"}${breakdown}${skipped > 0 ? ` · ${skipped} already had plans` : ""}`,
         });
       } else if (skipped > 0) {
         toast({
@@ -408,8 +419,13 @@ export function CreateFeePlanDialog({
             </div>
           )}
 
-          {/* Tip about per-student overrides */}
+          {/* Tip about hostel fee behavior + per-student overrides */}
           <div className="rounded-md border border-border-default bg-surface-hover px-3 py-2 text-caption text-text-secondary">
+            <strong className="text-text-primary">Hostel fee:</strong> Only applied to
+            students with an active hostel bed allocation. Day scholars (no bed)
+            are automatically skipped. If a bed has its own monthly fee set,
+            that overrides the amount entered here.
+            <br />
             <strong className="text-text-primary">Tip:</strong> After bulk creation,
             you can edit individual student plans to reduce fees for specific
             students (e.g. scholarships).

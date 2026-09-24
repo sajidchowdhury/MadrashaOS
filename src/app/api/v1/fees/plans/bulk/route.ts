@@ -118,6 +118,43 @@ export const POST = withPermission("fees.plan.edit", async (req: Request) => {
     );
   }
 
+  // --- HOSTEL ALLOCATION CHECK (bug fix) ---
+  // The hostel_fee from the request body is a TEMPLATE — it's only applied
+  // to students who actually have an active hostel bed allocation.
+  // Day scholars (no bed, or bed vacated) do NOT pay the hostel fee.
+  //
+  // For students WITH an active allocation, the actual hostel charge is:
+  //   - HostelBed.monthly_fee if it's > 0 (the per-bed actual charge)
+  //   - otherwise falls back to the request body's hostel_fee
+  //
+  // An allocation is "active" when status='occupied' AND vacated_at IS NULL.
+  const studentIds = students.map((s) => s.id);
+  const activeBeds = await db.hostelBed.findMany({
+    where: {
+      organization_id: ctx.organization_id,
+      student_id: { in: studentIds },
+      status: "occupied",
+      vacated_at: null,
+      deleted_at: null,
+    },
+    select: {
+      student_id: true,
+      monthly_fee: true,
+      bed_number: true,
+      room: { select: { room_number: true } },
+    },
+  });
+  // Map: student_id → { monthlyFee, bedNumber, roomNumber }
+  const hostelMap = new Map<string, { monthlyFee: number; bedNumber: string; roomNumber: string }>();
+  for (const bed of activeBeds) {
+    const bedFee = Number(bed.monthly_fee);
+    hostelMap.set(bed.student_id, {
+      monthlyFee: bedFee > 0 ? bedFee : data.hostel_fee,
+      bedNumber: bed.bed_number,
+      roomNumber: bed.room?.room_number ?? "—",
+    });
+  }
+
   // Find students who already have a fee plan for this academic year —
   // we skip them so re-running bulk doesn't overwrite per-student overrides.
   const existingPlans = await db.feePlan.findMany({
@@ -146,53 +183,70 @@ export const POST = withPermission("fees.plan.edit", async (req: Request) => {
     );
   }
 
-  // Build installment rows (same for every student in this bulk run)
-  const installments: { label: string; amount: number; due_date: Date }[] = [];
+  // Build installment LABELS + DUE DATES (shared across all students — only
+  // the AMOUNT varies per student based on hostel allocation).
+  const installmentDates: { label: string; due_date: Date }[] = [];
   for (let i = 0; i < data.months; i++) {
     const monthIdx = (data.start_month - 1 + i) % 12;
     const yearOffset = Math.floor((data.start_month - 1 + i) / 12);
     const monthName = MONTH_NAMES[monthIdx];
     const year = data.academic_year + yearOffset;
-    installments.push({
+    installmentDates.push({
       label: `${monthName} ${year}`,
-      amount: monthlyTotal,
       due_date: new Date(year, monthIdx, 15),
     });
   }
 
-  const totalAmount = monthlyTotal * data.months;
-
-  // Build a human-readable notes string listing the components
-  const componentParts: string[] = [];
-  if (data.monthly_tuition > 0) componentParts.push(`Tuition: ৳${data.monthly_tuition}/mo`);
-  if (data.hostel_fee > 0) componentParts.push(`Hostel: ৳${data.hostel_fee}/mo`);
-  if (data.bus_fee > 0) componentParts.push(`Bus: ৳${data.bus_fee}/mo`);
-  if (data.other_fee > 0) {
-    componentParts.push(`${data.other_label ?? "Other"}: ৳${data.other_fee}/mo`);
-  }
-  const notes = `Monthly: ৳${monthlyTotal} × ${data.months} months. Components: ${componentParts.join(", ")}`;
-
-  // Create all plans + installments in a transaction
+  // Create all plans + installments in a transaction.
+  // Per-student monthly total = tuition + (hostel_fee IF allocated ELSE 0)
+  //                              + bus + other
+  let hostelCount = 0;
+  let dayScholarCount = 0;
   const created = await db.$transaction(async (tx) => {
     let count = 0;
     for (const student of toCreate) {
+      // --- Per-student hostel fee (bug fix) ---
+      // Day scholars (no active bed) pay 0 hostel fee.
+      // Boarders pay HostelBed.monthly_fee if > 0, else the template hostel_fee.
+      const bed = hostelMap.get(student.id);
+      const studentHostelFee = bed ? bed.monthlyFee : 0;
+      if (bed) hostelCount++; else dayScholarCount++;
+
+      const studentMonthlyTotal =
+        data.monthly_tuition + studentHostelFee + data.bus_fee + data.other_fee;
+      const studentTotalAmount = studentMonthlyTotal * data.months;
+
+      // Per-student notes (includes allocation info for boarders)
+      const parts: string[] = [];
+      if (data.monthly_tuition > 0) parts.push(`Tuition: ৳${data.monthly_tuition}/mo`);
+      if (studentHostelFee > 0) {
+        parts.push(`Hostel: ৳${studentHostelFee}/mo${bed ? ` (Bed ${bed.bedNumber}, Room ${bed.roomNumber})` : ""}`);
+      }
+      if (data.bus_fee > 0) parts.push(`Bus: ৳${data.bus_fee}/mo`);
+      if (data.other_fee > 0) {
+        parts.push(`${data.other_label ?? "Other"}: ৳${data.other_fee}/mo`);
+      }
+      const studentNotes =
+        `Monthly: ৳${studentMonthlyTotal} × ${data.months} months. ` +
+        `Components: ${parts.join(", ")}`;
+
       const plan = await tx.feePlan.create({
         data: {
           organization_id: ctx.organization_id,
           branch_id: student.branch_id ?? ctx.branch_id ?? null,
           student_id: student.id,
           academic_year: data.academic_year,
-          total_amount: totalAmount,
+          total_amount: studentTotalAmount,
           scholarship_amount: 0,
-          net_payable: totalAmount,
+          net_payable: studentTotalAmount,
           installment_count: data.months,
           status: "active",
-          notes,
+          notes: studentNotes,
           created_by: ctx.user_id,
         } as never,
       });
 
-      for (const inst of installments) {
+      for (const inst of installmentDates) {
         await tx.feeInstallment.create({
           data: {
             organization_id: ctx.organization_id,
@@ -200,7 +254,7 @@ export const POST = withPermission("fees.plan.edit", async (req: Request) => {
             fee_plan_id: plan.id,
             student_id: student.id,
             label: inst.label,
-            amount: inst.amount,
+            amount: studentMonthlyTotal,
             due_date: inst.due_date,
             status: "unpaid",
             created_by: ctx.user_id,
@@ -212,15 +266,29 @@ export const POST = withPermission("fees.plan.edit", async (req: Request) => {
     return count;
   });
 
+  // For the response summary, report the "template" monthly total (with
+  // hostel) so the admin sees what they configured, plus the actual
+  // breakdown of boarders vs day scholars.
+  const templateMonthlyTotal =
+    data.monthly_tuition + data.hostel_fee + data.bus_fee + data.other_fee;
+  const templateTotalPerStudent = templateMonthlyTotal * data.months;
+
   return successResponse(
     {
       created,
       skipped: studentsWithPlans.size,
       total_students: students.length,
       class_name: klass.name,
-      monthly_total: monthlyTotal,
-      total_per_student: totalAmount,
+      monthly_total: templateMonthlyTotal,
+      total_per_student: templateTotalPerStudent,
+      boarders: hostelCount,
+      day_scholars: dayScholarCount,
+      hostel_fee_applied: data.hostel_fee > 0,
+      hostel_fee_per_boarder: data.hostel_fee,
     },
-    `Created ${created} fee plan(s) for ${klass.name} · ৳${monthlyTotal}/mo × ${data.months} months`,
+    `Created ${created} fee plan(s) for ${klass.name} · ` +
+    `${hostelCount} boarder(s) pay ৳${templateMonthlyTotal}/mo, ` +
+    `${dayScholarCount} day scholar(s) pay ৳${data.monthly_tuition + data.bus_fee + data.other_fee}/mo ` +
+    `(hostel fee skipped for day scholars).`,
   );
 });
