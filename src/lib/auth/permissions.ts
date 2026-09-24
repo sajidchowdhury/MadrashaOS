@@ -92,6 +92,7 @@ export const PERMISSION_CODES = [
   "inventory.view",
   "inventory.receive",
   "inventory.issue",
+  "inventory.sale",
   "purchase.view",
   "purchase.create",
   "purchase.approve",

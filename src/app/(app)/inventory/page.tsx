@@ -22,7 +22,7 @@
 import * as React from "react";
 import {
   Package, Plus, Search, ArrowDownToLine, ArrowUpFromLine,
-  AlertTriangle, CheckCircle2,
+  AlertTriangle, CheckCircle2, ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,7 @@ import {
 } from "@/components/states";
 import { EmptyState } from "@/components/ui/empty-state";
 import { KpiStat } from "@/components/operations/KpiStat";
+import { SellToStudentDialog } from "@/components/inventory/SellToStudentDialog";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { formatNumber } from "@/lib/i18n/format";
@@ -67,6 +68,8 @@ export default function InventoryPage() {
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [dialogItem, setDialogItem] = React.useState<InventoryItem | undefined>();
   const [dialogQty, setDialogQty] = React.useState<number>(0);
+  const [sellOpen, setSellOpen] = React.useState(false);
+  const [sellItem, setSellItem] = React.useState<{ id: string; name: string } | undefined>();
   const [addItem, setAddItem] = React.useState({
     name: "", code: "", category: "Stationery", unit: "pcs", qty: 0, reorder: 0,
   });
@@ -168,6 +171,12 @@ export default function InventoryPage() {
               <Button variant="outline" onClick={() => openIssue(undefined)}>
                 <ArrowUpFromLine className="h-4 w-4" />
                 Issue Stock
+              </Button>
+            </IfPermission>
+            <IfPermission code="inventory.sale">
+              <Button variant="outline" onClick={() => { setSellItem(undefined); setSellOpen(true); }}>
+                <ShoppingCart className="h-4 w-4" />
+                Sell to Student
               </Button>
             </IfPermission>
             <IfPermission code="inventory.receive">
@@ -435,6 +444,13 @@ export default function InventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SellToStudentDialog
+        open={sellOpen}
+        onOpenChange={setSellOpen}
+        itemId={sellItem?.id}
+        itemName={sellItem?.name}
+      />
     </div>
   );
 }

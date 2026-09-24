@@ -241,6 +241,7 @@ model Organization {
   reports             Report[]
   approvals           Approval[]
   payroll_records     PayrollRecord[]
+  inventory_sales     InventorySale[]
 
   @@index([deleted_at])
   @@index([created_at])
@@ -319,6 +320,7 @@ model Branch {
   approvals           Approval[]
   assets_transferred  Asset[]             @relation("AssetTransferredToBranch")
   payroll_records     PayrollRecord[]
+  inventory_sales     InventorySale[]
 
   @@unique([organization_id, code])
   @@index([organization_id])
@@ -755,6 +757,7 @@ model Student {
   library_issues     LibraryIssue[]
   hostel_beds        HostelBed[]
   zakat_transactions ZakatTransaction[]
+  inventory_sales    InventorySale[]
 
   @@unique([organization_id, code])
   @@unique([section_id, roll])
@@ -1749,6 +1752,7 @@ model InventoryItem {
   organization   Organization   @relation(fields: [organization_id], references: [id])
   branch         Branch?        @relation(fields: [branch_id], references: [id])
   purchase_items PurchaseItem[]
+  sales          InventorySale[]
 
   @@unique([organization_id, code])
   @@index([organization_id, branch_id])
@@ -1757,6 +1761,49 @@ model InventoryItem {
   @@index([is_active])
   @@index([deleted_at])
   @@map("inventory_items")
+}
+
+/// Inventory Sale to Student — when a student buys something from the
+/// inventory (book, uniform, stationery). Two payment modes:
+///   - 'cash'   : paid immediately → posts a LedgerEntry (debit Cash/Bank,
+///                credit Sale Income) + decrements stock
+///   - 'credit' : added to student's outstanding fees → creates a
+///                FeeInstallment row (label: "Sale: {item name}")
+///                + decrements stock + posts a LedgerEntry (debit Accounts
+///                Receivable / Student, credit Sale Income)
+model InventorySale {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  sale_no          String    // SALE-{year}-{seq}
+  student_id       String    @db.Uuid
+  item_id          String    @db.Uuid
+  qty              Decimal   @db.Decimal(14, 2)
+  unit_price       Decimal   @db.Decimal(14, 2)
+  total_amount     Decimal   @db.Decimal(14, 2)
+  payment_mode     String    // 'cash' | 'credit'
+  account_id       String?   @db.Uuid // Cash/Bank account (cash mode)
+  fee_installment_id String? @db.Uuid // linked FeeInstallment (credit mode)
+  ledger_entry_id  String?   @db.Uuid // linked LedgerEntry
+  status           String    @default("completed") // completed | void
+  notes            String?
+  sold_at          DateTime  @default(now()) @db.Timestamptz
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization     Organization @relation(fields: [organization_id], references: [id])
+  branch           Branch?      @relation(fields: [branch_id], references: [id])
+  student          Student      @relation(fields: [student_id], references: [id])
+  item             InventoryItem @relation(fields: [item_id], references: [id])
+
+  @@unique([organization_id, sale_no])
+  @@index([organization_id, student_id])
+  @@index([organization_id, item_id])
+  @@index([sold_at])
+  @@map("inventory_sales")
 }
 
 /// Purchase order header.

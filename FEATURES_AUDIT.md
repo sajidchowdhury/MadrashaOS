@@ -266,21 +266,27 @@ The "Take Attendance" button was enabled for Administrator in commit `e2165f6` (
 ## Feature 13: Inventory Sale to Students
 
 ### Where to find it
-- **Page:** `/inventory` (`src/app/(app)/inventory/page.tsx`)
-- **API:** `GET/POST /api/v1/inventory/*` (items, issue)
+- **Page:** `/inventory` — "Sell to Student" button (gated by `inventory.sale`)
+- **API:** `POST /api/v1/inventory/sell`, `GET /api/v1/inventory/sales`
+- **Dialog:** `src/components/inventory/SellToStudentDialog.tsx`
+- **Model:** `InventorySale` (sales records table)
 
 ### Business logic
-- **Inventory Item model:** `InventoryItem` has `name`, `code`, `qty_in_stock`, `unit_price`, `reorder_level`, etc.
-- **Issue/Consume** (`POST /api/v1/inventory/issue`):
-  - Fields: `item_id`, `qty`, `note?`, `issued_to?` (free text, NOT a `student_id` FK).
-  - Decrements `qty_in_stock`, writes an audit log, sends a low-stock notification.
-  - **No money collected, no LedgerEntry created, no FeeInstallment link.**
-- **Purchases** (`/api/v1/purchases/*`): Supplier-side purchase orders (PO → approve → receive). When received, stock increases and a LedgerEntry is posted (debit inventory, credit cash/bank).
+- **Sell to Student** (`POST /api/v1/inventory/sell`):
+  - Accepts: `student_id`, `item_id`, `qty`, `unit_price?` (defaults to item's unit_cost), `payment_mode` (cash/credit), `account_id?` (required for cash), `notes?`.
+  - Validates the item exists + has sufficient stock.
+  - Validates the student exists in the tenant.
+  - Finds a Sale Income account (income account whose name contains "sale" → code "4001" → any income account).
+  - **Two payment modes:**
+    - **Cash mode:** Posts a LedgerEntry (debit Cash/Bank, credit Sale Income) + decrements stock. Updates the Cash/Bank balance.
+    - **Credit mode:** Creates a `FeeInstallment` row for the student (label: "Sale: {item name} × {qty}") + posts a LedgerEntry (debit Accounts Receivable, credit Sale Income) + decrements stock. The installment appears on `/fees` and can be collected later via "Collect Payment".
+  - Generates `sale_no` (`SALE-YYYY-NNNN`) + `voucher_no` (`JV-YYYY-NNN`).
+  - Audit log entry (`inventory.sell`).
+- **List Sales** (`GET /api/v1/inventory/sales`): Paginated, filterable by `student_id`, `item_id`, `payment_mode`.
+- **UI:** The `/inventory` page has a "Sell to Student" button in the header. Clicking it opens the `SellToStudentDialog` with student + item dropdowns, qty, unit price (auto-filled from the item's cost), payment mode (cash/credit), account (cash mode), notes, and a live total.
 
-### Status: ❌ No "sale to student" concept
-There is no `Sale` or `StudentSale` model. The `issued_to` field is free text, not linked to a student. **When a student buys something from the inventory, there is no mechanism to add that cost to their fee or create a separate sale invoice.** This is a missing feature.
-
-**What needs to happen:** Either (a) add an `InventorySale` model with `student_id` + `amount` + ledger posting + optional `FeeInstallment` link, or (b) extend the issue endpoint to accept a `student_id` and optionally create a fee charge.
+### Status: ✅ Active & sufficient (implemented)
+Students can now be charged for inventory purchases. Cash sales post immediately to the ledger; credit sales create a fee installment that rides the student's fee stream (collectable via `/fees` → Collect Payment).
 
 ---
 
@@ -489,7 +495,7 @@ All mutations are audited.
 | 10 | Teacher Assignment | ✅ Active | Add Teacher + Assign (class+subject) |
 | 11 | Hostel Management | ✅ Fixed | Hostel fee now conditional on bed allocation |
 | 12 | Attendance | ✅ Active | Take attendance → real API |
-| 13 | Inventory Sale to Students | ❌ Missing | No sale model, no fee link |
+| 13 | Inventory Sale to Students | ✅ Active | Sell to student (cash/credit) + ledger + fee link (implemented) |
 | 14 | Salary Payment (Payroll) | ✅ Active | POST /payroll/pay + ledger + payslip (implemented) |
 | 15 | Library | ❌ Mock UI | Backend exists, frontend uses mock data, fines not linked to fees |
 | 16 | Approvals Workflow | ⚠️ Underutilized | Only purchase uses it (indirectly) |
@@ -505,19 +511,15 @@ All mutations are audited.
 
 ## Critical Gaps (Priority Order)
 
-### 1. ❌ Inventory Sale to Students — MISSING
-**Impact:** When a student buys something from the inventory (book, uniform, supplies), there's no way to charge them or add it to their fee.
-**Fix:** Add an `InventorySale` model with `student_id` + `amount` + ledger posting + optional `FeeInstallment` link.
-
-### 2. ❌ Library Frontend — MOCK DATA
+### 1. ❌ Library Frontend — MOCK DATA
 **Impact:** The library page shows 8 hardcoded mock books and doesn't call the real API. Issue/return don't persist.
 **Fix:** Wire the `/library` page to `useQuery` (books) + `fetch` (issue/return).
 
-### 3. ⚠️ Library Fines — NOT LINKED TO FEES
+### 2. ⚠️ Library Fines — NOT LINKED TO FEES
 **Impact:** When a book is returned with a fine, the fine is stored on the `LibraryIssue` row but never added to the student's fee outstanding.
 **Fix:** In `library/return/route.ts`, when `fine_amount > 0`, create a `FeeInstallment` for the student.
 
-### 4. ⚠️ Approvals — NOT GATING OPERATIONS
+### 3. ⚠️ Approvals — NOT GATING OPERATIONS
 **Impact:** The Approval entity exists but doesn't gate fee discounts, salary, or admissions. Only purchase uses it (indirectly via `Purchase.status`).
 **Fix:** Hook salary payment, fee-discount-above-threshold, and purchase receive into checking for an `Approval` row with `status='approved'`.
 
@@ -543,7 +545,6 @@ If you follow this workflow, everything works end-to-end:
 
 ## What Blocks the Full Workflow
 
-- ❌ **Cannot charge students for inventory purchases** — no sale model
 - ❌ **Library page is fake** — mock data, no real issue/return
 - ❌ **Library fines don't reach student fees** — disconnected
 
