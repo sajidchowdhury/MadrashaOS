@@ -281,23 +281,30 @@ There is no `Sale` or `StudentSale` model. The `issued_to` field is free text, n
 ## Feature 14: Teacher/Employee Salary Payment (Payroll)
 
 ### Where to find it
-- **Page:** None
-- **API:** None
+- **Page:** `/employees` — per-row "Pay Salary" button (gated by `accounting.ledger.post`)
+- **API:** `POST /api/v1/payroll/pay`, `GET /api/v1/payroll`
+- **Dialog:** `src/components/finance/PaySalaryDialog.tsx`
+- **Model:** `PayrollRecord` (payslips table)
 
 ### Business logic
-- `Teacher.salary` and `Employee.salary` are stored `Decimal?` fields — purely informational metadata.
-- There is **no payroll, payslip, or pay-salary API endpoint** anywhere in the codebase.
-- `LedgerEntry.source_type` has a `salary` value listed in the comment, but **`salary` is never written** in any code path.
-- Salary is NOT wired to the ledger.
+- **Pay Salary** (`POST /api/v1/payroll/pay`):
+  - Accepts: `staff_type` (employee/teacher), `staff_id`, `month`, `year`, `amount`, `account_id` (Cash/Bank), `deductions?`, `notes?`, `payment_date?`.
+  - Validates the staff exists in the tenant and is `active`.
+  - Validates the payment account is an `asset` (Cash/Bank).
+  - Finds a Salary Expense account (debit side): looks for an expense account whose name contains "salary", then code "5000", then any expense account.
+  - **Duplicate-payslip guard:** one payslip per staff per month/year (returns 409 if already paid).
+  - **Golden Flow (transaction):** creates a `PayrollRecord` (payslip) + a balanced `LedgerEntry` with `source_type='salary'` (debit Salary Expense, credit Cash/Bank) + updates both account balances.
+  - Generates payslip number (`PAY-YYYY-NNNN`) + voucher number (`JV-YYYY-NNN`).
+  - Writes an audit log entry (`payroll.pay`).
+- **List Payslips** (`GET /api/v1/payroll`): Paginated, filterable by `staff_type`, `month`, `year`.
+- **UI:** The `/employees` page has a "Pay Salary" button per row. Clicking it opens the `PaySalaryDialog` with the staff's stored salary pre-filled. The dialog shows month/year, amount, deductions, payment account (Cash/Bank dropdown), notes, and a live summary.
 
-### Status: ❌ Missing entirely
-**There is no salary payment feature.** The salary field on Teacher/Employee is just stored data — there's no way to actually pay a salary, generate a payslip, or post a salary expense to the accounting ledger.
-
-**What needs to happen:** Add `POST /api/v1/payroll/pay` that:
-1. Accepts `employee_id` (or `teacher_id`), `month`, `amount`, `account_id` (cash/bank).
-2. Creates a `LedgerEntry` with `source_type='salary'` (debit Salary Expense, credit Cash/Bank).
-3. Optionally requires approval above a threshold.
-4. Generates a payslip PDF.
+### Status: ✅ Active & sufficient (implemented)
+Salary payment is now fully wired to the double-entry ledger. Paying a salary:
+1. Debits the Salary Expense account (expense increases)
+2. Credits the Cash/Bank account (asset decreases)
+3. Creates a payslip record for audit history
+4. Generates a payslip number (PAY-2026-0001) + voucher number (JV-2026-001)
 
 ---
 
@@ -477,7 +484,7 @@ All mutations are audited.
 | 11 | Hostel Management | ❌ Broken | Bed allocation exists but fee not linked |
 | 12 | Attendance | ✅ Active | Take attendance → real API |
 | 13 | Inventory Sale to Students | ❌ Missing | No sale model, no fee link |
-| 14 | Salary Payment (Payroll) | ❌ Missing | No endpoint, no ledger posting |
+| 14 | Salary Payment (Payroll) | ✅ Active | POST /payroll/pay + ledger + payslip (implemented) |
 | 15 | Library | ❌ Mock UI | Backend exists, frontend uses mock data, fines not linked to fees |
 | 16 | Approvals Workflow | ⚠️ Underutilized | Only purchase uses it (indirectly) |
 | 17 | Cash & Bank Transfers | ✅ Active | Wired to ledger |
@@ -492,27 +499,23 @@ All mutations are audited.
 
 ## Critical Gaps (Priority Order)
 
-### 1. ❌ Salary Payment (Payroll) — COMPLETELY MISSING
-**Impact:** Cannot pay teacher/employee salaries. No payslip. No salary expense in the ledger.
-**Fix:** Add `POST /api/v1/payroll/pay` that creates a `LedgerEntry` (debit Salary Expense, credit Cash/Bank) + optional payslip PDF.
-
-### 2. ❌ Hostel Fee Bug — CHARGES DAY SCHOLARS
+### 1. ❌ Hostel Fee Bug — CHARGES DAY SCHOLARS
 **Impact:** When creating class-wise fee plans with a hostel component, ALL students (including day scholars) are charged the hostel fee.
 **Fix:** In `fees/plans/bulk/route.ts`, query `HostelBed` per student and only add `hostel_fee` (or use `HostelBed.monthly_fee`) for students with an active allocation.
 
-### 3. ❌ Inventory Sale to Students — MISSING
+### 2. ❌ Inventory Sale to Students — MISSING
 **Impact:** When a student buys something from the inventory (book, uniform, supplies), there's no way to charge them or add it to their fee.
 **Fix:** Add an `InventorySale` model with `student_id` + `amount` + ledger posting + optional `FeeInstallment` link.
 
-### 4. ❌ Library Frontend — MOCK DATA
+### 3. ❌ Library Frontend — MOCK DATA
 **Impact:** The library page shows 8 hardcoded mock books and doesn't call the real API. Issue/return don't persist.
 **Fix:** Wire the `/library` page to `useQuery` (books) + `fetch` (issue/return).
 
-### 5. ⚠️ Library Fines — NOT LINKED TO FEES
+### 4. ⚠️ Library Fines — NOT LINKED TO FEES
 **Impact:** When a book is returned with a fine, the fine is stored on the `LibraryIssue` row but never added to the student's fee outstanding.
 **Fix:** In `library/return/route.ts`, when `fine_amount > 0`, create a `FeeInstallment` for the student.
 
-### 6. ⚠️ Approvals — NOT GATING OPERATIONS
+### 5. ⚠️ Approvals — NOT GATING OPERATIONS
 **Impact:** The Approval entity exists but doesn't gate fee discounts, salary, or admissions. Only purchase uses it (indirectly via `Purchase.status`).
 **Fix:** Hook salary payment, fee-discount-above-threshold, and purchase receive into checking for an `Approval` row with `status='approved'`.
 
@@ -536,9 +539,8 @@ If you follow this workflow, everything works end-to-end:
 12. ✅ Transfer cash↔bank (`/cashbank`)
 13. ✅ View audit trail (`/audit`)
 
-## What Doesn't Work (Blockers)
+## What Blocks the Full Workflow
 
-- ❌ **Cannot pay salaries** — no payroll feature
 - ❌ **Cannot charge students for inventory purchases** — no sale model
 - ❌ **Hostel fee overcharges day scholars** — bulk fee bug
 - ❌ **Library page is fake** — mock data, no real issue/return

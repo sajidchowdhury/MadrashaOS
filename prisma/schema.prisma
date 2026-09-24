@@ -240,6 +240,7 @@ model Organization {
   documents           Document[]
   reports             Report[]
   approvals           Approval[]
+  payroll_records     PayrollRecord[]
 
   @@index([deleted_at])
   @@index([created_at])
@@ -317,6 +318,7 @@ model Branch {
   reports             Report[]
   approvals           Approval[]
   assets_transferred  Asset[]             @relation("AssetTransferredToBranch")
+  payroll_records     PayrollRecord[]
 
   @@unique([organization_id, code])
   @@index([organization_id])
@@ -403,6 +405,9 @@ model User {
   approvals_requested Approval[] @relation("ApprovalRequestedBy")
   approvals_decided   Approval[] @relation("ApprovalDecidedBy")
   approvals_delegated Approval[] @relation("ApprovalDelegatedTo")
+
+  // Payroll — payslips where this user is the payee
+  payroll_records PayrollRecord[] @relation("PayrollPayee")
 
   @@unique([organization_id, email])
   @@index([organization_id, branch_id])
@@ -903,6 +908,45 @@ model Employee {
   @@index([joined_at])
   @@index([deleted_at])
   @@map("employees")
+}
+
+/// Payroll — salary payment records (payslips).
+/// Each row represents one salary payment to an Employee or Teacher.
+/// The linked LedgerEntry (source_type='salary') posts the double-entry:
+///   debit Salary Expense account, credit Cash/Bank account.
+model PayrollRecord {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  payslip_no       String    // PAY-{year}-{seq}
+  staff_type       String    // 'employee' | 'teacher'
+  staff_id         String    @db.Uuid // Employee.id or Teacher.id
+  user_id          String    @db.Uuid // linked User (for name lookup)
+  month            Int       // 1-12
+  year             Int
+  gross_salary     Decimal   @db.Decimal(14, 2)
+  deductions       Decimal   @default(0) @db.Decimal(14, 2)
+  net_salary       Decimal   @db.Decimal(14, 2)
+  payment_date     DateTime  @db.Date
+  account_id       String    @db.Uuid // Cash/Bank account (credit side)
+  ledger_entry_id  String?   @db.Uuid // linked LedgerEntry
+  status           String    @default("paid") // paid | void
+  notes            String?
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization     Organization @relation(fields: [organization_id], references: [id])
+  branch           Branch?      @relation(fields: [branch_id], references: [id])
+  user             User         @relation("PayrollPayee", fields: [user_id], references: [id])
+
+  @@unique([organization_id, payslip_no])
+  @@unique([organization_id, staff_type, staff_id, month, year]) // one payslip per staff per month/year
+  @@index([organization_id, staff_id])
+  @@index([user_id])
+  @@map("payroll_records")
 }
 
 /// Admission pipeline (applied → interviewed → approved → registered / rejected).

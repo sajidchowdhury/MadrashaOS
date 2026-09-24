@@ -22,9 +22,10 @@
  */
 
 import * as React from "react";
-import { Briefcase, Search, Phone, UserPlus } from "lucide-react";
+import { Briefcase, Search, Phone, UserPlus, Wallet } from "lucide-react";
 import { useEmployees } from "@/lib/query/client";
 import { Button } from "@/components/ui/button";
+import { PaySalaryDialog } from "@/components/finance/PaySalaryDialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -106,6 +107,10 @@ export default function EmployeesListPage() {
   const [search, setSearch] = React.useState("");
   const { toast } = useToast();
   const [addOpen, setAddOpen] = React.useState(false);
+  const [payOpen, setPayOpen] = React.useState(false);
+  const [payStaff, setPayStaff] = React.useState<{
+    id: string; name: string; code?: string; salary?: number | null;
+  } | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [empName, setEmpName] = React.useState("");
   const [empNameBn, setEmpNameBn] = React.useState("");
@@ -326,8 +331,11 @@ export default function EmployeesListPage() {
                     <TableHead className="text-caption font-semibold uppercase tracking-wide text-text-muted">
                       Joined
                     </TableHead>
-                    <TableHead className="pe-4 text-end text-caption font-semibold uppercase tracking-wide text-text-muted">
+                    <TableHead className="text-end text-caption font-semibold uppercase tracking-wide text-text-muted">
                       Status
+                    </TableHead>
+                    <TableHead className="pe-4 text-end text-caption font-semibold uppercase tracking-wide text-text-muted">
+                      Actions
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -392,8 +400,24 @@ export default function EmployeesListPage() {
                             ? formatDate(joinedDate, locale)
                             : "—"}
                         </TableCell>
-                        <TableCell className="pe-4 py-3 text-end">
+                        <TableCell className="py-3 text-end">
                           <StatusBadge status={e.status} />
+                        </TableCell>
+                        <TableCell className="pe-4 py-3 text-end">
+                          <IfPermission code="accounting.ledger.post">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={e.status !== "active"}
+                              onClick={() => {
+                                setPayStaff({ id: e.id, name: e.name, code: e.employeeCode, salary: e.salary });
+                                setPayOpen(true);
+                              }}
+                            >
+                              <Wallet className="h-4 w-4" />
+                              Pay Salary
+                            </Button>
+                          </IfPermission>
                         </TableCell>
                       </TableRow>
                     );
@@ -404,6 +428,16 @@ export default function EmployeesListPage() {
           </SectionCard>
         )}
       </div>
+
+      <PaySalaryDialog
+        open={payOpen}
+        onOpenChange={setPayOpen}
+        staffType="employee"
+        staffId={payStaff?.id ?? ""}
+        staffName={payStaff?.name ?? ""}
+        staffCode={payStaff?.code}
+        defaultSalary={payStaff?.salary}
+      />
 
       {/* Add Employee Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
