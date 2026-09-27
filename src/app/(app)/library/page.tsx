@@ -5,19 +5,25 @@
  *
  * Library circulation per SRS §2.5.7 (Library).
  *
- *   - 8 mock books (title, author, copies, available)
- *   - Table: Title · Author · Total Copies · Available · Status (badge)
+ * Now wired to the REAL API (was mock data before):
+ *   - useLibraryBooks() → GET /api/v1/library/books
+ *   - Issue Book → POST /api/v1/library/issue
+ *   - Return Book → POST /api/v1/library/return (with optional fine → fee)
+ *
+ * Features:
+ *   - Table: Code · Title · Author · Total · Available · Status (badge)
  *   - "Issue Book" dialog (perm: library.issue): select book + select student
- *     + VALIDATION: if available=0 → "Copy already issued — cannot issue"
- *   - "Return Book" dialog (perm: library.return)
- *   - Quick-scan mode: a search bar that lets you type a book code and
- *     instantly issue / return
- *   - Badge for status (Available=success, All Issued=danger)
+ *     + due date + VALIDATION: if available=0 → blocked
+ *   - "Return Book" dialog (perm: library.return): select issue + optional
+ *     fine amount. When fine > 0, the API creates a FeeInstallment so the
+ *     fine rides the student's fee stream.
+ *   - "Add Book" dialog (perm: library.issue): create a new book
  */
 
 import * as React from "react";
 import {
-  BookOpen, Plus, Search, ArrowUpRight, ArrowDownLeft, ScanLine, AlertTriangle,
+  BookOpen, Plus, Search, ArrowUpRight, ArrowDownLeft, AlertTriangle,
+  Save, XCircle, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,55 +41,73 @@ import {
 } from "@/components/ui/dialog";
 import { IfPermission } from "@/components/auth/IfPermission";
 import {
-  PermissionDenied,
+  PermissionDenied, LoadingState, ErrorState,
 } from "@/components/states";
 import { EmptyState } from "@/components/ui/empty-state";
 import { KpiStat } from "@/components/operations/KpiStat";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useI18n } from "@/lib/i18n/I18nProvider";
-import { formatDate } from "@/lib/i18n/format";
-import { useStudents } from "@/lib/query/client";
+import { useStudents, useLibraryBooks, queryClient } from "@/lib/query/client";
 import { useToast } from "@/hooks/use-toast";
-
-/* --- Inline mock books --- */
 
 type Book = {
   id: string;
-  code: string;
+  accessionNo: string;
   title: string;
-  titleBn: string;
+  titleBn?: string;
   author: string;
+  category: string;
   totalCopies: number;
-  available: number;
-  issuedTo?: { studentId: string; studentName: string; issuedOn: string }[];
+  availableCopies: number;
+  isAvailable: boolean;
+  shelfLocation?: string;
 };
 
-const INITIAL_BOOKS: Book[] = [
-  { id: "bk-1", code: "BK-001", title: "Tafsir Ibn Kathir (Vol 1)", titleBn: "তাফসীর ইবনে কাসীর", author: "Ibn Kathir", totalCopies: 3, available: 2 },
-  { id: "bk-2", code: "BK-002", title: "Sahih al-Bukhari", titleBn: "সহীহ বুখারী", author: "Imam Bukhari", totalCopies: 2, available: 0 },
-  { id: "bk-3", code: "BK-003", title: "Sahih Muslim", titleBn: "সহীহ মুসলিম", author: "Imam Muslim", totalCopies: 2, available: 1 },
-  { id: "bk-4", code: "BK-004", title: "Fiqh us-Sunnah", titleBn: "ফিকহুস সুন্নাহ", author: "Sayyid Sabiq", totalCopies: 4, available: 3 },
-  { id: "bk-5", code: "BK-005", title: "Arabic Grammar — Nahw", titleBn: "আরবি ব্যাকরণ — নহু", author: "Dr. V. Abdur Rahim", totalCopies: 5, available: 5 },
-  { id: "bk-6", code: "BK-006", title: "Stories of the Prophets", titleBn: "কাসাসুল আম্বিয়া", author: "Ibn Kathir", totalCopies: 3, available: 1 },
-  { id: "bk-7", code: "BK-007", title: "Seerah — The Prophet's Life", titleBn: "সীরাতে নববী", author: "Ibn Hisham", totalCopies: 2, available: 0 },
-  { id: "bk-8", code: "BK-008", title: "Bangla Grammar (Class 5-8)", titleBn: "বাংলা ব্যাকরণ", author: "Dr. Muhammed Shahidullah", totalCopies: 10, available: 7 },
-];
+type Student = {
+  id: string;
+  code: string;
+  name: string;
+  nameBn?: string;
+  className?: string;
+};
 
-type DialogMode = "issue" | "return" | null;
+type DialogMode = "issue" | "return" | "add" | null;
 
 export default function LibraryPage() {
   const { locale } = useI18n();
   const hasPermission = useSessionStore((s) => s.hasPermission);
   const canView = hasPermission("library.view");
-  const { data: students } = useStudents();
   const { toast } = useToast();
 
-  const [books, setBooks] = React.useState<Book[]>(INITIAL_BOOKS);
+  const { data: books, isLoading, isError, refetch } = useLibraryBooks();
+  const { data: students } = useStudents();
+
+  const bookList = (books ?? []) as Book[];
+  const studentList = (students ?? []) as Student[];
+
   const [search, setSearch] = React.useState("");
-  const [scanInput, setScanInput] = React.useState("");
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
-  const [dialogBookId, setDialogBookId] = React.useState<string>("");
-  const [dialogStudentId, setDialogStudentId] = React.useState<string>("");
+
+  // Issue dialog state
+  const [issueBookId, setIssueBookId] = React.useState("");
+  const [issueStudentId, setIssueStudentId] = React.useState("");
+  const [issueDueDate, setIssueDueDate] = React.useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14); // default 2-week loan
+    return d.toISOString().slice(0, 10);
+  });
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Return dialog state
+  const [returnIssueId, setReturnIssueId] = React.useState("");
+  const [returnStudentId, setReturnStudentId] = React.useState("");
+  const [fineAmount, setFineAmount] = React.useState<string>("0");
+
+  // Add book dialog state
+  const [addBook, setAddBook] = React.useState({
+    accessionNo: "", title: "", author: "", category: "Islamic", totalCopies: 1,
+  });
 
   if (!canView) {
     return (
@@ -95,124 +119,142 @@ export default function LibraryPage() {
     );
   }
 
-  const filtered = books.filter((b) => {
+  const filtered = bookList.filter((b) => {
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
-    return b.title.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.author.toLowerCase().includes(q);
+    return (
+      b.title.toLowerCase().includes(q) ||
+      b.accessionNo.toLowerCase().includes(q) ||
+      b.author.toLowerCase().includes(q)
+    );
   });
 
-  const totalCopies = books.reduce((s, b) => s + b.totalCopies, 0);
-  const totalAvailable = books.reduce((s, b) => s + b.available, 0);
-  const totalIssued = totalCopies - totalAvailable;
-  const allIssuedCount = books.filter((b) => b.available === 0).length;
-
-  const selectedBook = books.find((b) => b.id === dialogBookId);
-
-  const issueExceedsAvailable = dialogMode === "issue" && selectedBook && selectedBook.available === 0;
+  const totalCopies = bookList.reduce((s, b) => s + b.totalCopies, 0);
+  const totalAvailable = bookList.reduce((s, b) => s + b.availableCopies, 0);
+  const allIssuedCount = bookList.filter((b) => b.availableCopies === 0).length;
 
   const openIssue = (book?: Book) => {
-    setDialogBookId(book?.id ?? "");
-    setDialogStudentId("");
+    setIssueBookId(book?.id ?? "");
+    setIssueStudentId("");
+    setError(null);
     setDialogMode("issue");
   };
-  const openReturn = (book?: Book) => {
-    setDialogBookId(book?.id ?? "");
-    setDialogStudentId("");
+  const openReturn = () => {
+    setReturnIssueId("");
+    setReturnStudentId("");
+    setFineAmount("0");
+    setError(null);
     setDialogMode("return");
   };
-
-  const handleConfirmIssue = () => {
-    if (!selectedBook || selectedBook.available === 0) return;
-    const student = students?.find((s) => s.id === dialogStudentId);
-    if (!student) return;
-    setBooks((prev) => prev.map((b) => {
-      if (b.id !== selectedBook.id) return b;
-      return {
-        ...b,
-        available: b.available - 1,
-        issuedTo: [...(b.issuedTo ?? []), {
-          studentId: student.id,
-          studentName: student.name,
-          issuedOn: new Date().toISOString().slice(0, 10),
-        }],
-      };
-    }));
-    toast({
-      title: "Book issued",
-      description: `${selectedBook.title} → ${student.name} (${student.code}).`,
-    });
-    setDialogMode(null);
-    setDialogBookId("");
-    setDialogStudentId("");
+  const openAdd = () => {
+    setAddBook({ accessionNo: "", title: "", author: "", category: "Islamic", totalCopies: 1 });
+    setError(null);
+    setDialogMode("add");
   };
 
-  const handleConfirmReturn = () => {
-    if (!selectedBook) return;
-    const student = students?.find((s) => s.id === dialogStudentId);
-    if (!student) return;
-    const wasIssued = (selectedBook.issuedTo ?? []).some((i) => i.studentId === student.id);
-    if (!wasIssued) {
-      toast({
-        title: "No active issue found",
-        description: `${student.name} does not currently hold this book.`,
-        variant: "destructive",
-      });
+  const handleConfirmIssue = async () => {
+    setError(null);
+    if (!issueBookId || !issueStudentId || !issueDueDate) {
+      setError("Book, student, and due date are required.");
       return;
     }
-    setBooks((prev) => prev.map((b) => {
-      if (b.id !== selectedBook.id) return b;
-      return {
-        ...b,
-        available: Math.min(b.totalCopies, b.available + 1),
-        issuedTo: (b.issuedTo ?? []).filter((i) => i.studentId !== student.id),
-      };
-    }));
-    toast({
-      title: "Book returned",
-      description: `${selectedBook.title} ← ${student.name}.`,
-    });
-    setDialogMode(null);
-    setDialogBookId("");
-    setDialogStudentId("");
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/library/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          book_id: issueBookId,
+          student_id: issueStudentId,
+          due_date: issueDueDate,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error || `Failed (HTTP ${res.status})`);
+        setSubmitting(false);
+        return;
+      }
+      toast({
+        title: "Book issued",
+        description: data?.message || "Book issued successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
+      setDialogMode(null);
+    } catch {
+      setError("Network error — please try again.");
+    }
+    setSubmitting(false);
   };
 
-  const handleQuickScan = () => {
-    const code = scanInput.trim().toUpperCase();
-    if (!code) return;
-    const book = books.find((b) => b.code.toUpperCase() === code);
-    if (!book) {
-      toast({
-        title: "Unknown book code",
-        description: `No book matches "${scanInput}". Try one of: BK-001 to BK-008.`,
-        variant: "destructive",
-      });
-      setScanInput("");
+  const handleConfirmReturn = async () => {
+    setError(null);
+    if (!returnIssueId) {
+      setError("Please select an issue record to return.");
       return;
     }
-    if (book.available > 0 && hasPermission("library.issue")) {
-      setBooks((prev) => prev.map((b) => b.id === book.id ? {
-        ...b,
-        available: b.available - 1,
-        issuedTo: [...(b.issuedTo ?? []), {
-          studentId: "stu-001",
-          studentName: "Walk-in Student",
-          issuedOn: new Date().toISOString().slice(0, 10),
-        }],
-      } : b));
-      toast({ title: "Book issued (quick-scan)", description: `${book.title} — issued to walk-in student.` });
-    } else if (book.available === 0 && hasPermission("library.return")) {
-      setBooks((prev) => prev.map((b) => b.id === book.id ? {
-        ...b,
-        available: Math.min(b.totalCopies, b.available + 1),
-        issuedTo: (b.issuedTo ?? []).slice(0, -1),
-      } : b));
-      toast({ title: "Book returned (quick-scan)", description: `${book.title} returned.` });
-    } else if (!hasPermission("library.issue") && !hasPermission("library.return")) {
-      toast({ title: "Insufficient permission", description: "You need library.issue or library.return to use quick-scan.", variant: "destructive" });
-    } else {
-      toast({ title: "Cannot process", description: "Book state unchanged.", variant: "destructive" });
+    const fine = Number(fineAmount) || 0;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/library/return", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issue_id: returnIssueId,
+          fine_amount: fine > 0 ? fine : undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error || `Failed (HTTP ${res.status})`);
+        setSubmitting(false);
+        return;
+      }
+      toast({
+        title: "Book returned",
+        description: data?.message || "Book returned successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
+      queryClient.invalidateQueries({ queryKey: ["fee-plans"] });
+      setDialogMode(null);
+    } catch {
+      setError("Network error — please try again.");
     }
-    setScanInput("");
+    setSubmitting(false);
+  };
+
+  const handleAddBook = async () => {
+    setError(null);
+    if (!addBook.accessionNo.trim() || !addBook.title.trim()) {
+      setError("Accession number and title are required.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/library/books", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accession_no: addBook.accessionNo.trim(),
+          title: addBook.title.trim(),
+          author: addBook.author.trim() || undefined,
+          category: addBook.category || undefined,
+          total_copies: addBook.totalCopies,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error || `Failed (HTTP ${res.status})`);
+        setSubmitting(false);
+        return;
+      }
+      toast({ title: "Book added", description: `${addBook.title} (${addBook.totalCopies} copies)` });
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
+      setDialogMode(null);
+    } catch {
+      setError("Network error — please try again.");
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -222,7 +264,7 @@ export default function LibraryPage() {
           <div>
             <h1 className="text-display font-bold text-text-primary">Library Circulation</h1>
             <p className="mt-1 text-body text-text-secondary">
-              Issue / return books with quick-scan mode per SRS §2.5.7.
+              Issue / return books. Fines are automatically added to student fees.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -233,9 +275,15 @@ export default function LibraryPage() {
               </Button>
             </IfPermission>
             <IfPermission code="library.return">
-              <Button variant="outline" onClick={() => openReturn(undefined)}>
+              <Button variant="outline" onClick={openReturn}>
                 <ArrowDownLeft className="h-4 w-4" />
                 Return Book
+              </Button>
+            </IfPermission>
+            <IfPermission code="library.issue">
+              <Button onClick={openAdd}>
+                <Plus className="h-4 w-4" />
+                Add Book
               </Button>
             </IfPermission>
           </div>
@@ -243,37 +291,10 @@ export default function LibraryPage() {
 
         {/* KPI strip */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiStat label="Total Titles" value={String(books.length)} icon={BookOpen} tone="primary" />
+          <KpiStat label="Total Titles" value={String(bookList.length)} icon={BookOpen} tone="primary" />
           <KpiStat label="Total Copies" value={String(totalCopies)} icon={Plus} tone="default" />
           <KpiStat label="Available" value={String(totalAvailable)} icon={BookOpen} tone="success" />
           <KpiStat label="All Issued" value={String(allIssuedCount)} hint="no copies available" icon={AlertTriangle} tone={allIssuedCount > 0 ? "warning" : "success"} />
-        </div>
-
-        {/* Quick-scan */}
-        <div className="rounded-lg border-2 border-dashed border-primary-500/40 bg-primary-50/30 p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-subtitle font-semibold text-primary-700">
-              <ScanLine className="h-5 w-5" />
-              Quick Scan
-            </div>
-            <div className="relative min-w-56 flex-1">
-              <Input
-                placeholder="Type book code (e.g. BK-002) and press Enter…"
-                className="font-mono"
-                value={scanInput}
-                onChange={(e) => setScanInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleQuickScan(); }}
-                aria-label="Quick scan book code"
-              />
-            </div>
-            <Button onClick={handleQuickScan} variant="outline">
-              <ScanLine className="h-4 w-4" />
-              Issue / Return
-            </Button>
-          </div>
-          <p className="mt-2 text-caption text-text-muted">
-            Toggle behaviour: available book → issue to walk-in student · no copies left → return last issued.
-          </p>
         </div>
 
         {/* Search */}
@@ -289,14 +310,26 @@ export default function LibraryPage() {
         </div>
 
         {/* Body */}
-        {filtered.length === 0 && (
+        {isLoading && <LoadingState pattern="table" rows={5} />}
+        {isError && <ErrorState onRetry={() => refetch()} />}
+        {!isLoading && !isError && filtered.length === 0 && (
           <EmptyState
             illustration="inventory"
             title="No books found"
             description={search ? `No matches for "${search}".` : "Add your first book to get started."}
+            action={
+              !search ? (
+                <IfPermission code="library.issue">
+                  <Button onClick={openAdd}>
+                    <Plus className="h-4 w-4" />
+                    Add Book
+                  </Button>
+                </IfPermission>
+              ) : undefined
+            }
           />
         )}
-        {filtered.length > 0 && (
+        {!isLoading && !isError && filtered.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-border-default bg-surface-card">
             <Table>
               <TableHeader>
@@ -304,7 +337,7 @@ export default function LibraryPage() {
                   <TableHead className="px-4">Code</TableHead>
                   <TableHead className="px-4">Title</TableHead>
                   <TableHead className="px-4">Author</TableHead>
-                  <TableHead className="px-4 text-end">Total Copies</TableHead>
+                  <TableHead className="px-4 text-end">Total</TableHead>
                   <TableHead className="px-4 text-end">Available</TableHead>
                   <TableHead className="px-4">Status</TableHead>
                   <TableHead className="px-4 text-end">Actions</TableHead>
@@ -312,63 +345,49 @@ export default function LibraryPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((b) => {
-                  const allIssued = b.available === 0;
+                  const allIssued = b.availableCopies === 0;
                   return (
                     <TableRow key={b.id} className={allIssued ? "bg-danger-50/30" : ""}>
                       <TableCell className="px-4 py-3 font-mono text-caption text-text-secondary">
-                        {b.code}
+                        {b.accessionNo}
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <p className="text-body font-medium text-text-primary">{b.title}</p>
-                        <p className="text-caption text-text-muted" lang="bn">{b.titleBn}</p>
+                        <div className="text-body font-medium text-text-primary">{b.title}</div>
+                        {b.titleBn && (
+                          <div className="text-caption text-text-muted" lang="bn">{b.titleBn}</div>
+                        )}
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-body text-text-secondary">{b.author}</TableCell>
-                      <TableCell className="px-4 py-3 text-end font-mono text-body text-text-primary">{b.totalCopies}</TableCell>
+                      <TableCell className="px-4 py-3 text-body text-text-secondary">
+                        {b.author || "—"}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-end font-mono text-body text-text-secondary">
+                        {b.totalCopies}
+                      </TableCell>
                       <TableCell className="px-4 py-3 text-end font-mono text-body">
-                        <span className={b.available === 0 ? "text-semantic-danger font-semibold" : "text-text-primary"}>
-                          {b.available}
+                        <span className={b.availableCopies > 0 ? "text-semantic-success" : "text-semantic-danger"}>
+                          {b.availableCopies}
                         </span>
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        {b.available === 0 ? (
-                          <Badge variant="outline" className="border-semantic-danger/40 bg-danger-50 text-semantic-danger">
-                            All Issued
-                          </Badge>
-                        ) : b.available === b.totalCopies ? (
-                          <Badge variant="outline" className="border-semantic-success/40 bg-success-50 text-semantic-success">
-                            Available
-                          </Badge>
+                        {b.availableCopies > 0 ? (
+                          <Badge variant="outline" className="bg-success-50 text-semantic-success">Available</Badge>
                         ) : (
-                          <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
-                            {b.available} of {b.totalCopies} free
-                          </Badge>
+                          <Badge variant="outline" className="bg-danger-50 text-semantic-danger">All Issued</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <IfPermission code="library.issue" fallback={<span className="text-caption text-text-muted">View</span>}>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openIssue(b)}
-                              disabled={b.available === 0}
-                              aria-label={`Issue ${b.title}`}
-                            >
-                              <ArrowUpRight className="h-4 w-4 text-primary-500" />
-                            </Button>
-                          </IfPermission>
-                          <IfPermission code="library.return" fallback={<span className="text-caption text-text-muted">View</span>}>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openReturn(b)}
-                              disabled={b.available === b.totalCopies}
-                              aria-label={`Return ${b.title}`}
-                            >
-                              <ArrowDownLeft className="h-4 w-4 text-semantic-success" />
-                            </Button>
-                          </IfPermission>
-                        </div>
+                      <TableCell className="px-4 py-3 text-end">
+                        <IfPermission code="library.issue">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={b.availableCopies === 0}
+                            onClick={() => openIssue(b)}
+                            aria-label={`Issue ${b.title}`}
+                          >
+                            <ArrowUpRight className="h-4 w-4" />
+                            Issue
+                          </Button>
+                        </IfPermission>
                       </TableCell>
                     </TableRow>
                   );
@@ -377,101 +396,222 @@ export default function LibraryPage() {
             </Table>
           </div>
         )}
-
-        {/* Active issues list */}
-        {books.some((b) => (b.issuedTo ?? []).length > 0) && (
-          <section className="rounded-lg border border-border-default bg-surface-card p-4">
-            <h3 className="mb-3 text-subtitle font-semibold text-text-primary">Currently Issued</h3>
-            <ul className="space-y-2">
-              {books.flatMap((b) => (b.issuedTo ?? []).map((issue, idx) => (
-                <li key={`${b.id}-${idx}`} className="flex items-center justify-between rounded-md border border-border-default p-2">
-                  <div>
-                    <p className="text-body font-medium text-text-primary">{b.title}</p>
-                    <p className="text-caption text-text-muted font-mono">{b.code}</p>
-                  </div>
-                  <div className="text-end">
-                    <p className="text-body text-text-primary">{issue.studentName}</p>
-                    <p className="text-caption text-text-muted">{formatDate(new Date(issue.issuedOn), locale)}</p>
-                  </div>
-                </li>
-              )))}
-            </ul>
-          </section>
-        )}
       </div>
 
-      {/* Issue / Return dialog */}
-      <Dialog open={dialogMode !== null} onOpenChange={(o) => !o && setDialogMode(null)}>
+      {/* ---------- Issue Dialog ---------- */}
+      <Dialog open={dialogMode === "issue"} onOpenChange={(o) => !o && setDialogMode(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-subtitle">
-              {dialogMode === "issue" ? (
-                <ArrowUpRight className="h-5 w-5 text-primary-500" />
-              ) : (
-                <ArrowDownLeft className="h-5 w-5 text-semantic-success" />
-              )}
-              {dialogMode === "issue" ? "Issue Book" : "Return Book"}
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowUpRight className="h-5 w-5 text-primary-500" />
+              Issue Book
             </DialogTitle>
             <DialogDescription>
-              {dialogMode === "issue"
-                ? "Lend a copy to a student. Validation rejects if no copies are available."
-                : "Mark a book returned to circulation."}
+              Select a book and a student to issue. The due date defaults to 2 weeks from today.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label htmlFor="lib-book" className="mb-1.5 block text-subtitle">Book</Label>
-              <Select value={dialogBookId} onValueChange={setDialogBookId}>
-                <SelectTrigger id="lib-book" className="w-full" aria-label="Select book">
-                  <SelectValue placeholder="Select book…" />
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="issue-book">Book *</Label>
+              <Select value={issueBookId} onValueChange={setIssueBookId}>
+                <SelectTrigger id="issue-book" className="w-full">
+                  <SelectValue placeholder="Select book" />
                 </SelectTrigger>
                 <SelectContent>
-                  {books.map((b) => (
+                  {bookList.filter((b) => b.availableCopies > 0).map((b) => (
                     <SelectItem key={b.id} value={b.id}>
-                      {b.title} · {b.code} ({b.available}/{b.totalCopies} available)
+                      {b.title} ({b.accessionNo}) · {b.availableCopies} avail
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="lib-stu" className="mb-1.5 block text-subtitle">Student</Label>
-              <Select value={dialogStudentId} onValueChange={setDialogStudentId}>
-                <SelectTrigger id="lib-stu" className="w-full" aria-label="Select student">
-                  <SelectValue placeholder="Select student…" />
+            <div className="space-y-1.5">
+              <Label htmlFor="issue-student">Student *</Label>
+              <Select value={issueStudentId} onValueChange={setIssueStudentId}>
+                <SelectTrigger id="issue-student" className="w-full">
+                  <SelectValue placeholder="Select student" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(students ?? []).slice(0, 40).map((s) => (
+                  {studentList.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name} · {s.code}
+                      {s.name} ({s.code}){s.className ? ` · ${s.className}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {dialogMode === "issue" && issueExceedsAvailable && (
-              <p className="rounded-md bg-danger-50 p-2 text-caption text-semantic-danger" role="alert">
-                Copy already issued — cannot issue. No copies available.
-              </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="issue-due">Due Date *</Label>
+              <Input
+                id="issue-due"
+                type="date"
+                value={issueDueDate}
+                onChange={(e) => setIssueDueDate(e.target.value)}
+              />
+            </div>
+            {error && (
+              <div role="alert" className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
-            {dialogMode === "issue" ? (
-              <Button
-                onClick={handleConfirmIssue}
-                disabled={!dialogBookId || !dialogStudentId || issueExceedsAvailable}
-              >
-                Issue Book
-              </Button>
-            ) : (
-              <Button
-                onClick={handleConfirmReturn}
-                disabled={!dialogBookId || !dialogStudentId}
-              >
-                Return Book
-              </Button>
+            <Button variant="outline" onClick={() => setDialogMode(null)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmIssue} disabled={submitting}>
+              <Save className="h-4 w-4" />
+              {submitting ? "Issuing…" : "Issue Book"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Return Dialog ---------- */}
+      <Dialog open={dialogMode === "return"} onOpenChange={(o) => !o && setDialogMode(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowDownLeft className="h-5 w-5 text-primary-500" />
+              Return Book
+            </DialogTitle>
+            <DialogDescription>
+              Enter the issue ID (from the issue receipt). If a fine applies,
+              it will be added to the student&apos;s fees automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="return-issue">Issue ID *</Label>
+              <Input
+                id="return-issue"
+                placeholder="Paste the issue_id from the issue receipt"
+                value={returnIssueId}
+                onChange={(e) => setReturnIssueId(e.target.value)}
+                className="font-mono"
+              />
+              <p className="text-caption text-text-muted">
+                Find the issue_id in the toast/receipt shown when the book was issued.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="return-fine">Fine Amount (BDT)</Label>
+              <Input
+                id="return-fine"
+                type="number"
+                min={0}
+                placeholder="0"
+                value={fineAmount}
+                onChange={(e) => setFineAmount(e.target.value)}
+              />
+              {Number(fineAmount) > 0 && (
+                <p className="text-caption text-primary-700">
+                  Fine of ৳{Number(fineAmount).toLocaleString()} will be added to
+                  the student&apos;s outstanding fees (appears on /fees).
+                </p>
+              )}
+            </div>
+            {error && (
+              <div role="alert" className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
             )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogMode(null)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmReturn} disabled={submitting}>
+              <Save className="h-4 w-4" />
+              {submitting ? "Returning…" : "Return Book"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Add Book Dialog ---------- */}
+      <Dialog open={dialogMode === "add"} onOpenChange={(o) => !o && setDialogMode(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary-500" />
+              Add Book
+            </DialogTitle>
+            <DialogDescription>
+              Add a new book to the library catalog.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="add-accession">Accession No. *</Label>
+              <Input
+                id="add-accession"
+                placeholder="BK-001"
+                value={addBook.accessionNo}
+                onChange={(e) => setAddBook({ ...addBook, accessionNo: e.target.value })}
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="add-title">Title *</Label>
+              <Input
+                id="add-title"
+                placeholder="Tafsir Ibn Kathir"
+                value={addBook.title}
+                onChange={(e) => setAddBook({ ...addBook, title: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="add-author">Author</Label>
+                <Input
+                  id="add-author"
+                  placeholder="Ibn Kathir"
+                  value={addBook.author}
+                  onChange={(e) => setAddBook({ ...addBook, author: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add-copies">Total Copies</Label>
+                <Input
+                  id="add-copies"
+                  type="number"
+                  min={1}
+                  value={addBook.totalCopies}
+                  onChange={(e) => setAddBook({ ...addBook, totalCopies: Number(e.target.value) || 1 })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="add-category">Category</Label>
+              <Input
+                id="add-category"
+                placeholder="Islamic"
+                value={addBook.category}
+                onChange={(e) => setAddBook({ ...addBook, category: e.target.value })}
+              />
+            </div>
+            {error && (
+              <div role="alert" className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogMode(null)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleAddBook} disabled={submitting}>
+              <Save className="h-4 w-4" />
+              {submitting ? "Adding…" : "Add Book"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

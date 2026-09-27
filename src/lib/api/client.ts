@@ -499,4 +499,24 @@ export const api = {
     const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/approvals/pending");
     return res.data as never;
   },
+
+  // --- Library ---
+  async getLibraryBooks() {
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/library/books?pageSize=100");
+    return res.data.map((b) => ({
+      id: b.id,
+      accessionNo: b.accessionNo,
+      title: b.title,
+      titleBn: b.titleBn ?? "",
+      titleAr: b.titleAr ?? "",
+      author: b.author ?? "",
+      category: b.category ?? "",
+      isbn: b.isbn ?? "",
+      totalCopies: b.totalCopies ?? 0,
+      availableCopies: b.availableCopies ?? 0,
+      isAvailable: b.isAvailable ?? false,
+      shelfLocation: b.shelfLocation ?? "",
+      isActive: b.isActive ?? true,
+    })) as never;
+  },
 };

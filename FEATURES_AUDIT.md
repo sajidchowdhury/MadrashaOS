@@ -323,25 +323,31 @@ Salary payment is now fully wired to the double-entry ledger. Paying a salary:
 ## Feature 15: Library Management
 
 ### Where to find it
-- **Page:** `/library` (`src/app/(app)/library/page.tsx`)
+- **Page:** `/library` (`src/app/(app)/library/page.tsx`) — wired to the real API
 - **API:** `GET/POST /api/v1/library/books`, `POST /api/v1/library/issue`, `POST /api/v1/library/return`
+- **Hooks:** `useLibraryBooks()` from `@/lib/query/client`
 
 ### Business logic
-- **Backend (real):**
-  - `LibraryBook` model: `title`, `author`, `isbn`, `total_copies`, `available_copies`, `shelf_location`.
-  - `LibraryIssue` model: `book_id`, `student_id`, `issued_at`, `due_date`, `returned_at`, `fine_amount`.
-  - **Issue** (`POST /api/v1/library/issue`): Validates availability, creates issue, decrements `available_copies`.
-  - **Return** (`POST /api/v1/library/return`): Accepts `issue_id`, `fine_amount?`, `notes?`. Stores the fine on the issue row, increments `available_copies`.
-- **Frontend (mock):**
-  - The `/library` page uses **inline mock data** (`INITIAL_BOOKS` — 8 hardcoded books), NOT the real API.
-  - Issue/return dialogs update local state only — they don't call `/api/v1/library/*`.
+- **LibraryBook model:** `title`, `author`, `isbn`, `total_copies`, `available_copies`, `shelf_location`.
+- **LibraryIssue model:** `book_id`, `student_id`, `issue_date`, `due_date`, `returned_date`, `fine_amount`, `status`.
+- **List Books** (`GET /api/v1/library/books`): Paginated, searchable by title/author/accession_no, filterable by category + availability.
+- **Add Book** (`POST /api/v1/library/books`): Creates a new book with accession_no, title, author, category, total_copies.
+- **Issue** (`POST /api/v1/library/issue`): Validates availability (409 if no copies), creates a `LibraryIssue` row, decrements `available_copies`. Fields: `book_id`, `student_id`, `due_date`, `notes?`.
+- **Return** (`POST /api/v1/library/return`): Returns a book. Fields: `issue_id`, `fine_amount?`, `notes?`. Sets `status='returned'`, increments `available_copies`.
+  - **When `fine_amount > 0`:**
+    1. Finds the student's active `FeePlan` for the current year.
+    2. Creates a `FeeInstallment` (label: "Library fine: {book title}") so the fine rides the student's fee stream — collectable via `/fees` → Collect Payment.
+    3. Posts a balanced `LedgerEntry` (debit Accounts Receivable, credit Library Fine Income) with `source_type='library_fine'`.
+    4. Updates both account balances.
+- **Frontend (real API):**
+  - The `/library` page uses `useLibraryBooks()` (TanStack Query) to fetch books.
+  - "Issue Book" dialog: select book + student + due date → calls `POST /api/v1/library/issue`.
+  - "Return Book" dialog: enter issue_id + optional fine → calls `POST /api/v1/library/return`. Shows a note that the fine will be added to student fees.
+  - "Add Book" dialog: creates a new book via `POST /api/v1/library/books`.
+  - Loading/error/empty states properly handled.
 
-### Status: ❌ Backend exists, frontend is mock
-The API works, but the UI doesn't use it. **Also, library fines are NOT connected to student fees** — the `fine_amount` is stored on the `LibraryIssue` row but never creates a `FeeInstallment` or `LedgerEntry`.
-
-**What needs to happen:**
-1. Wire the `/library` page to the real API (`useQuery` for books, `fetch` for issue/return).
-2. When a fine is recorded on return, create a `FeeInstallment` for the student (or post a ledger entry) so the fine rides the fee stream.
+### Status: ✅ Active & sufficient (fixed)
+The library page is now wired to the real API (was mock data before). Library fines are automatically added to the student's outstanding fees as a `FeeInstallment` (appears on `/fees`) and posted to the ledger as a balanced entry.
 
 ---
 
@@ -497,7 +503,7 @@ All mutations are audited.
 | 12 | Attendance | ✅ Active | Take attendance → real API |
 | 13 | Inventory Sale to Students | ✅ Active | Sell to student (cash/credit) + ledger + fee link (implemented) |
 | 14 | Salary Payment (Payroll) | ✅ Active | POST /payroll/pay + ledger + payslip (implemented) |
-| 15 | Library | ❌ Mock UI | Backend exists, frontend uses mock data, fines not linked to fees |
+| 15 | Library | ✅ Active | Real API + fines → fee installments (fixed) |
 | 16 | Approvals Workflow | ⚠️ Underutilized | Only purchase uses it (indirectly) |
 | 17 | Cash & Bank Transfers | ✅ Active | Wired to ledger |
 | 18 | Exams & Marks | ✅ Active | Create exam + enter marks + publish |
@@ -511,15 +517,7 @@ All mutations are audited.
 
 ## Critical Gaps (Priority Order)
 
-### 1. ❌ Library Frontend — MOCK DATA
-**Impact:** The library page shows 8 hardcoded mock books and doesn't call the real API. Issue/return don't persist.
-**Fix:** Wire the `/library` page to `useQuery` (books) + `fetch` (issue/return).
-
-### 2. ⚠️ Library Fines — NOT LINKED TO FEES
-**Impact:** When a book is returned with a fine, the fine is stored on the `LibraryIssue` row but never added to the student's fee outstanding.
-**Fix:** In `library/return/route.ts`, when `fine_amount > 0`, create a `FeeInstallment` for the student.
-
-### 3. ⚠️ Approvals — NOT GATING OPERATIONS
+### 1. ⚠️ Approvals — NOT GATING OPERATIONS
 **Impact:** The Approval entity exists but doesn't gate fee discounts, salary, or admissions. Only purchase uses it (indirectly via `Purchase.status`).
 **Fix:** Hook salary payment, fee-discount-above-threshold, and purchase receive into checking for an `Approval` row with `status='approved'`.
 
@@ -545,8 +543,15 @@ If you follow this workflow, everything works end-to-end:
 
 ## What Blocks the Full Workflow
 
-- ❌ **Library page is fake** — mock data, no real issue/return
-- ❌ **Library fines don't reach student fees** — disconnected
+All previously-blocking gaps are now fixed. The full madrasha workflow
+(login → employees → accounts → classes → subjects → fees → teachers →
+attendance → fee collection → salary payment → inventory sales → library)
+works end-to-end.
+
+The only remaining gap (Approvals not gating operations) is a
+nice-to-have, not a blocker — it means salary/fee-discount operations
+don't require a second-person approval, which is acceptable for smaller
+madrashas.
 
 ---
 

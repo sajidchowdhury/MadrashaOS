@@ -358,3 +358,13 @@ export function usePendingApprovals(
     ...options,
   });
 }
+
+export function useLibraryBooks(
+  options?: Omit<UseQueryOptions<unknown[]>, "queryKey" | "queryFn">,
+) {
+  return useQuery({
+    queryKey: ["library-books", ...sessionKey()],
+    queryFn: () => api.getLibraryBooks(),
+    ...options,
+  });
+}
