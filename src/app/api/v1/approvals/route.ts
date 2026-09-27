@@ -18,7 +18,7 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const createApprovalSchema = z.object({
-  type: z.enum(["expense", "purchase", "discount", "admission"]),
+  type: z.enum(["expense", "purchase", "discount", "admission", "salary"]),
   title: z.string().min(1).max(500),
   description: z.string().max(2000).optional(),
   amount: z.number().min(0).optional(),

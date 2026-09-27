@@ -143,6 +143,7 @@ enum ApprovalType {
   purchase
   discount
   admission
+  salary
 }
 
 enum ApprovalStatus {

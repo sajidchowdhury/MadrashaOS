@@ -40,6 +40,7 @@
 import { db } from "@/lib/db";
 import { getTenantContext, tenantWhere } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
+import { checkApprovalGate } from "@/lib/auth/with-approval-gate";
 import {
   jsonResponse, errorResponse, successResponse,
   paginatedResponse, parsePagination,
@@ -244,6 +245,33 @@ export const POST = withPermission("accounting.ledger.post", async (req: Request
   const paymentDate = data.payment_date ? new Date(data.payment_date) : new Date();
 
   const monthLabel = `${MONTH_NAMES[data.month - 1]} ${data.year}`;
+
+  // --- 5b. Approval gate (threshold-based) ---
+  // If the net salary exceeds SALARY_APPROVAL_THRESHOLD (default ৳20,000),
+  // the payment requires an approved Approval row. If no approval exists,
+  // a pending request is auto-created and we return 202 "pending approval".
+  // If rejected, we return 403. If approved (or below threshold), proceed.
+  const gate = await checkApprovalGate(ctx, {
+    type: "salary",
+    title: `Salary — ${staff.user.name} — ${monthLabel}`,
+    description: `Net salary: ৳${netSalary.toLocaleString()} · Staff: ${staff.user.name} (${staff.user.email}) · ${data.staff_type}`,
+    amount: netSalary,
+    entityType: "payroll",
+    entityId: `${data.staff_type}:${data.staff_id}:${data.year}:${data.month}`,
+    payload: {
+      staff_type: data.staff_type,
+      staff_id: data.staff_id,
+      staff_name: staff.user.name,
+      month: data.month,
+      year: data.year,
+      net_salary: netSalary,
+      account_id: data.account_id,
+    },
+  });
+  if (gate.status === "pending" || gate.status === "rejected") {
+    return gate.response!;
+  }
+  // gate.status === "approved" or "below_threshold" → proceed
 
   // --- 6. Golden Flow: create payslip + ledger entry + update balances ---
   const result = await db.$transaction(async (tx) => {

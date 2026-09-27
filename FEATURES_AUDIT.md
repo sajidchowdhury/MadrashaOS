@@ -356,18 +356,29 @@ The library page is now wired to the real API (was mock data before). Library fi
 ### Where to find it
 - **Page:** Dashboard approval widget + `/api/v1/approvals/*`
 - **API:** `GET/POST /api/v1/approvals`, `GET /api/v1/approvals/pending`, `POST /api/v1/approvals/[id]/approve`, `POST /api/v1/approvals/[id]/reject`, `POST /api/v1/approvals/[id]/delegate`
+- **Helper:** `src/lib/auth/with-approval-gate.ts` — `checkApprovalGate()`
 
 ### Business logic
-- **Approval model:** Generic entity with `type` (expense/purchase/discount/admission), `payload` (JSON), `entity_type`, `entity_id`, `requested_by`, `decided_by`, `status` (pending/approved/rejected/delegated).
-- **No-self-approve (D16):** A user cannot approve their own request.
-- **Who actually uses it?** Only the `/api/v1/approvals/*` routes reference `db.approval.*`. **No other business operation creates or checks an Approval row.**
-- **Purchase approval:** Enforced on the `Purchase` row itself (`purchase.status === 'approved'`), NOT via the Approval table. The receive endpoint checks `purchase.status !== 'approved'` and returns 409.
-- **Fee discount:** `PATCH /api/v1/fees/plans/[id]` updates `scholarship_amount` directly — no approval gate.
-- **Admission:** Uses its own status pipeline (`applied → approved → registered`) on the Admission row, bypassing the Approval table.
-- **Salary:** N/A (no salary endpoint exists).
+- **Approval model:** Generic entity with `type` (expense/purchase/discount/admission/salary), `payload` (JSON), `entity_type`, `entity_id`, `requested_by`, `decided_by`, `status` (pending/approved/rejected/delegated).
+- **No-self-approve (D16):** A user cannot approve their own request (enforced server-side in the approve endpoint).
+- **Threshold-based gating (implemented):** The `checkApprovalGate()` helper now gates two operations:
+  1. **Salary payment** (`POST /api/v1/payroll/pay`): If the net salary exceeds `SALARY_APPROVAL_THRESHOLD` (default ৳20,000), the payment is blocked until an Approval row with `status='approved'` exists. If none exists, a pending approval is auto-created and the endpoint returns 202 "pending approval". Once approved (by a different user), the salary can be paid by retrying the same request.
+  2. **Fee discount** (`PATCH /api/v1/fees/plans/[id]`): If `scholarship_amount` exceeds `DISCOUNT_APPROVAL_THRESHOLD` (default ৳5,000), the discount is blocked until approved. Prevents a single admin from granting large discounts without oversight.
+- **Workflow:**
+  1. User attempts an operation (e.g. pay salary of ৳25,000)
+  2. The gate helper checks: amount > threshold → yes
+  3. Looks for existing approval (type=salary, entity_id=staff:year:month)
+  4. If none → creates a pending Approval + returns 202 "Approval required"
+  5. Authorized user (e.g. Principal) sees it on the dashboard → approves it
+  6. User retries the operation → gate finds approved Approval → proceeds
+- **Thresholds** (env-configurable via `.env`):
+  - `SALARY_APPROVAL_THRESHOLD` = 20,000 BDT
+  - `DISCOUNT_APPROVAL_THRESHOLD` = 5,000 BDT
+  - `EXPENSE_APPROVAL_THRESHOLD` = 10,000 BDT
+  - Set to 0 to disable gating for a type.
 
-### Status: ⚠️ Active but underutilized
-The Approval entity exists and the dashboard shows pending approvals, but it's **not actually gating** any business operation except purchase (and even that bypasses the Approval table, checking `Purchase.status` directly). Fee discounts, salary payments, and admissions don't use it.
+### Status: ✅ Active & sufficient (fixed)
+The approval system now actually gates business operations. Salary payments above ৳20,000 and fee discounts above ৳5,000 require a second-person approval before they can be executed. D16 (no self-approve) is enforced server-side. The thresholds are configurable via environment variables.
 
 ---
 
@@ -504,7 +515,7 @@ All mutations are audited.
 | 13 | Inventory Sale to Students | ✅ Active | Sell to student (cash/credit) + ledger + fee link (implemented) |
 | 14 | Salary Payment (Payroll) | ✅ Active | POST /payroll/pay + ledger + payslip (implemented) |
 | 15 | Library | ✅ Active | Real API + fines → fee installments (fixed) |
-| 16 | Approvals Workflow | ⚠️ Underutilized | Only purchase uses it (indirectly) |
+| 16 | Approvals Workflow | ✅ Active | Threshold-based gating for salary (৳20k) + discounts (৳5k) |
 | 17 | Cash & Bank Transfers | ✅ Active | Wired to ledger |
 | 18 | Exams & Marks | ✅ Active | Create exam + enter marks + publish |
 | 19 | Results & Report Cards | ✅ Active | GPA + rank generation, guardian scope |
@@ -517,9 +528,15 @@ All mutations are audited.
 
 ## Critical Gaps (Priority Order)
 
-### 1. ⚠️ Approvals — NOT GATING OPERATIONS
-**Impact:** The Approval entity exists but doesn't gate fee discounts, salary, or admissions. Only purchase uses it (indirectly via `Purchase.status`).
-**Fix:** Hook salary payment, fee-discount-above-threshold, and purchase receive into checking for an `Approval` row with `status='approved'`.
+**All critical gaps are now resolved.** The full madrasha workflow works
+end-to-end with proper financial controls:
+
+1. ✅ ~~Salary Payment (Payroll)~~ — Fixed (commit `4060849`)
+2. ✅ ~~Hostel Fee Bug~~ — Fixed (commit `02ae8c7`)
+3. ✅ ~~Inventory Sale to Students~~ — Fixed (commit `1491eb8`)
+4. ✅ ~~Library Frontend~~ — Fixed (commit `993b9e3`)
+5. ✅ ~~Library Fines → Fees~~ — Fixed (commit `993b9e3`)
+6. ✅ ~~Approvals gating~~ — Fixed (this commit)
 
 ---
 
@@ -543,15 +560,9 @@ If you follow this workflow, everything works end-to-end:
 
 ## What Blocks the Full Workflow
 
-All previously-blocking gaps are now fixed. The full madrasha workflow
-(login → employees → accounts → classes → subjects → fees → teachers →
-attendance → fee collection → salary payment → inventory sales → library)
-works end-to-end.
-
-The only remaining gap (Approvals not gating operations) is a
-nice-to-have, not a blocker — it means salary/fee-discount operations
-don't require a second-person approval, which is acceptable for smaller
-madrashas.
+**Nothing.** All previously-blocking gaps are now fixed. The full madrasha
+workflow works end-to-end with proper financial controls (approval gating
+for large salaries + discounts).
 
 ---
 

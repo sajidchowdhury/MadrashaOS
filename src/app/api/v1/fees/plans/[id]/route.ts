@@ -10,6 +10,7 @@
 import { db } from "@/lib/db";
 import { getTenantContext } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
+import { checkApprovalGate } from "@/lib/auth/with-approval-gate";
 import { jsonResponse, errorResponse, successResponse } from "@/lib/api/helpers";
 import { z } from "zod";
 
@@ -120,6 +121,36 @@ export const PATCH = withPermission("fees.plan.edit", async (req: Request, ctx: 
   const totalAmount = parsed.data.total_amount ?? Number(existing.total_amount);
   const scholarshipAmount = parsed.data.scholarship_amount ?? Number(existing.scholarship_amount);
   const netPayable = totalAmount - scholarshipAmount;
+
+  // --- Approval gate for discounts (scholarship_amount) ---
+  // If the scholarship_amount exceeds DISCOUNT_APPROVAL_THRESHOLD (default
+  // ৳5,000), the discount requires an approved Approval row. This prevents
+  // a single admin from granting large discounts without oversight.
+  // Only triggers when scholarship_amount is being CHANGED (in the request)
+  // and exceeds the threshold.
+  if (
+    parsed.data.scholarship_amount !== undefined &&
+    scholarshipAmount > 0
+  ) {
+    const gate = await checkApprovalGate(tenantCtx, {
+      type: "discount",
+      title: `Fee discount — Plan ${id.slice(0, 8)} — ৳${scholarshipAmount.toLocaleString()}`,
+      description: `Scholarship/discount of ৳${scholarshipAmount.toLocaleString()} on fee plan. Net payable after discount: ৳${netPayable.toLocaleString()}.`,
+      amount: scholarshipAmount,
+      entityType: "fee_plan",
+      entityId: id,
+      payload: {
+        fee_plan_id: id,
+        scholarship_amount: scholarshipAmount,
+        total_amount: totalAmount,
+        net_payable: netPayable,
+      },
+    });
+    if (gate.status === "pending" || gate.status === "rejected") {
+      return gate.response!;
+    }
+    // gate.status === "approved" or "below_threshold" → proceed
+  }
 
   const updated = await db.feePlan.update({
     where: { id },
