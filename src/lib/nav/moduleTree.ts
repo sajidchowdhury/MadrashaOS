@@ -75,8 +75,8 @@ export const moduleTree: ModuleGroup[] = [
       { id: "organization", labelKey: "shell.nav.organization", icon: Building2, layer: "foundation", permissionRequired: "organization.config.view", phase: 0, route: "/organization" },
       { id: "rbac", labelKey: "shell.nav.rbac", icon: ShieldCheck, layer: "foundation", permissionRequired: "rbac.role.view", phase: 0, route: "/rbac" },
       { id: "audit", labelKey: "shell.nav.audit", icon: History, layer: "foundation", permissionRequired: "audit.view", phase: 0, route: "/audit" },
-      { id: "security", labelKey: "shell.nav.settings", icon: Lock, layer: "foundation", permissionRequired: "security.policy.edit", phase: 0, route: "/security" },
-      { id: "backup", labelKey: "shell.nav.settings", icon: DatabaseBackup, layer: "foundation", permissionRequired: "backup.run", phase: 0, route: "/backup" },
+      { id: "security", labelKey: "shell.nav.security", icon: Lock, layer: "foundation", permissionRequired: "security.policy.edit", phase: 0, route: "/security" },
+      { id: "backup", labelKey: "shell.nav.backup", icon: DatabaseBackup, layer: "foundation", permissionRequired: "backup.run", phase: 0, route: "/backup" },
     ],
   },
   {
@@ -87,7 +87,7 @@ export const moduleTree: ModuleGroup[] = [
       { id: "admission", labelKey: "shell.nav.admission", icon: UserPlus, layer: "people", permissionRequired: "admission.view", phase: 1, route: "/admission" },
       { id: "guardians", labelKey: "shell.nav.guardians", icon: Users, layer: "people", permissionRequired: "guardians.view", phase: 1, route: "/guardians" },
       { id: "teachers", labelKey: "shell.nav.teachers", icon: UserCheck, layer: "people", permissionRequired: "teachers.view", phase: 1, route: "/teachers" },
-      { id: "employees", labelKey: "shell.nav.teachers", icon: Briefcase, layer: "people", permissionRequired: "employees.view", phase: 1, route: "/employees" },
+      { id: "employees", labelKey: "shell.nav.employees", icon: Briefcase, layer: "people", permissionRequired: "employees.view", phase: 1, route: "/employees" },
     ],
   },
   {
@@ -107,10 +107,10 @@ export const moduleTree: ModuleGroup[] = [
     items: [
       { id: "fees", labelKey: "shell.nav.fees", icon: Wallet, layer: "finance", permissionRequired: "fees.view", phase: 2, route: "/fees" },
       { id: "accounting", labelKey: "shell.nav.accounting", icon: Calculator, layer: "finance", permissionRequired: "accounting.ledger.view", phase: 2, route: "/accounting" },
-      { id: "cashbank", labelKey: "shell.nav.accounting", icon: Landmark, layer: "finance", permissionRequired: "cashbank.transfer", phase: 2, route: "/cashbank" },
+      { id: "cashbank", labelKey: "shell.nav.cashbank", icon: Landmark, layer: "finance", permissionRequired: "cashbank.transfer", phase: 2, route: "/cashbank" },
       { id: "zakat", labelKey: "shell.nav.zakat", icon: Scale, layer: "finance", permissionRequired: "zakat.view", phase: 2, route: "/zakat" },
-      { id: "scholarship", labelKey: "shell.nav.fees", icon: Gift, layer: "finance", permissionRequired: "scholarship.view", phase: 2, route: "/scholarship" },
-      { id: "donations", labelKey: "shell.nav.fees", icon: CreditCard, layer: "finance", permissionRequired: "donations.view", phase: 2, route: "/donations" },
+      { id: "scholarship", labelKey: "shell.nav.scholarship", icon: Gift, layer: "finance", permissionRequired: "scholarship.view", phase: 2, route: "/scholarship" },
+      { id: "donations", labelKey: "shell.nav.donations", icon: CreditCard, layer: "finance", permissionRequired: "donations.view", phase: 2, route: "/donations" },
     ],
   },
   {
@@ -118,12 +118,12 @@ export const moduleTree: ModuleGroup[] = [
     labelKey: "shell.nav.group.operations",
     items: [
       { id: "inventory", labelKey: "shell.nav.inventory", icon: Package, layer: "operations", permissionRequired: "inventory.view", phase: 2, route: "/inventory" },
-      { id: "purchase", labelKey: "shell.nav.inventory", icon: ShoppingCart, layer: "operations", permissionRequired: "purchase.view", phase: 2, route: "/purchase" },
-      { id: "suppliers", labelKey: "shell.nav.inventory", icon: Truck, layer: "operations", permissionRequired: "suppliers.view", phase: 2, route: "/suppliers" },
+      { id: "purchase", labelKey: "shell.nav.purchases", icon: ShoppingCart, layer: "operations", permissionRequired: "purchase.view", phase: 2, route: "/purchase" },
+      { id: "suppliers", labelKey: "shell.nav.suppliers", icon: Truck, layer: "operations", permissionRequired: "suppliers.view", phase: 2, route: "/suppliers" },
       { id: "hostel", labelKey: "shell.nav.hostel", icon: Sofa, layer: "operations", permissionRequired: "hostel.view", phase: 3, route: "/hostel" },
-      { id: "food", labelKey: "shell.nav.hostel", icon: UtensilsCrossed, layer: "operations", permissionRequired: "food.meal-plan", phase: 3, route: "/food" },
+      { id: "food", labelKey: "shell.nav.food", icon: UtensilsCrossed, layer: "operations", permissionRequired: "food.meal-plan", phase: 3, route: "/food" },
       { id: "library", labelKey: "shell.nav.library", icon: BookOpen, layer: "operations", permissionRequired: "library.view", phase: 3, route: "/library" },
-      { id: "transport", labelKey: "shell.nav.inventory", icon: Bus, layer: "operations", permissionRequired: "transport.view", phase: 3, route: "/transport" },
+      { id: "transport", labelKey: "shell.nav.transport", icon: Bus, layer: "operations", permissionRequired: "transport.view", phase: 3, route: "/transport" },
     ],
   },
   {
@@ -131,7 +131,7 @@ export const moduleTree: ModuleGroup[] = [
     labelKey: "shell.nav.notices",
     items: [
       { id: "notices", labelKey: "shell.nav.notices", icon: Bell, layer: "communication", permissionRequired: "notices.view", phase: 3, route: "/notices" },
-      { id: "documents", labelKey: "shell.nav.notices", icon: FileArchive, layer: "communication", permissionRequired: "documents.download", phase: 3, route: "/documents" },
+      { id: "documents", labelKey: "shell.nav.documents", icon: FileArchive, layer: "communication", permissionRequired: "documents.download", phase: 3, route: "/documents" },
     ],
   },
   {

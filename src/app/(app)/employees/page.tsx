@@ -71,6 +71,49 @@ type EmployeeRow = {
   createdAt: string | null;
 };
 
+/**
+ * Predefined designations — the job title of the employee.
+ * NOTE: This is DIFFERENT from the Role (permission role). The Role
+ * controls what menus/features the user can access; the designation
+ * describes the job position. They are intentionally separate:
+ *   - Role (system, reserved) → e.g. "administrator", "accountant"
+ *     → controls permissions via RolePermission → Permission codes
+ *   - Designation (job title) → e.g. "Senior Accountant", "Office Assistant"
+ *     → describes the position; no permission implications
+ *
+ * Keeping designation as a dropdown prevents free-text inconsistency.
+ */
+const DESIGNATIONS = [
+  { value: "Principal", label: "Principal" },
+  { value: "Vice Principal", label: "Vice Principal" },
+  { value: "Office Assistant", label: "Office Assistant" },
+  { value: "Accountant", label: "Accountant" },
+  { value: "Senior Accountant", label: "Senior Accountant" },
+  { value: "Librarian", label: "Librarian" },
+  { value: "Storekeeper", label: "Storekeeper" },
+  { value: "Clerk", label: "Clerk" },
+  { value: "Driver", label: "Driver" },
+  { value: "Cook", label: "Cook" },
+  { value: "Guard", label: "Guard" },
+  { value: "Cleaner", label: "Cleaner" },
+  { value: "IT Support", label: "IT Support" },
+  { value: "Receptionist", label: "Receptionist" },
+] as const;
+
+/**
+ * Role options (the 8 system roles that control permissions).
+ * When creating an employee, the admin picks a role — this determines
+ * what menus/features the user can access. The role_code is sent to
+ * POST /api/v1/employees which links the User to the Role.
+ */
+const ROLE_OPTIONS = [
+  { value: "administrator", label: "Administrator — full office access" },
+  { value: "authority", label: "Authority (Principal) — all-branch read + approve" },
+  { value: "accountant", label: "Accountant — finance CRUD" },
+  { value: "storekeeper", label: "Storekeeper — inventory + purchases" },
+  { value: "teacher", label: "Teacher — own classes + sections" },
+] as const;
+
 const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
   { value: "active", label: "Active" },
@@ -115,6 +158,7 @@ export default function EmployeesListPage() {
   const [empName, setEmpName] = React.useState("");
   const [empNameBn, setEmpNameBn] = React.useState("");
   const [empDesignation, setEmpDesignation] = React.useState("");
+  const [empRole, setEmpRole] = React.useState<string>("");
   const [empPhone, setEmpPhone] = React.useState("");
   const [empEmail, setEmpEmail] = React.useState("");
   const [empSalary, setEmpSalary] = React.useState("");
@@ -122,6 +166,10 @@ export default function EmployeesListPage() {
   const handleAddEmployee = async () => {
     if (!empName.trim() || !empDesignation.trim() || !empPhone.trim() || !empEmail.trim()) {
       toast({ title: "Missing fields", description: "Name, designation, phone, and email are required.", variant: "destructive" });
+      return;
+    }
+    if (!empRole) {
+      toast({ title: "Role required", description: "Please select a permission role for this employee.", variant: "destructive" });
       return;
     }
     setSubmitting(true);
@@ -133,6 +181,7 @@ export default function EmployeesListPage() {
           name: empName.trim(),
           name_bn: empNameBn.trim() || undefined,
           designation: empDesignation.trim(),
+          role_code: empRole,
           phone: empPhone.trim(),
           email: empEmail.trim(),
           salary: empSalary ? Number(empSalary) : undefined,
@@ -145,8 +194,8 @@ export default function EmployeesListPage() {
         setSubmitting(false);
         return;
       }
-      toast({ title: "Employee added", description: `${empName} — ${empDesignation}` });
-      setEmpName(""); setEmpNameBn(""); setEmpDesignation(""); setEmpPhone(""); setEmpEmail(""); setEmpSalary("");
+      toast({ title: "Employee added", description: `${empName} — ${empDesignation} (role: ${empRole})` });
+      setEmpName(""); setEmpNameBn(""); setEmpDesignation(""); setEmpRole(""); setEmpPhone(""); setEmpEmail(""); setEmpSalary("");
       setAddOpen(false);
       queryClient.invalidateQueries({ queryKey: ["employees"] });
     } catch {
@@ -462,7 +511,37 @@ export default function EmployeesListPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="emp-designation">Designation *</Label>
-              <Input id="emp-designation" value={empDesignation} onChange={(e) => setEmpDesignation(e.target.value)} placeholder="Office Assistant" />
+              <Select value={empDesignation} onValueChange={setEmpDesignation}>
+                <SelectTrigger id="emp-designation" className="w-full">
+                  <SelectValue placeholder="Select designation" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DESIGNATIONS.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-caption text-text-muted">
+                Job title (e.g. Accountant, Librarian). This is separate from
+                the permission role below.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="emp-role">Permission Role *</Label>
+              <Select value={empRole} onValueChange={setEmpRole}>
+                <SelectTrigger id="emp-role" className="w-full">
+                  <SelectValue placeholder="Select role (controls menu access)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_OPTIONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-caption text-text-muted">
+                Determines what menus and features this employee can access.
+                Configurable later via Roles &amp; Permissions.
+              </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
