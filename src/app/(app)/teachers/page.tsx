@@ -587,7 +587,7 @@ function TeachersContent({
                             <Button
                               variant="ghost"
                               size="icon"
-                              aria-label={`Remove assignment for ${u?.name}`}
+                              aria-label={`Remove assignment for ${asg.teacherName ?? "teacher"}`}
                               onClick={() => handleDeleteAssignment(asg.id)}
                             >
                               <Trash2 className="h-4 w-4 text-semantic-danger" />
