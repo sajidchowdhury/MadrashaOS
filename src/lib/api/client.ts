@@ -151,8 +151,18 @@ export const api = {
   },
 
   async getBranches() {
-    const res = await apiFetch<{ data: Array<{ id: string; code: string; name: string; name_bn: string; is_active: boolean }> }>("/branches");
-    return res.data;
+    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>("/branches");
+    return res.data.map((b) => ({
+      id: b.id as string,
+      code: b.code as string,
+      name: b.name as string,
+      nameBn: (b.nameBn as string | null) ?? (b.name_bn as string | null) ?? "",
+      address: (b.address as string | null) ?? "",
+      phone: (b.phone as string | null) ?? "",
+      email: (b.email as string | null) ?? "",
+      establishedYear: (b.establishedYear as number | null) ?? (b.established_year as number | null) ?? null,
+      isActive: (b.isActive as boolean | null) ?? (b.is_active as boolean | null) ?? true,
+    })) as never;
   },
 
   /**
