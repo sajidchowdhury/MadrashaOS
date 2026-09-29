@@ -155,6 +155,23 @@ export const PUT = withPermission(
       return errorResponse("Role not found", 404);
     }
 
+    // Guard: the super-admin role is a platform-level role. Only a
+    // super-admin user can modify its permissions — tenant admins
+    // (administrator, authority, etc.) cannot, even if they have
+    // rbac.permission.assign. This prevents a tenant admin from
+    // locking themselves out or escalating privileges.
+    if (role.code === "super-admin" && tenantCtx.role !== "super-admin") {
+      return errorResponse(
+        "Forbidden — the Super Admin role can only be modified by a Super Admin user.",
+        403,
+        {
+          role_code: role.code,
+          current_role: tenantCtx.role,
+          hint: "Log in as superadmin@madrashaos.org to modify this role.",
+        },
+      );
+    }
+
     // Validate every requested code exists in the Permission table.
     // We do a single findMany against the unique `code` column.
     const existingPerms = await db.permission.findMany({
