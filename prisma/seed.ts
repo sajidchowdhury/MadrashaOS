@@ -150,7 +150,7 @@ const ROLE_PERMS: Record<string, string[]> = {
     "approval.approve", "approval.reject", "approval.delegate", "pdf.generate",
   ],
   authority: [
-    "organization.branch.switch", "organization.config.view", "rbac.role.view",
+    "organization.branch.switch", "organization.branch.create", "organization.config.view", "rbac.role.view",
     "audit.view", "audit.export", "students.view", "students.notes.view",
     "admission.view", "admission.approve", "admission.reject", "guardians.view",
     "teachers.view", "academic.structure.view", "attendance.view", "exams.view",
@@ -165,7 +165,7 @@ const ROLE_PERMS: Record<string, string[]> = {
     "approval.reject", "approval.delegate",
   ],
   administrator: [
-    "organization.branch.switch", "organization.config.view", "organization.config.edit", "organization.module.toggle",
+    "organization.branch.switch", "organization.branch.create", "organization.config.view", "organization.config.edit", "organization.module.toggle",
     "rbac.role.view", "rbac.role.create", "rbac.role.update", "rbac.permission.assign",
     "audit.view", "backup.run", "students.view", "students.create", "students.update",
     "students.promote", "students.notes.view", "students.notes.edit", "admission.view",

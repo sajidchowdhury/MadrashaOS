@@ -61,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionCode[]> = {
    */
   authority: [
     "organization.branch.switch",
+    "organization.branch.create",
     "organization.config.view",
     "rbac.role.view",
     "audit.view",
@@ -118,6 +119,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionCode[]> = {
    */
   administrator: [
     "organization.branch.switch",
+    "organization.branch.create",
     "organization.config.view",
     "organization.config.edit",
     "organization.module.toggle",
