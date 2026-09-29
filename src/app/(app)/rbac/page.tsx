@@ -393,7 +393,7 @@ function RbacMatrixContent() {
         <SectionCard>
           <SectionCardHeader
             title="Role × Permission Group"
-            description="Each cell shows whether the role currently holds permissions in that group. Toggle to draft changes (visual only in mock mode)."
+            description="Each cell shows a checkbox + 'X / Y' count. X = permissions this role currently has in that group. Y = total permissions available in that group. Toggle a checkbox to grant/revoke the entire group, then click Save."
             action={
               <Badge variant="outline" className="font-mono">
                 {convertDigits(String(ROLES.length), locale)} roles ×{" "}
@@ -420,6 +420,7 @@ function RbacMatrixContent() {
             <TableBody>
               {ROLES.map((role) => {
                 const isCurrent = role === currentRole;
+                const isProtectedRole = role === "super-admin" && currentRole !== "super-admin";
                 return (
                   <TableRow
                     key={role}
@@ -433,6 +434,11 @@ function RbacMatrixContent() {
                         {isCurrent && (
                           <Badge className="bg-primary-500 text-primary-foreground">
                             You
+                          </Badge>
+                        )}
+                        {isProtectedRole && (
+                          <Badge variant="outline" className="bg-neutral-100 text-text-muted">
+                            Read-only
                           </Badge>
                         )}
                       </span>
