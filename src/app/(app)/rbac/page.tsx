@@ -295,6 +295,12 @@ function RbacMatrixContent() {
     try {
       // For each role, compute the new permission list from the group + approval toggles.
       for (const role of ROLES) {
+        // Skip the super-admin role — only a super-admin user can modify it.
+        // The server enforces this too (403), but skipping here avoids the
+        // error message and lets the admin save the other 7 roles.
+        if (role === "super-admin" && currentRole !== "super-admin") {
+          continue;
+        }
         const roleId = roleIds[role];
         if (!roleId) {
           setSaveError(`Could not resolve role ID for "${role}". Save aborted.`);
