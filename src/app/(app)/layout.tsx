@@ -22,16 +22,30 @@ export default function AppGroupLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const role = useSessionStore((s) => s.role);
   const setRole = useSessionStore((s) => s.setRole);
   const userQuery = useCurrentUser();
 
   // Sync the client-side sessionStore with the real server session.
+  //
+  // IMPORTANT: We use a ref to track the last role we synced FROM the
+  // server, and only call setRole when the SERVER role changes. This
+  // prevents the infinite loop:
+  //   - Before: effect deps included `role` (store state) → calling
+  //     setRole changed `role` → effect re-ran → loop.
+  //   - Now: effect deps are only [userQuery.data?.role, setRole].
+  //     setRole is stable (Zustand returns the same function reference),
+  //     so the effect only runs when the server session's role actually
+  //     changes (e.g. on login/role switch). The ref guards against
+  //     re-calling setRole for the same value.
+  const lastSyncedRole = React.useRef<string | undefined>(undefined);
+
   React.useEffect(() => {
-    if (userQuery.data?.role && userQuery.data.role !== role) {
-      setRole(userQuery.data.role as never);
+    const serverRole = userQuery.data?.role;
+    if (serverRole && serverRole !== lastSyncedRole.current) {
+      lastSyncedRole.current = serverRole;
+      setRole(serverRole as never);
     }
-  }, [userQuery.data?.role, role, setRole]);
+  }, [userQuery.data?.role, setRole]);
 
   return (
     <>
