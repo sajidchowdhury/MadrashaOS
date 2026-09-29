@@ -147,18 +147,24 @@ async function getCachedUserPermissions(userId: string): Promise<string[]> {
   if (cached && cached.expiresAt > now) {
     return cached.permissions;
   }
-  // Fetch the user's role_id, then the role's permissions
+  // Fetch the user's role, then the role's permissions via the
+  // Role.role_permissions junction (NOT User.role_permissions — that's
+  // the "granted_by" back-relation, which returns the wrong rows).
   const user = await db.user.findUnique({
     where: { id: userId },
     select: {
-      role_id: true,
-      role_permissions: {
-        where: { deleted_at: null },
-        select: { permission: { select: { code: true } } },
+      role: {
+        select: {
+          role_permissions: {
+            where: { deleted_at: null },
+            select: { permission: { select: { code: true } } },
+          },
+        },
       },
     },
   });
-  const permissions = user?.role_permissions.map((rp) => rp.permission.code) ?? [];
+  const permissions =
+    user?.role?.role_permissions?.map((rp) => rp.permission.code) ?? [];
   userPermCache.set(userId, {
     permissions,
     expiresAt: now + USER_BRANCH_CACHE_TTL_MS,
