@@ -22,7 +22,7 @@
  */
 
 import * as React from "react";
-import { Briefcase, Search, Phone, UserPlus, Wallet, CheckCircle2 } from "lucide-react";
+import { Briefcase, Search, Phone, UserPlus, Wallet, CheckCircle2, KeyRound } from "lucide-react";
 import { useEmployees } from "@/lib/query/client";
 import { Button } from "@/components/ui/button";
 import { PaySalaryDialog } from "@/components/finance/PaySalaryDialog";
@@ -478,20 +478,54 @@ export default function EmployeesListPage() {
                           <StatusBadge status={e.status} />
                         </TableCell>
                         <TableCell className="pe-4 py-3 text-end">
-                          <IfPermission code="accounting.ledger.post">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={e.status !== "active"}
-                              onClick={() => {
-                                setPayStaff({ id: e.id, name: e.name, code: e.employeeCode, salary: e.salary });
-                                setPayOpen(true);
-                              }}
-                            >
-                              <Wallet className="h-4 w-4" />
-                              Pay Salary
-                            </Button>
-                          </IfPermission>
+                          <div className="flex justify-end gap-1">
+                            <IfPermission code="accounting.ledger.post">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={e.status !== "active"}
+                                onClick={() => {
+                                  setPayStaff({ id: e.id, name: e.name, code: e.employeeCode, salary: e.salary });
+                                  setPayOpen(true);
+                                }}
+                              >
+                                <Wallet className="h-4 w-4" />
+                                Pay Salary
+                              </Button>
+                            </IfPermission>
+                            <IfPermission code="employees.create">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/v1/employees/${e.id}/reset-password`, {
+                                      method: "POST",
+                                    });
+                                    const data = await res.json().catch(() => ({}));
+                                    if (!res.ok) {
+                                      toast({ title: "Failed", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+                                      return;
+                                    }
+                                    const creds = data?.data ?? {};
+                                    setCreatedCredentials({
+                                      name: creds.employee_name ?? e.name,
+                                      email: creds.email ?? e.email ?? "",
+                                      password: creds.temp_password ?? "",
+                                      code: creds.employee_code ?? e.employeeCode ?? "",
+                                    });
+                                    setCredentialsOpen(true);
+                                  } catch {
+                                    toast({ title: "Network error", variant: "destructive" });
+                                  }
+                                }}
+                                aria-label={`Reset password for ${e.name}`}
+                              >
+                                <KeyRound className="h-4 w-4" />
+                                Reset Password
+                              </Button>
+                            </IfPermission>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

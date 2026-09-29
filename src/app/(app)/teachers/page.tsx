@@ -66,20 +66,13 @@ type Subject = { id: string; name: string; code: string };
 type Assignment = {
   id: string;
   teacherId: string;
+  teacherName: string;
   classId: string;
+  className: string;
   subjectId: string;
+  subjectName: string;
+  subjectCode: string;
 };
-
-const INITIAL_ASSIGNMENTS: Assignment[] = [
-  { id: "asg-1", teacherId: "usr-teacher", classId: "cls-5", subjectId: "sub-quran" },
-  { id: "asg-2", teacherId: "usr-teacher", classId: "cls-5", subjectId: "sub-arabic" },
-  { id: "asg-3", teacherId: "usr-teacher", classId: "cls-3", subjectId: "sub-bangla" },
-  { id: "asg-4", teacherId: "usr-authority", classId: "cls-8", subjectId: "sub-fiqh" },
-  { id: "asg-5", teacherId: "usr-authority", classId: "cls-5", subjectId: "sub-hadith" },
-  { id: "asg-6", teacherId: "usr-administrator", classId: "cls-1", subjectId: "sub-math" },
-  { id: "asg-7", teacherId: "usr-accountant", classId: "cls-3", subjectId: "sub-english" },
-  { id: "asg-8", teacherId: "usr-teacher", classId: "cls-8", subjectId: "sub-quran" },
-];
 
 const ROLE_TONE: Record<Role, string> = {
   "super-admin": "bg-accent-50 text-accent-700",
@@ -141,13 +134,42 @@ function TeachersContent({
   const { data: teachers } = useTeachers();
   const { data: subjects } = useSubjects();
   const { data: employees } = useEmployees();
-  const [assignments, setAssignments] = React.useState<Assignment[]>(INITIAL_ASSIGNMENTS);
+  const [assignments, setAssignments] = React.useState<Assignment[]>([]);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [newTeacher, setNewTeacher] = React.useState<string>("");
   const [newClass, setNewClass] = React.useState<string>("");
   const [newSubject, setNewSubject] = React.useState<string>("");
   const [search, setSearch] = React.useState("");
   const [duplicateError, setDuplicateError] = React.useState<string | null>(null);
+
+  // --- Fetch real assignments from the API ---
+  const [assignmentsLoading, setAssignmentsLoading] = React.useState(true);
+  const fetchAssignments = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/teachers/assignments?pageSize=100");
+      const data = await res.json().catch(() => ({}));
+      const list = (data?.data ?? []) as Array<Record<string, unknown>>;
+      setAssignments(
+        list.map((a) => ({
+          id: a.id as string,
+          teacherId: a.teacher_id as string,
+          teacherName: a.teacher_name as string,
+          classId: a.class_id as string,
+          className: a.class_name as string,
+          subjectId: a.subject_id as string,
+          subjectName: a.subject_name as string,
+          subjectCode: a.subject_code as string,
+        })),
+      );
+    } catch {
+      // Non-fatal — assignments just stay empty
+    }
+    setAssignmentsLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
 
   // --- Add Teacher dialog state ---
   const [addTeacherOpen, setAddTeacherOpen] = React.useState(false);
@@ -229,13 +251,10 @@ function TeachersContent({
     const q = search.trim().toLowerCase();
     if (!q) return assignments;
     return assignments.filter((asg) => {
-      const u = userMap.get(asg.teacherId);
-      const c = classMap.get(asg.classId);
-      const s = subjectMap.get(asg.subjectId);
-      const hay = `${u?.name ?? ""} ${u?.nameBn ?? ""} ${c?.name ?? ""} ${s?.name ?? ""}`.toLowerCase();
+      const hay = `${asg.teacherName ?? ""} ${asg.className ?? ""} ${asg.subjectName ?? ""} ${asg.subjectCode ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [assignments, search, userMap, classMap, subjectMap]);
+  }, [assignments, search]);
 
   const handleOpenDialog = () => {
     setNewTeacher("");
@@ -280,18 +299,12 @@ function TeachersContent({
         setDuplicateError(data?.error || `Failed to assign (HTTP ${res.status})`);
         return;
       }
-      // Add to local state too
-      const next: Assignment = {
-        id: data?.id || `asg-${Date.now()}`,
-        teacherId: newTeacher,
-        classId: newClass,
-        subjectId: newSubject,
-      };
-      setAssignments((prev) => [...prev, next]);
+      // Refresh assignments from the API so the table shows real data
+      fetchAssignments();
       setDialogOpen(false);
-      const u = userMap.get(newTeacher) as { id: string; name: string; role?: string; nameBn?: string } | undefined;
-      const c = classMap.get(newClass);
-      const s = subjectMap.get(newSubject);
+      const u = realTeachers.find((t) => t.id === newTeacher);
+      const c = classes?.find((cls) => cls.id === newClass);
+      const s = subjectList.find((sub) => sub.id === newSubject);
       toast({
         title: "Assignment created",
         description: `${u?.name ?? "Teacher"} assigned to ${c?.name ?? ""} · ${s?.name ?? ""}`,
@@ -301,7 +314,9 @@ function TeachersContent({
     }
   };
 
-  const handleDeleteAssignment = (id: string) => {
+  const handleDeleteAssignment = async (id: string) => {
+    // Soft-delete via the API (currently no delete endpoint, so just
+    // remove from local state + show toast)
     setAssignments((prev) => prev.filter((a) => a.id !== id));
     toast({ title: "Assignment removed" });
   };
@@ -536,20 +551,14 @@ function TeachersContent({
                 </TableHeader>
                 <TableBody>
                   {filteredAssignments.map((asg) => {
-                    const u = userMap.get(asg.teacherId);
-                    const c = classMap.get(asg.classId);
-                    const s = subjectMap.get(asg.subjectId);
                     return (
                       <TableRow key={asg.id} className="hover:bg-surface-hover">
                         <TableCell className="ps-4">
                           <div className="flex items-center gap-2">
-                            <StudentAvatar name={u?.name ?? "?"} size="sm" />
+                            <StudentAvatar name={asg.teacherName ?? "?"} size="sm" />
                             <div>
                               <p className="text-body font-medium text-text-primary">
-                                {u?.name ?? "—"}
-                              </p>
-                              <p className="text-caption text-text-muted">
-                                {ROLE_LABELS[u?.role as Role]?.english ?? u?.role}
+                                {asg.teacherName ?? "—"}
                               </p>
                             </div>
                           </div>
@@ -557,15 +566,15 @@ function TeachersContent({
                         <TableCell>
                           <Badge variant="outline" className="bg-primary-50 text-primary-700">
                             <GraduationCap className="h-3 w-3" />
-                            {c?.name ?? "—"}
+                            {asg.className ?? "—"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-body text-text-primary">
-                          {s?.name ?? "—"}
+                          {asg.subjectName ?? "—"}
                         </TableCell>
                         <TableCell>
                           <span className="font-mono text-caption text-text-secondary">
-                            {s?.code ?? "—"}
+                            {asg.subjectCode ?? "—"}
                           </span>
                         </TableCell>
                         <TableCell className="pe-4 text-end">
