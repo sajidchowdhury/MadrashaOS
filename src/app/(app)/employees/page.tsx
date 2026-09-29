@@ -22,7 +22,7 @@
  */
 
 import * as React from "react";
-import { Briefcase, Search, Phone, UserPlus, Wallet } from "lucide-react";
+import { Briefcase, Search, Phone, UserPlus, Wallet, CheckCircle2 } from "lucide-react";
 import { useEmployees } from "@/lib/query/client";
 import { Button } from "@/components/ui/button";
 import { PaySalaryDialog } from "@/components/finance/PaySalaryDialog";
@@ -154,6 +154,10 @@ export default function EmployeesListPage() {
   const [payStaff, setPayStaff] = React.useState<{
     id: string; name: string; code?: string; salary?: number | null;
   } | null>(null);
+  const [credentialsOpen, setCredentialsOpen] = React.useState(false);
+  const [createdCredentials, setCreatedCredentials] = React.useState<{
+    name: string; email: string; password: string; code: string;
+  } | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [empName, setEmpName] = React.useState("");
   const [empNameBn, setEmpNameBn] = React.useState("");
@@ -194,7 +198,28 @@ export default function EmployeesListPage() {
         setSubmitting(false);
         return;
       }
-      toast({ title: "Employee added", description: `${empName} — ${empDesignation} (role: ${empRole})` });
+      // The API returns a one-time temp password + the login email.
+      // Display it so the admin can hand it to the employee.
+      const tempPassword = data?.data?.temp_password;
+      const loginEmail = data?.data?.email ?? empEmail.trim();
+      const employeeCode = data?.data?.employee_code ?? "";
+      if (tempPassword) {
+        toast({
+          title: "Employee added — credentials below",
+          description: `${empName} (role: ${empRole}) — Login email: ${loginEmail} · Temp password: ${tempPassword}`,
+          duration: 15000,
+        });
+        // Store credentials so the dialog can display them for copying
+        setCreatedCredentials({
+          name: empName,
+          email: loginEmail,
+          password: tempPassword,
+          code: employeeCode,
+        });
+        setCredentialsOpen(true);
+      } else {
+        toast({ title: "Employee added", description: `${empName} — ${empDesignation} (role: ${empRole})` });
+      }
       setEmpName(""); setEmpNameBn(""); setEmpDesignation(""); setEmpRole(""); setEmpPhone(""); setEmpEmail(""); setEmpSalary("");
       setAddOpen(false);
       queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -487,6 +512,56 @@ export default function EmployeesListPage() {
         staffCode={payStaff?.code}
         defaultSalary={payStaff?.salary}
       />
+
+      {/* ---------- Credentials Dialog (shown after employee creation) ---------- */}
+      <Dialog open={credentialsOpen} onOpenChange={setCredentialsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-semantic-success" />
+              Employee Created — Save These Credentials
+            </DialogTitle>
+            <DialogDescription>
+              Write these down — the temp password is shown only once and
+              cannot be retrieved later. Hand it to the employee
+              out-of-band (e.g. in person or via a secure channel).
+            </DialogDescription>
+          </DialogHeader>
+          {createdCredentials && (
+            <div className="space-y-3">
+              <div className="rounded-md border border-border-default bg-surface-hover p-4 space-y-2">
+                <div>
+                  <Label className="text-caption uppercase tracking-wide text-text-muted">Employee Name</Label>
+                  <p className="text-body font-medium text-text-primary">{createdCredentials.name}</p>
+                </div>
+                <div>
+                  <Label className="text-caption uppercase tracking-wide text-text-muted">Employee Code</Label>
+                  <p className="font-mono text-body text-text-primary">{createdCredentials.code}</p>
+                </div>
+                <div>
+                  <Label className="text-caption uppercase tracking-wide text-text-muted">Login Email (username)</Label>
+                  <p className="font-mono text-body text-text-primary">{createdCredentials.email}</p>
+                </div>
+                <div>
+                  <Label className="text-caption uppercase tracking-wide text-text-muted">Temp Password</Label>
+                  <p className="font-mono text-body font-bold text-semantic-warning">{createdCredentials.password}</p>
+                </div>
+              </div>
+              <p className="text-caption text-text-secondary">
+                The employee should log in at <span className="font-mono">/login</span> using
+                the email + temp password above, then change the password from their profile settings.
+                Multiple employees can share the same role (e.g. you can have 3 accountants) — each
+                gets their own email + password.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setCredentialsOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Employee Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
