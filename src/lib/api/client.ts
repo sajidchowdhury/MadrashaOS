@@ -277,8 +277,10 @@ export const api = {
   },
 
   async getStudentHistory(id: string) {
-    const res = await apiFetch<{ data: Array<Record<string, unknown>> }>(`/students/${id}/history`);
-    return res.data as never;
+    // API returns { student, timeline, total } — NOT { data: [...] }.
+    // Extract the timeline array so TanStack Query gets a defined value.
+    const res = await apiFetch<{ timeline?: Array<Record<string, unknown>>; data?: Array<Record<string, unknown>> }>(`/students/${id}/history`);
+    return (res.timeline ?? res.data ?? []) as never;
   },
 
   async getDocuments() {

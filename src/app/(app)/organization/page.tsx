@@ -14,19 +14,29 @@
  * from src/components/states (per project rules).
  */
 
-import { Building2, Plus, MapPin, CalendarDays } from "lucide-react";
+import * as React from "react";
+import { Building2, Plus, MapPin, CalendarDays, Pencil, Save, XCircle, AlertCircle, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { IfPermission } from "@/components/auth/IfPermission";
 import { LoadingState, ErrorState } from "@/components/states";
 import { SectionCard, SectionCardHeader } from "@/components/foundation/SectionCard";
 import { BranchCard } from "@/components/foundation/BranchCard";
-import { useOrganization, useBranches } from "@/lib/query/client";
+import { useOrganization, useBranches, queryClient } from "@/lib/query/client";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { convertDigits } from "@/lib/i18n/format";
 
 export default function OrganizationPage() {
   const { locale } = useI18n();
+  const { toast } = useToast();
   const {
     data: org,
     isLoading: orgLoading,
@@ -39,6 +49,63 @@ export default function OrganizationPage() {
     isError: branchesError,
     refetch: branchesRefetch,
   } = useBranches();
+
+  // --- Edit Organization dialog state ---
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editSubmitting, setEditSubmitting] = React.useState(false);
+  const [editError, setEditError] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState("");
+  const [editNameBn, setEditNameBn] = React.useState("");
+  const [editPhone, setEditPhone] = React.useState("");
+  const [editEmail, setEditEmail] = React.useState("");
+  const [editAddress, setEditAddress] = React.useState("");
+  const [editWebsite, setEditWebsite] = React.useState("");
+
+  function openEditDialog() {
+    setEditName(org?.name ?? "");
+    setEditNameBn(org?.nameBn ?? "");
+    setEditPhone(org?.phone ?? "");
+    setEditEmail(org?.email ?? "");
+    setEditAddress(org?.address ?? "");
+    setEditWebsite(org?.websiteUrl ?? "");
+    setEditError(null);
+    setEditOpen(true);
+  }
+
+  async function handleSaveOrg() {
+    setEditError(null);
+    if (!editName.trim()) {
+      setEditError("Organization name (English) is required.");
+      return;
+    }
+    setEditSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/organizations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName.trim(),
+          name_bn: editNameBn.trim() || undefined,
+          phone: editPhone.trim() || undefined,
+          email: editEmail.trim() || undefined,
+          address: editAddress.trim() || undefined,
+          website_url: editWebsite.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEditError(data?.error || `Failed (HTTP ${res.status})`);
+        setEditSubmitting(false);
+        return;
+      }
+      toast({ title: "Organization updated", description: editName });
+      queryClient.invalidateQueries({ queryKey: ["organization"] });
+      setEditOpen(false);
+    } catch {
+      setEditError("Network error — please try again.");
+    }
+    setEditSubmitting(false);
+  }
 
   const isLoading = orgLoading || branchesLoading;
   const isError = orgError || branchesError;
@@ -81,12 +148,20 @@ export default function OrganizationPage() {
               )}
             </p>
           </div>
-          <IfPermission code="organization.branch.create">
-            <Button>
-              <Plus className="h-4 w-4" />
-              Add Branch
-            </Button>
-          </IfPermission>
+          <div className="flex flex-wrap gap-2">
+            <IfPermission code="organization.config.edit">
+              <Button variant="outline" onClick={openEditDialog}>
+                <Pencil className="h-4 w-4" />
+                Edit Profile
+              </Button>
+            </IfPermission>
+            <IfPermission code="organization.branch.create">
+              <Button>
+                <Plus className="h-4 w-4" />
+                Add Branch
+              </Button>
+            </IfPermission>
+          </div>
         </header>
 
         {isLoading && <LoadingState pattern="list" rows={3} />}
@@ -206,6 +281,111 @@ export default function OrganizationPage() {
           </SectionCard>
         )}
       </div>
+
+      {/* ---------- Edit Organization dialog ---------- */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary-500" />
+              Edit Organization Profile
+            </DialogTitle>
+            <DialogDescription>
+              Update your madrasha&apos;s profile. This information appears on
+              receipts, reports, and the public website.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="org-name">Name (English) *</Label>
+                <Input
+                  id="org-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Darul Uloom Madrasha"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="org-name-bn">নাম (বাংলা)</Label>
+                <Input
+                  id="org-name-bn"
+                  value={editNameBn}
+                  onChange={(e) => setEditNameBn(e.target.value)}
+                  placeholder="দারুল উলূম মাদরাসা"
+                  lang="bn"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="org-phone">Phone</Label>
+                <Input
+                  id="org-phone"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+880 2 9661234"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="org-email">Email</Label>
+                <Input
+                  id="org-email"
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="info@madrashaos.org"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="org-address">Address</Label>
+              <Textarea
+                id="org-address"
+                value={editAddress}
+                onChange={(e) => setEditAddress(e.target.value)}
+                placeholder="123 Madrasha Road, Dhaka 1000"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="org-website">Website URL</Label>
+              <Input
+                id="org-website"
+                type="url"
+                value={editWebsite}
+                onChange={(e) => setEditWebsite(e.target.value)}
+                placeholder="https://madrashaos.org"
+              />
+            </div>
+
+            {editError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{editError}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              <XCircle className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleSaveOrg} disabled={editSubmitting}>
+              <Save className="h-4 w-4" />
+              {editSubmitting ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
