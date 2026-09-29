@@ -29,7 +29,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { IfPermission } from "@/components/auth/IfPermission";
 import { PermissionDenied } from "@/components/states";
 import { useToast } from "@/hooks/use-toast";
-import { useClasses, useGuardians } from "@/lib/query/client";
+import { useClasses, useGuardians, queryClient } from "@/lib/query/client";
 
 export default function AddStudentPage() {
   return (
@@ -53,6 +53,49 @@ function AddStudentContent() {
   const [sectionId, setSectionId] = React.useState("");
   const [guardianId, setGuardianId] = React.useState("");
   const [guardianRelation, setGuardianRelation] = React.useState("father");
+
+  // --- Inline create-new-guardian state ---
+  const [showNewGuardian, setShowNewGuardian] = React.useState(false);
+  const [newGuardianName, setNewGuardianName] = React.useState("");
+  const [newGuardianPhone, setNewGuardianPhone] = React.useState("");
+  const [newGuardianEmail, setNewGuardianEmail] = React.useState("");
+  const [newGuardianOccupation, setNewGuardianOccupation] = React.useState("");
+  const [creatingGuardian, setCreatingGuardian] = React.useState(false);
+
+  const handleCreateGuardian = async () => {
+    if (!newGuardianName.trim() || !newGuardianPhone.trim()) return;
+    setCreatingGuardian(true);
+    try {
+      const res = await fetch("/api/v1/guardians", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newGuardianName.trim(),
+          phone: newGuardianPhone.trim(),
+          email: newGuardianEmail.trim() || undefined,
+          occupation: newGuardianOccupation.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({ title: "Failed to create guardian", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+        setCreatingGuardian(false);
+        return;
+      }
+      const newId = data?.data?.id;
+      queryClient.invalidateQueries({ queryKey: ["guardians"] });
+      setGuardianId(newId);
+      setShowNewGuardian(false);
+      setNewGuardianName("");
+      setNewGuardianPhone("");
+      setNewGuardianEmail("");
+      setNewGuardianOccupation("");
+      toast({ title: "Guardian created", description: newGuardianName });
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+    setCreatingGuardian(false);
+  };
   const [roll, setRoll] = React.useState(1);
   const [gender, setGender] = React.useState<"male" | "female">("male");
   const [dob, setDob] = React.useState("");
@@ -250,6 +293,58 @@ function AddStudentContent() {
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Inline create-new-guardian toggle */}
+                {showNewGuardian ? (
+                  <div className="mt-2 space-y-2 rounded-md border border-primary-200 bg-primary-50/30 p-3">
+                    <p className="text-caption font-medium text-primary-700">Create New Guardian</p>
+                    <Input
+                      placeholder="Guardian name *"
+                      value={newGuardianName}
+                      onChange={(e) => setNewGuardianName(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Phone *"
+                      value={newGuardianPhone}
+                      onChange={(e) => setNewGuardianPhone(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Email (optional)"
+                      type="email"
+                      value={newGuardianEmail}
+                      onChange={(e) => setNewGuardianEmail(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Occupation (optional)"
+                      value={newGuardianOccupation}
+                      onChange={(e) => setNewGuardianOccupation(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowNewGuardian(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleCreateGuardian}
+                        disabled={creatingGuardian || !newGuardianName.trim() || !newGuardianPhone.trim()}
+                      >
+                        {creatingGuardian ? "Creating…" : "Create & Select"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowNewGuardian(true)}
+                    className="text-caption"
+                  >
+                    + Create new guardian
+                  </Button>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="relation">Guardian Relation</Label>

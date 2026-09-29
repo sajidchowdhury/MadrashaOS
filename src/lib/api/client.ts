@@ -277,12 +277,18 @@ export const api = {
       gender: s.gender,
       dob: s.dob,
       status: s.status,
+      phone: (s.phone as string) ?? "",
+      presentAddress: (s.presentAddress as string) ?? "",
+      bloodGroup: (s.bloodGroup as string) ?? "",
       classId: (s.class as { id?: string } | null)?.id ?? "",
       className: (s.class as { name?: string } | null)?.name ?? "",
       section: (s.section as { name?: string } | null)?.name ?? "",
       sectionId: (s.section as { id?: string } | null)?.id ?? "",
       guardianId: (s.primaryGuardian as { id?: string } | null)?.id ?? "",
       guardianName: (s.primaryGuardian as { name?: string } | null)?.name ?? "",
+      guardianPhone: (s.primaryGuardian as { phone?: string } | null)?.phone ?? "",
+      guardianEmail: (s.primaryGuardian as { email?: string } | null)?.email ?? "",
+      guardianOccupation: (s.primaryGuardian as { occupation?: string } | null)?.occupation ?? "",
     } as never;
   },
 

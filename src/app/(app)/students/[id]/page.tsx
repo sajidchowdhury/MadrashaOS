@@ -28,9 +28,9 @@ import {
   ArrowLeft, CalendarDays, GraduationCap, FileText, Wallet, Users,
   ClipboardCheck, History as HistoryIcon, Upload, ArrowUpCircle,
   CheckCircle2, Clock, XCircle, FileArchive, Phone, Mail, Briefcase,
-  AlertCircle, BookOpen, Hash, Download,
+  AlertCircle, BookOpen, Hash, Download, Pencil, Save, XCircle as XIcon,
 } from "lucide-react";
-import { useStudent, useStudentHistory, useFeePlans, useAttendanceSessions, useGuardians, useClasses, useDocuments } from "@/lib/query/client";
+import { useStudent, useStudentHistory, useFeePlans, useAttendanceSessions, useGuardians, useClasses, useDocuments, queryClient } from "@/lib/query/client";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { formatDate, formatCurrency } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
@@ -149,6 +149,60 @@ export default function StudentProfilePage() {
   const [uploadFile, setUploadFile] = React.useState<File | null>(null);
   const [uploadName, setUploadName] = React.useState<string>("");
   const [uploadSubmitting, setUploadSubmitting] = React.useState(false);
+
+  // --- Edit Student dialog state ---
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editSubmitting, setEditSubmitting] = React.useState(false);
+  const [editName, setEditName] = React.useState("");
+  const [editNameBn, setEditNameBn] = React.useState("");
+  const [editRoll, setEditRoll] = React.useState("");
+  const [editDob, setEditDob] = React.useState("");
+  const [editPhone, setEditPhone] = React.useState("");
+  const [editPresentAddress, setEditPresentAddress] = React.useState("");
+
+  React.useEffect(() => {
+    if (editOpen && student) {
+      setEditName(student.name ?? "");
+      setEditNameBn(student.nameBn ?? "");
+      setEditRoll(String(student.roll ?? ""));
+      setEditDob(student.dob ?? "");
+      setEditPhone(student.phone ?? "");
+      setEditPresentAddress(student.presentAddress ?? "");
+    }
+  }, [editOpen, student]);
+
+  const handleEditSave = async () => {
+    if (!student) return;
+    setEditSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {};
+      if (editName.trim() && editName !== student.name) body.name = editName.trim();
+      if (editNameBn.trim() !== (student.nameBn ?? "")) body.name_bn = editNameBn.trim() || undefined;
+      if (editRoll && Number(editRoll) !== student.roll) body.roll = Number(editRoll);
+      if (editDob !== (student.dob ?? "")) body.dob = editDob || undefined;
+      if (editPhone.trim() !== (student.phone ?? "")) body.phone = editPhone.trim() || undefined;
+      if (editPresentAddress.trim() !== (student.presentAddress ?? "")) body.present_address = editPresentAddress.trim() || undefined;
+
+      const res = await fetch(`/api/v1/students/${student.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({ title: "Failed to update", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+        setEditSubmitting(false);
+        return;
+      }
+      toast({ title: "Student updated", description: editName });
+      queryClient.invalidateQueries({ queryKey: ["student"] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      setEditOpen(false);
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+    setEditSubmitting(false);
+  };
 
   // pastAssignments is now derived from real API data (see above)
 
@@ -375,6 +429,12 @@ export default function StudentProfilePage() {
             </div>
             <div className="flex items-center gap-2">
               <StudentStatusBadge status={student.status} />
+              <IfPermission code="students.update">
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Button>
+              </IfPermission>
               <Button variant="outline" size="sm" onClick={() => router.push("/students")}>
                 <ArrowLeft className="h-4 w-4" />
                 Back
@@ -1038,6 +1098,62 @@ export default function StudentProfilePage() {
             <Button onClick={handleUploadSubmit} disabled={!uploadFile || uploadSubmitting}>
               <Upload className="h-4 w-4" />
               {uploadSubmitting ? "Uploading…" : "Upload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Edit Student dialog ---------- */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary-500" />
+              Edit Student
+            </DialogTitle>
+            <DialogDescription>
+              Update the student&apos;s personal information. Leave fields
+              unchanged to keep existing values.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-name">Name (English)</Label>
+                <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-name-bn">নাম (বাংলা)</Label>
+                <Input id="edit-name-bn" value={editNameBn} onChange={(e) => setEditNameBn(e.target.value)} lang="bn" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-roll">Roll No.</Label>
+                <Input id="edit-roll" type="number" min={1} value={editRoll} onChange={(e) => setEditRoll(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-dob">Date of Birth</Label>
+                <Input id="edit-dob" type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input id="edit-phone" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+880 1XXX-XXXXXX" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-address">Present Address</Label>
+              <Textarea id="edit-address" value={editPresentAddress} onChange={(e) => setEditPresentAddress(e.target.value)} rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              <XIcon className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleEditSave} disabled={editSubmitting}>
+              <Save className="h-4 w-4" />
+              {editSubmitting ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
