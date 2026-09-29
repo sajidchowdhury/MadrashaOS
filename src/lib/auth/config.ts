@@ -111,6 +111,74 @@ export function invalidateUserBranchCache(userId: string): void {
   userBranchCache.delete(userId);
 }
 
+/* ----------------------------------------------------------------
+ * USER PERMISSIONS CACHE — same pattern as the branch cache.
+ * When the admin changes a role's permissions via the RBAC matrix
+ * (PUT /api/v1/roles/:id/permissions), the JWT cookie still carries
+ * the OLD permissions until the user re-authenticates. This cache +
+ * invalidation lets the jwt callback re-read permissions from the DB
+ * on every request (5s TTL) so permission changes take effect without
+ * requiring a logout/login.
+ * ---------------------------------------------------------------- */
+type PermissionCacheEntry = {
+  permissions: string[];
+  expiresAt: number;
+};
+
+const globalForPermCache = globalThis as unknown as {
+  __madrashaUserPermCache?: Map<string, PermissionCacheEntry>;
+};
+
+const userPermCache: Map<string, PermissionCacheEntry> =
+  globalForPermCache.__madrashaUserPermCache ??
+  new Map<string, PermissionCacheEntry>();
+
+if (!globalForPermCache.__madrashaUserPermCache) {
+  globalForPermCache.__madrashaUserPermCache = userPermCache;
+}
+
+/**
+ * Returns the user's current permission codes, using a short-TTL
+ * in-memory cache. On cache miss, queries the role_permissions junction.
+ */
+async function getCachedUserPermissions(userId: string): Promise<string[]> {
+  const now = Date.now();
+  const cached = userPermCache.get(userId);
+  if (cached && cached.expiresAt > now) {
+    return cached.permissions;
+  }
+  // Fetch the user's role_id, then the role's permissions
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: {
+      role_id: true,
+      role_permissions: {
+        where: { deleted_at: null },
+        select: { permission: { select: { code: true } } },
+      },
+    },
+  });
+  const permissions = user?.role_permissions.map((rp) => rp.permission.code) ?? [];
+  userPermCache.set(userId, {
+    permissions,
+    expiresAt: now + USER_BRANCH_CACHE_TTL_MS,
+  });
+  return permissions;
+}
+
+/**
+ * Invalidates the cached permissions for ALL users with the given role_id.
+ * Called by PUT /api/v1/roles/:id/permissions after a role's permissions
+ * are changed, so all users with that role pick up the new permissions on
+ * their next request.
+ */
+export function invalidateRolePermissionCache(roleId: string): void {
+  // We don't track which users have which role in the cache, so we clear
+  // the entire permissions cache. This is fine — it's a short-lived cache
+  // and the next request for each user will re-populate it.
+  userPermCache.clear();
+}
+
 /**
  * NextAuth config — exported as a function-less object so both the
  * `/api/auth/[...nextauth]` route handler AND the middleware can import
@@ -314,10 +382,12 @@ export const authConfig: NextAuthOptions = {
           });
         }
       } else if (token.id) {
-        // Subsequent request — re-read branch_id from the DB so a branch
-        // switch (via POST /api/v1/branches/switch) takes effect on the
-        // very next request, without requiring the user to re-authenticate.
+        // Subsequent request — re-read branch_id + permissions from the DB
+        // so changes (branch switch via POST /api/v1/branches/switch OR
+        // permission changes via PUT /api/v1/roles/:id/permissions) take
+        // effect on the very next request, without requiring re-auth.
         token.branch_id = await getCachedUserBranchId(token.id);
+        token.permissions = await getCachedUserPermissions(token.id);
       }
       return token;
     },

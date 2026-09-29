@@ -35,6 +35,7 @@
 import { db } from "@/lib/db";
 import { getTenantContext } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
+import { invalidateRolePermissionCache } from "@/lib/auth/config";
 import { assignPermissionsSchema } from "@/lib/validation/schemas";
 import { jsonResponse, errorResponse, successResponse } from "@/lib/api/helpers";
 
@@ -251,6 +252,10 @@ export const PUT = withPermission(
       },
     });
 
+    // Invalidate the permissions cache so all users with this role pick
+    // up the new permissions on their next request (within 5s TTL).
+    invalidateRolePermissionCache(role.id);
+
     return successResponse(
       {
         role: {
@@ -266,7 +271,7 @@ export const PUT = withPermission(
           removed: toRemove.length,
         },
       },
-      `Permission set updated (${toAdd.length} added, ${toRemove.length} removed)`,
+      `Permission set updated (${toAdd.length} added, ${toRemove.length} removed) — changes take effect within 5 seconds for all affected users.`,
     );
   },
 );
