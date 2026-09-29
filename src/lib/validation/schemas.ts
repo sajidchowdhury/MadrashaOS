@@ -28,7 +28,7 @@ export const updateOrganizationSchema = z.object({
 export const createBranchSchema = z.object({
   code: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/, "Code must be lowercase alphanumeric with dashes"),
   name: z.string().min(1).max(255),
-  name_bn: z.string().min(1).max(255),
+  name_bn: z.string().min(1).max(255).optional(),
   address: z.string().max(1000).optional(),
   phone: z.string().max(50).optional(),
   email: z.string().email().optional(),
@@ -183,7 +183,7 @@ export const studentStatusSchema = z.enum(["active", "graduated", "withdrawn"]);
 export const createStudentSchema = z.object({
   code: z.string().min(1).max(50).optional(),
   name: z.string().min(1).max(255),
-  name_bn: z.string().min(1).max(255),
+  name_bn: z.string().min(1).max(255).optional(),
   name_ar: z.string().max(255).optional(),
   class_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   section_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
