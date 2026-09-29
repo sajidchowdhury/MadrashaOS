@@ -15,7 +15,7 @@
  */
 
 import * as React from "react";
-import { Building2, Plus, MapPin, CalendarDays, Pencil, Save, XCircle, AlertCircle, Phone, Mail } from "lucide-react";
+import { Building2, Plus, MapPin, CalendarDays, Save, XCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -50,61 +50,65 @@ export default function OrganizationPage() {
     refetch: branchesRefetch,
   } = useBranches();
 
-  // --- Edit Organization dialog state ---
-  const [editOpen, setEditOpen] = React.useState(false);
-  const [editSubmitting, setEditSubmitting] = React.useState(false);
-  const [editError, setEditError] = React.useState<string | null>(null);
-  const [editName, setEditName] = React.useState("");
-  const [editNameBn, setEditNameBn] = React.useState("");
-  const [editPhone, setEditPhone] = React.useState("");
-  const [editEmail, setEditEmail] = React.useState("");
-  const [editAddress, setEditAddress] = React.useState("");
-  const [editWebsite, setEditWebsite] = React.useState("");
+  // --- Add Branch dialog state ---
+  const [addBranchOpen, setAddBranchOpen] = React.useState(false);
+  const [addBranchSubmitting, setAddBranchSubmitting] = React.useState(false);
+  const [addBranchError, setAddBranchError] = React.useState<string | null>(null);
+  const [brCode, setBrCode] = React.useState("");
+  const [brName, setBrName] = React.useState("");
+  const [brNameBn, setBrNameBn] = React.useState("");
+  const [brAddress, setBrAddress] = React.useState("");
+  const [brPhone, setBrPhone] = React.useState("");
+  const [brEmail, setBrEmail] = React.useState("");
+  const [brYear, setBrYear] = React.useState("");
 
-  function openEditDialog() {
-    setEditName(org?.name ?? "");
-    setEditNameBn(org?.nameBn ?? "");
-    setEditPhone(org?.phone ?? "");
-    setEditEmail(org?.email ?? "");
-    setEditAddress(org?.address ?? "");
-    setEditWebsite(org?.websiteUrl ?? "");
-    setEditError(null);
-    setEditOpen(true);
+  function openAddBranchDialog() {
+    setBrCode("");
+    setBrName("");
+    setBrNameBn("");
+    setBrAddress("");
+    setBrPhone("");
+    setBrEmail("");
+    setBrYear("");
+    setAddBranchError(null);
+    setAddBranchOpen(true);
   }
 
-  async function handleSaveOrg() {
-    setEditError(null);
-    if (!editName.trim()) {
-      setEditError("Organization name (English) is required.");
+  async function handleAddBranch() {
+    setAddBranchError(null);
+    if (!brCode.trim() || !brName.trim()) {
+      setAddBranchError("Branch code and name (English) are required.");
       return;
     }
-    setEditSubmitting(true);
+    setAddBranchSubmitting(true);
     try {
-      const res = await fetch("/api/v1/organizations", {
-        method: "PATCH",
+      const res = await fetch("/api/v1/branches", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: editName.trim(),
-          name_bn: editNameBn.trim() || undefined,
-          phone: editPhone.trim() || undefined,
-          email: editEmail.trim() || undefined,
-          address: editAddress.trim() || undefined,
-          website_url: editWebsite.trim() || undefined,
+          code: brCode.trim().toLowerCase(),
+          name: brName.trim(),
+          name_bn: brNameBn.trim() || undefined,
+          address: brAddress.trim() || undefined,
+          phone: brPhone.trim() || undefined,
+          email: brEmail.trim() || undefined,
+          established_year: brYear ? Number(brYear) : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setEditError(data?.error || `Failed (HTTP ${res.status})`);
-        setEditSubmitting(false);
+        setAddBranchError(data?.error || `Failed (HTTP ${res.status})`);
+        setAddBranchSubmitting(false);
         return;
       }
-      toast({ title: "Organization updated", description: editName });
+      toast({ title: "Branch added", description: brName });
+      queryClient.invalidateQueries({ queryKey: ["branches"] });
       queryClient.invalidateQueries({ queryKey: ["organization"] });
-      setEditOpen(false);
+      setAddBranchOpen(false);
     } catch {
-      setEditError("Network error — please try again.");
+      setAddBranchError("Network error — please try again.");
     }
-    setEditSubmitting(false);
+    setAddBranchSubmitting(false);
   }
 
   const isLoading = orgLoading || branchesLoading;
@@ -119,7 +123,8 @@ export default function OrganizationPage() {
   const branchCount = branches?.length ?? 0;
   const establishedRange = (() => {
     if (!branches || branches.length === 0) return "";
-    const years = branches.map((b) => b.establishedYear).sort((a, b) => a - b);
+    const years = branches.map((b) => b.establishedYear).filter((y): y is number => y != null).sort((a, b) => a - b);
+    if (years.length === 0) return "";
     const earliest = years[0];
     const latest = years[years.length - 1];
     return `${convertDigits(String(earliest), locale)}–${convertDigits(String(latest), locale)}`;
@@ -149,14 +154,8 @@ export default function OrganizationPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <IfPermission code="organization.config.edit">
-              <Button variant="outline" onClick={openEditDialog}>
-                <Pencil className="h-4 w-4" />
-                Edit Profile
-              </Button>
-            </IfPermission>
             <IfPermission code="organization.branch.create">
-              <Button>
+              <Button onClick={openAddBranchDialog}>
                 <Plus className="h-4 w-4" />
                 Add Branch
               </Button>
@@ -282,106 +281,121 @@ export default function OrganizationPage() {
         )}
       </div>
 
-      {/* ---------- Edit Organization dialog ---------- */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      {/* ---------- Add Branch dialog ---------- */}
+      <Dialog open={addBranchOpen} onOpenChange={setAddBranchOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5 text-primary-500" />
-              Edit Organization Profile
+              <Plus className="h-5 w-5 text-primary-500" />
+              Add New Branch
             </DialogTitle>
             <DialogDescription>
-              Update your madrasha&apos;s profile. This information appears on
-              receipts, reports, and the public website.
+              Create a new branch/campus for your madrasha. Each branch has
+              its own students, staff, and financial data.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="org-name">Name (English) *</Label>
+                <Label htmlFor="br-code">Code *</Label>
                 <Input
-                  id="org-name"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Darul Uloom Madrasha"
+                  id="br-code"
+                  value={brCode}
+                  onChange={(e) => setBrCode(e.target.value.toLowerCase())}
+                  placeholder="khulna"
+                  className="font-mono"
                 />
+                <p className="text-caption text-text-muted">Lowercase, no spaces (e.g. dhaka, ctg, khulna).</p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="org-name-bn">নাম (বাংলা)</Label>
+                <Label htmlFor="br-year">Established Year</Label>
                 <Input
-                  id="org-name-bn"
-                  value={editNameBn}
-                  onChange={(e) => setEditNameBn(e.target.value)}
-                  placeholder="দারুল উলূম মাদরাসা"
-                  lang="bn"
+                  id="br-year"
+                  type="number"
+                  min={1900}
+                  max={new Date().getFullYear()}
+                  value={brYear}
+                  onChange={(e) => setBrYear(e.target.value)}
+                  placeholder="1995"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="org-phone">Phone</Label>
+                <Label htmlFor="br-name">Name (English) *</Label>
                 <Input
-                  id="org-phone"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="+880 2 9661234"
+                  id="br-name"
+                  value={brName}
+                  onChange={(e) => setBrName(e.target.value)}
+                  placeholder="Khulna Branch"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="org-email">Email</Label>
+                <Label htmlFor="br-name-bn">নাম (বাংলা)</Label>
                 <Input
-                  id="org-email"
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  placeholder="info@madrashaos.org"
+                  id="br-name-bn"
+                  value={brNameBn}
+                  onChange={(e) => setBrNameBn(e.target.value)}
+                  placeholder="খুলনা শাখা"
+                  lang="bn"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="org-address">Address</Label>
+              <Label htmlFor="br-address">Address</Label>
               <Textarea
-                id="org-address"
-                value={editAddress}
-                onChange={(e) => setEditAddress(e.target.value)}
-                placeholder="123 Madrasha Road, Dhaka 1000"
+                id="br-address"
+                value={brAddress}
+                onChange={(e) => setBrAddress(e.target.value)}
+                placeholder="123 KDA Avenue, Khulna 9100"
                 rows={2}
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="org-website">Website URL</Label>
-              <Input
-                id="org-website"
-                type="url"
-                value={editWebsite}
-                onChange={(e) => setEditWebsite(e.target.value)}
-                placeholder="https://madrashaos.org"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="br-phone">Phone</Label>
+                <Input
+                  id="br-phone"
+                  value={brPhone}
+                  onChange={(e) => setBrPhone(e.target.value)}
+                  placeholder="+880 41 123456"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="br-email">Email</Label>
+                <Input
+                  id="br-email"
+                  type="email"
+                  value={brEmail}
+                  onChange={(e) => setBrEmail(e.target.value)}
+                  placeholder="khulna@madrashaos.org"
+                />
+              </div>
             </div>
 
-            {editError && (
+            {addBranchError && (
               <div
                 role="alert"
                 className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger"
               >
                 <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
-                <span>{editError}</span>
+                <span>{addBranchError}</span>
               </div>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>
+            <Button variant="outline" onClick={() => setAddBranchOpen(false)}>
               <XCircle className="h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={handleSaveOrg} disabled={editSubmitting}>
+            <Button onClick={handleAddBranch} disabled={addBranchSubmitting}>
               <Save className="h-4 w-4" />
-              {editSubmitting ? "Saving…" : "Save Changes"}
+              {addBranchSubmitting ? "Adding…" : "Add Branch"}
             </Button>
           </DialogFooter>
         </DialogContent>
