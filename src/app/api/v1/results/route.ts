@@ -54,7 +54,11 @@ export async function GET(req: Request) {
           select: { id: true, name: true, name_bn: true, code: true, roll: true, class_id: true },
         },
         exam: {
-          select: { id: true, name: true, term: true, academic_year: true, class_id: true },
+          select: {
+            id: true, name: true, term: true, academic_year: true,
+            class_id: true,
+            class: { select: { id: true, name: true } },
+          },
         },
       },
     }),
@@ -73,6 +77,8 @@ export async function GET(req: Request) {
         roll: r.student.roll,
         exam_id: r.exam_id,
         exam_name: r.exam.name,
+        class_id: r.exam.class_id,
+        class_name: r.exam.class?.name ?? null,
         term: r.exam.term,
         academic_year: r.exam.academic_year,
         total_marks: Number(r.total_marks),

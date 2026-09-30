@@ -26,8 +26,8 @@
  */
 
 import * as React from "react";
-import { Award, Search, CheckCircle2, XCircle, Plus, AlertCircle } from "lucide-react";
-import { useResults, useExams, queryClient } from "@/lib/query/client";
+import { Award, Search, CheckCircle2, XCircle, Plus, AlertCircle, Printer } from "lucide-react";
+import { useResults, useExams, useClasses, queryClient } from "@/lib/query/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +65,8 @@ type ResultRow = {
   roll: number | null;
   examId: string;
   examName: string;
+  className: string | null;
+  classId: string | null;
   term: string | null;
   academicYear: number;
   totalMarks: number;
@@ -126,6 +128,11 @@ export default function ResultsPage() {
   const [search, setSearch] = React.useState("");
   const [grade, setGrade] = React.useState<string>("all");
   const [passFilter, setPassFilter] = React.useState<string>("all");
+  const [classFilter, setClassFilter] = React.useState<string>("all");
+
+  // Classes for the class filter dropdown
+  const { data: classesData } = useClasses();
+  const classList = (classesData ?? []) as Array<{ id: string; name: string }>;
 
   // --- Generate Results dialog state ---
   const { data: examsData } = useExams();
@@ -176,25 +183,27 @@ export default function ResultsPage() {
     if (!results) return [];
     const q = search.trim().toLowerCase();
     return (results as ResultRow[]).filter((r) => {
+      if (classFilter !== "all" && r.classId !== classFilter) return false;
       if (grade !== "all" && (r.grade ?? "").toUpperCase() !== grade) return false;
       if (passFilter === "pass" && !r.isPassed) return false;
       if (passFilter === "fail" && r.isPassed) return false;
       if (q) {
         const haystack =
-          `${r.studentName} ${r.studentNameBn ?? ""} ${r.studentCode ?? ""} ${r.examName ?? ""}`.toLowerCase();
+          `${r.studentName} ${r.studentNameBn ?? ""} ${r.studentCode ?? ""} ${r.examName ?? ""} ${r.className ?? ""}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [results, search, grade, passFilter]);
+  }, [results, search, grade, passFilter, classFilter]);
 
   const activeFilterCount =
-    (grade !== "all" ? 1 : 0) + (passFilter !== "all" ? 1 : 0) + (search ? 1 : 0);
+    (grade !== "all" ? 1 : 0) + (passFilter !== "all" ? 1 : 0) + (classFilter !== "all" ? 1 : 0) + (search ? 1 : 0);
 
   const clearFilters = React.useCallback(() => {
     setSearch("");
     setGrade("all");
     setPassFilter("all");
+    setClassFilter("all");
   }, []);
 
   if (!canView) {
@@ -227,12 +236,18 @@ export default function ResultsPage() {
               ranking is hidden unless explicitly enabled for this view.
             </p>
           </div>
-          <IfPermission code="results.generate">
-            <Button onClick={() => { setGenError(null); setGenOpen(true); }}>
-              <Plus className="h-4 w-4" />
-              Generate Result
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="h-4 w-4" />
+              Print
             </Button>
-          </IfPermission>
+            <IfPermission code="results.generate">
+              <Button onClick={() => { setGenError(null); setGenOpen(true); }}>
+                <Plus className="h-4 w-4" />
+                Generate Result
+              </Button>
+            </IfPermission>
+          </div>
         </header>
 
         {/* KPI strip */}
@@ -280,6 +295,21 @@ export default function ResultsPage() {
               className="h-8 ps-9"
             />
           </div>
+          <Select value={classFilter} onValueChange={setClassFilter}>
+            <SelectTrigger
+              size="sm"
+              className="w-40"
+              aria-label="Filter by class"
+            >
+              <SelectValue placeholder="All classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All classes</SelectItem>
+              {classList.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={grade} onValueChange={setGrade}>
             <SelectTrigger
               size="sm"
@@ -383,10 +413,10 @@ export default function ResultsPage() {
                       Student
                     </TableHead>
                     <TableHead className="text-caption font-semibold uppercase tracking-wide text-text-muted">
-                      Exam
+                      Class
                     </TableHead>
                     <TableHead className="text-caption font-semibold uppercase tracking-wide text-text-muted">
-                      Term
+                      Exam
                     </TableHead>
                     <TableHead className="text-end text-caption font-semibold uppercase tracking-wide text-text-muted">
                       Total
@@ -434,19 +464,17 @@ export default function ResultsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="py-3">
+                          <Badge variant="outline" className="bg-primary-50 text-primary-700">
+                            {r.className ?? "—"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-3">
                           <div className="text-body text-text-primary">
                             {r.examName || "—"}
                           </div>
                           <div className="text-caption text-text-muted">
                             AY {formatNumber(r.academicYear ?? 0, locale)}
                           </div>
-                        </TableCell>
-                        <TableCell className="py-3 text-body text-text-secondary">
-                          {r.term ? (
-                            <Badge variant="outline" className="font-normal capitalize">
-                              {r.term}
-                            </Badge>
-                          ) : "—"}
                         </TableCell>
                         <TableCell className="py-3 text-end font-mono text-body">
                           <span className={failed ? "text-semantic-danger font-semibold" : "text-text-primary"}>
