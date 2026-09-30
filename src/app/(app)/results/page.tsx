@@ -26,11 +26,13 @@
  */
 
 import * as React from "react";
-import { Award, Search, CheckCircle2, XCircle } from "lucide-react";
-import { useResults } from "@/lib/query/client";
+import { Award, Search, CheckCircle2, XCircle, Plus, AlertCircle } from "lucide-react";
+import { useResults, useExams, queryClient } from "@/lib/query/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -38,9 +40,14 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState, ErrorState, PermissionDenied } from "@/components/states";
 import { IfPermission } from "@/components/auth/IfPermission";
+import { useToast } from "@/hooks/use-toast";
 import {
   SectionCard, SectionCardHeader,
 } from "@/components/foundation/SectionCard";
@@ -104,6 +111,7 @@ function GradeBadge({ grade }: { grade: string }) {
 
 export default function ResultsPage() {
   const { locale } = useI18n();
+  const { toast } = useToast();
   const hasPermission = useSessionStore((s) => s.hasPermission);
   const canView =
     hasPermission("results.view") || hasPermission("results.view.own");
@@ -118,6 +126,50 @@ export default function ResultsPage() {
   const [search, setSearch] = React.useState("");
   const [grade, setGrade] = React.useState<string>("all");
   const [passFilter, setPassFilter] = React.useState<string>("all");
+
+  // --- Generate Results dialog state ---
+  const { data: examsData } = useExams();
+  const examsList = ((examsData ?? []) as Array<Record<string, unknown>>).filter(
+    (e) => e.status === "published",
+  );
+  const [genOpen, setGenOpen] = React.useState(false);
+  const [genExamId, setGenExamId] = React.useState("");
+  const [genRanking, setGenRanking] = React.useState(false);
+  const [genSubmitting, setGenSubmitting] = React.useState(false);
+  const [genError, setGenError] = React.useState<string | null>(null);
+
+  async function handleGenerate() {
+    setGenError(null);
+    if (!genExamId) {
+      setGenError("Please select a published exam.");
+      return;
+    }
+    setGenSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/results/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exam_id: genExamId,
+          ranking_enabled: genRanking,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGenError(data?.error || `Failed (HTTP ${res.status})`);
+        setGenSubmitting(false);
+        return;
+      }
+      toast({ title: "Results generated", description: data?.message || "Results are now available." });
+      queryClient.invalidateQueries({ queryKey: ["results"] });
+      setGenOpen(false);
+      setGenExamId("");
+      setGenRanking(false);
+    } catch {
+      setGenError("Network error — please try again.");
+    }
+    setGenSubmitting(false);
+  }
 
   // Client-side filter pipeline.
   const filtered = React.useMemo(() => {
@@ -176,7 +228,10 @@ export default function ResultsPage() {
             </p>
           </div>
           <IfPermission code="results.generate">
-            <Button>Generate Result</Button>
+            <Button onClick={() => { setGenError(null); setGenOpen(true); }}>
+              <Plus className="h-4 w-4" />
+              Generate Result
+            </Button>
           </IfPermission>
         </header>
 
@@ -432,6 +487,68 @@ export default function ResultsPage() {
           </SectionCard>
         )}
       </div>
+
+      {/* ---------- Generate Results dialog ---------- */}
+      <Dialog open={genOpen} onOpenChange={setGenOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-primary-500" />
+              Generate Results
+            </DialogTitle>
+            <DialogDescription>
+              Select a published exam to generate results (GPA, grade,
+              pass/fail) for all students who have marks entered.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="gen-exam">Published Exam *</Label>
+              <Select value={genExamId} onValueChange={setGenExamId}>
+                <SelectTrigger id="gen-exam" className="w-full">
+                  <SelectValue placeholder="Select published exam" />
+                </SelectTrigger>
+                <SelectContent>
+                  {examsList.length === 0 && (
+                    <div className="px-3 py-2 text-caption text-text-muted">
+                      No published exams found. Publish an exam first.
+                    </div>
+                  )}
+                  {examsList.map((e) => (
+                    <SelectItem key={e.id as string} value={e.id as string}>
+                      {e.name as string} · {e.className as string ?? "—"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex cursor-pointer items-center gap-3 rounded-md border border-border-default px-3 py-2">
+              <Checkbox
+                checked={genRanking}
+                onCheckedChange={(v) => setGenRanking(v === true)}
+              />
+              <div>
+                <p className="text-body font-medium text-text-primary">Enable ranking</p>
+                <p className="text-caption text-text-muted">
+                  Assign positions (1st, 2nd, 3rd…) based on total marks.
+                </p>
+              </div>
+            </label>
+            {genError && (
+              <div role="alert" className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{genError}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGenOpen(false)}>Cancel</Button>
+            <Button onClick={handleGenerate} disabled={genSubmitting || !genExamId}>
+              {genSubmitting ? "Generating…" : "Generate Results"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
