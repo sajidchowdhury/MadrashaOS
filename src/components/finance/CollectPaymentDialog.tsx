@@ -139,15 +139,13 @@ export function CollectPaymentDialog({
   // Filter accounts by method
   const methodAccounts = React.useMemo(() => {
     const assets = (accounts ?? []) as Array<Record<string, unknown>>;
-    return assets.filter((a) => {
-      if (a.type !== "asset") return false;
-      const name = (a.name as string ?? "").toLowerCase();
-      if (method === "cash") return name.includes("cash");
-      if (method === "bank") return name.includes("bank");
-      if (method === "mobile") return name.includes("mobile") || name.includes("bkash") || name.includes("wallet");
-      return true;
-    });
-  }, [accounts, method]);
+    // Show ALL asset accounts (Cash, Bank, etc.) regardless of the
+    // payment method — the accountant picks which account receives
+    // the money. The previous name-based filter ('cash', 'bank',
+    // 'mobile') was too strict and excluded accounts with custom
+    // names like 'NCC' or 'Main Cash Box'.
+    return assets.filter((a) => a.type === "asset");
+  }, [accounts]);
 
   React.useEffect(() => {
     if (methodAccounts.length > 0) {
@@ -527,7 +525,8 @@ export function CollectPaymentDialog({
                   <SelectContent>
                     {methodAccounts.length === 0 && (
                       <div className="px-3 py-2 text-caption text-text-muted">
-                        No matching account. Add an asset account first.
+                        No asset accounts found. Go to Accounting → Add Account →
+                        Type: Asset (Cash or Bank) to create one first.
                       </div>
                     )}
                     {methodAccounts.map((a) => (
