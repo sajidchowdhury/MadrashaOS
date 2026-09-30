@@ -140,9 +140,11 @@ function TakeAttendanceContent() {
   const studentsQuery = useStudentsByClass(classId, sectionId);
   const students = studentsQuery.data ?? [];
 
+  // Search state for the student roster (must be declared before
+  // filteredStudents memo which uses it).
+  const [rosterSearch, setRosterSearch] = useState("");
+
   // Sort students by roll number (ascending) and filter by search query.
-  // This makes it easy for the teacher to find a student by name, code,
-  // or roll number in large classes (40+ students).
   const filteredStudents = useMemo(() => {
     const sorted = [...students].sort((a, b) => {
       const rollA = Number(a.roll) || 0;
@@ -165,7 +167,6 @@ function TakeAttendanceContent() {
   const [submittedAt, setSubmittedAt] = useState<number | null>(null);
   const [queued, setQueued] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [rosterSearch, setRosterSearch] = useState("");
 
   // Elapsed timer (seconds). Starts at 0; stops when submitted.
   const startTimeRef = useRef<number>(Date.now());
