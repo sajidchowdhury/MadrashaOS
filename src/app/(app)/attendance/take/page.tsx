@@ -40,6 +40,7 @@ import {
   Send,
   RotateCcw,
   ChevronDown,
+  Search,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { useClasses, useStudentsByClass, useAttendanceSessions } from "@/lib/query/client";
@@ -139,12 +140,32 @@ function TakeAttendanceContent() {
   const studentsQuery = useStudentsByClass(classId, sectionId);
   const students = studentsQuery.data ?? [];
 
+  // Sort students by roll number (ascending) and filter by search query.
+  // This makes it easy for the teacher to find a student by name, code,
+  // or roll number in large classes (40+ students).
+  const filteredStudents = useMemo(() => {
+    const sorted = [...students].sort((a, b) => {
+      const rollA = Number(a.roll) || 0;
+      const rollB = Number(b.roll) || 0;
+      return rollA - rollB;
+    });
+    if (!rosterSearch.trim()) return sorted;
+    const q = rosterSearch.trim().toLowerCase();
+    return sorted.filter(
+      (s) =>
+        s.name?.toLowerCase().includes(q) ||
+        s.code?.toLowerCase().includes(q) ||
+        String(s.roll ?? "").includes(q),
+    );
+  }, [students, rosterSearch]);
+
   // --- Attendance records state ---
   // Record<studentId, status> — default = present.
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
   const [submittedAt, setSubmittedAt] = useState<number | null>(null);
   const [queued, setQueued] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState("");
 
   // Elapsed timer (seconds). Starts at 0; stops when submitted.
   const startTimeRef = useRef<number>(Date.now());
@@ -491,11 +512,31 @@ function TakeAttendanceContent() {
       {students.length > 0 && (
         <>
           <AttendanceStatusSummary records={records} />
+
+          {/* Search box for finding students in large classes */}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            <input
+              type="search"
+              placeholder={`Search ${students.length} students by name, code, or roll…`}
+              className="w-full rounded-md border border-border-default bg-surface-card ps-9 pe-3 py-2 text-body text-text-primary placeholder:text-text-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+              value={rosterSearch}
+              onChange={(e) => setRosterSearch(e.target.value)}
+              aria-label="Search students in roster"
+            />
+          </div>
+
+          {filteredStudents.length === 0 && rosterSearch.trim() && (
+            <p className="py-4 text-center text-caption text-text-muted">
+              No students match &quot;{rosterSearch}&quot;.
+            </p>
+          )}
+
           <ul
             className="max-h-[calc(100vh-26rem)] space-y-2 overflow-y-auto pe-1"
             style={{ scrollbarWidth: "thin" }}
           >
-            {students.map((student) => (
+            {filteredStudents.map((student) => (
               <AttendanceRosterRow
                 key={student.id}
                 student={student}
