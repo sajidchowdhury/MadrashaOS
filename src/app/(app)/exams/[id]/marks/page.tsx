@@ -178,7 +178,7 @@ function EnterMarksContent() {
           if (isAbsent) {
             return {
               student_id: s.id,
-              subject_id: subjectId || s.id, // fallback — API uses exam.subject_id if not provided
+              ...(subjectId ? { subject_id: subjectId } : {}),
               marks_obtained: 0,
               is_absent: true,
             };
@@ -186,7 +186,7 @@ function EnterMarksContent() {
           if (markValue === undefined) return null;
           return {
             student_id: s.id,
-            subject_id: subjectId || s.id,
+            ...(subjectId ? { subject_id: subjectId } : {}),
             marks_obtained: markValue,
             is_absent: false,
           };
