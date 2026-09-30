@@ -114,8 +114,22 @@ export const PUT = withPermission("exams.enter-marks", async (req: Request, ctx:
     }
   }
 
-  // Use the exam's subject_id if not provided per mark
-  const subjectId = exam.subject_id;
+  // Use the exam's subject_id if not provided per mark.
+  // If neither the mark nor the exam has a subject_id, return 422
+  // because the Mark model requires subject_id (non-nullable).
+  const fallbackSubjectId = exam.subject_id;
+  if (!fallbackSubjectId) {
+    // Check if any mark is missing subject_id
+    const missingSubject = parsed.data.marks.some((m) => !m.subject_id);
+    if (missingSubject) {
+      return errorResponse(
+        "This exam has no subject assigned, and some marks don't include a subject_id. " +
+        "Please recreate the exam with a subject selected, or include subject_id in each mark entry.",
+        422,
+        { exam_subject_id: exam.subject_id, hint: "Go to Examinations → Create Exam → select a Subject." },
+      );
+    }
+  }
 
   // Save marks in a transaction using findFirst + update-or-create.
   // The Mark model has @@unique([exam_id, student_id, subject_id]) — a
@@ -125,7 +139,7 @@ export const PUT = withPermission("exams.enter-marks", async (req: Request, ctx:
   const result = await db.$transaction(async (tx) => {
     const saved: unknown[] = [];
     for (const mark of parsed.data.marks) {
-      const effectiveSubjectId = mark.subject_id || subjectId || mark.subject_id;
+      const effectiveSubjectId = mark.subject_id || fallbackSubjectId;
       const existing = await tx.mark.findFirst({
         where: {
           exam_id: id,
