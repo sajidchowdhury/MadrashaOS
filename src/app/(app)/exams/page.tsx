@@ -101,8 +101,8 @@ export default function ExamsListPage() {
 
   async function handleCreateExam() {
     setCreateError(null);
-    if (!examName.trim() || !examClassId || !examDate) {
-      setCreateError("Exam name, class, and date are required.");
+    if (!examName.trim() || !examClassId || !examSubjectId || !examDate) {
+      setCreateError("Exam name, class, subject, and date are required.");
       return;
     }
     setCreating(true);
@@ -306,13 +306,12 @@ export default function ExamsListPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="exam-subject">Subject</Label>
+                <Label htmlFor="exam-subject">Subject *</Label>
                 <Select value={examSubjectId} onValueChange={setExamSubjectId}>
                   <SelectTrigger id="exam-subject" className="w-full">
-                    <SelectValue placeholder="All subjects" />
+                    <SelectValue placeholder="Select subject" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All subjects</SelectItem>
                     {subjectList.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.name}{s.code ? ` · ${s.code}` : ""}

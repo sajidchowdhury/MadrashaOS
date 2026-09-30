@@ -21,7 +21,7 @@ const enterMarksSchema = z.object({
   marks: z.array(
     z.object({
       student_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
-      subject_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+      subject_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
       marks_obtained: z.number().min(0),
       is_absent: z.boolean().optional(),
       remark: z.string().optional(),
