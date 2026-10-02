@@ -64,7 +64,9 @@ export function ModuleSelectorButton() {
 }
 
 function ModuleCount() {
-  const enabledCount = useModuleStore((s) => s.enabledModules.size);
+  const enabledCount = useModuleStore((s) =>
+    Array.isArray(s.enabledModules) ? s.enabledModules.length : 0,
+  );
   return <>{enabledCount}</>;
 }
 
@@ -76,7 +78,11 @@ function ModuleSelectorSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useI18n();
-  const { enabledModules, toggleModule, enableAll, resetToDefaults } = useModuleStore();
+  const store = useModuleStore();
+  const enabledModules: string[] = Array.isArray(store.enabledModules)
+    ? store.enabledModules
+    : [];
+  const { toggleModule, enableAll, resetToDefaults } = store;
   const permissions = useSessionStore((s) => s.permissions);
   const permSet = new Set(permissions);
 
@@ -116,7 +122,7 @@ function ModuleSelectorSheet({
 
             const groupLabel = t(group.labelKey);
             const enabledInGroup = visibleItems.filter(
-              (item) => enabledModules.has(item.id),
+              (item) => enabledModules.includes(item.id),
             ).length;
 
             return (
@@ -131,7 +137,7 @@ function ModuleSelectorSheet({
                 </div>
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
-                    const isEnabled = enabledModules.has(item.id);
+                    const isEnabled = enabledModules.includes(item.id);
                     const isAlwaysOn = ALWAYS_ON.has(item.id);
                     const Icon = item.icon;
 
