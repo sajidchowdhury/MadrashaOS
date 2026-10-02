@@ -18,7 +18,7 @@
  */
 
 import * as React from "react";
-import { Calculator, Plus, Search, Download, Landmark } from "lucide-react";
+import { Calculator, Plus, Search, Download, Landmark, ArrowDownToLine, ArrowUpFromLine, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,8 @@ import { useLedgerEntries, useAccounts } from "@/lib/query/client";
 import { users } from "@/lib/mock/fixtures/users";
 import { LedgerEntryForm } from "@/components/finance/LedgerEntryForm";
 import { AccountFormDialog } from "@/components/finance/AccountFormDialog";
+import { ReceiveMoneyDialog } from "@/components/finance/ReceiveMoneyDialog";
+import { PayMoneyDialog } from "@/components/finance/PayMoneyDialog";
 import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
 
 type StatusFilter = "all" | "posted" | "pending" | "rejected";
@@ -57,6 +59,8 @@ export default function AccountingPage() {
   const [search, setSearch] = React.useState("");
   const [entryOpen, setEntryOpen] = React.useState(false);
   const [accountOpen, setAccountOpen] = React.useState(false);
+  const [receiveOpen, setReceiveOpen] = React.useState(false);
+  const [payOpen, setPayOpen] = React.useState(false);
 
   const accountName = (id: string) => accounts?.find((a) => a.id === id)?.name ?? id;
   const postedBy = (id: string) => users.find((u) => u.id === id)?.name ?? id;
@@ -137,14 +141,24 @@ export default function AccountingPage() {
               fileName={`ledger-statement-${fromDate || "all"}-to-${toDate || "now"}.pdf`}
             />
             <IfPermission code="accounting.ledger.post">
-              <Button variant="outline" onClick={() => setAccountOpen(true)}>
-                <Landmark className="h-4 w-4" />
-                Add Account
-              </Button>
-              <Button onClick={() => setEntryOpen(true)}>
-                <Plus className="h-4 w-4" />
-                New Entry
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setReceiveOpen(true)} className="bg-semantic-success hover:bg-semantic-success/90">
+                  <ArrowDownToLine className="h-4 w-4" />
+                  Receive Money
+                </Button>
+                <Button onClick={() => setPayOpen(true)} variant="destructive">
+                  <ArrowUpFromLine className="h-4 w-4" />
+                  Pay Money
+                </Button>
+                <Button variant="outline" onClick={() => setAccountOpen(true)}>
+                  <Landmark className="h-4 w-4" />
+                  Add Account
+                </Button>
+                <Button variant="ghost" onClick={() => setEntryOpen(true)} title="Advanced journal entry (debit/credit)">
+                  <Settings className="h-4 w-4" />
+                  Advanced
+                </Button>
+              </div>
             </IfPermission>
           </div>
         </header>
@@ -175,6 +189,43 @@ export default function AccountingPage() {
               {pendingCount}
             </p>
           </div>
+        </div>
+
+        {/* Fund separation summary cards */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {(() => {
+            const allAccts = (accounts ?? []) as Array<{ type: string; fund: string; balance: number }>;
+            const generalAccounts = allAccts.filter((a) => a.fund === "general" || !a.fund);
+            const zakatAccounts = allAccts.filter((a) => a.fund === "zakat");
+            const generalBalance = generalAccounts.reduce((s, a) => s + Number(a.balance ?? 0), 0);
+            const zakatBalance = zakatAccounts.reduce((s, a) => s + Number(a.balance ?? 0), 0);
+            return (
+              <>
+                <div className="rounded-lg border-2 border-primary-200 bg-primary-50 p-4">
+                  <p className="text-caption font-medium uppercase tracking-wider text-primary-600">
+                    General Fund Balance
+                  </p>
+                  <p className="mt-1 font-mono text-display font-bold text-primary-700">
+                    {formatCurrency(generalBalance, locale)}
+                  </p>
+                  <p className="mt-1 text-caption text-primary-600">
+                    Fee income, donations (non-zakat), expenses
+                  </p>
+                </div>
+                <div className="rounded-lg border-2 border-accent-200 bg-accent-50 p-4">
+                  <p className="text-caption font-medium uppercase tracking-wider text-accent-700">
+                    Zakat Fund Balance
+                  </p>
+                  <p className="mt-1 font-mono text-display font-bold text-accent-700">
+                    {formatCurrency(zakatBalance, locale)}
+                  </p>
+                  <p className="mt-1 text-caption text-accent-600">
+                    Zakat received − zakat distributed (sacred, never mixed)
+                  </p>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* Filter bar */}
@@ -398,6 +449,8 @@ export default function AccountingPage() {
 
       <LedgerEntryForm open={entryOpen} onOpenChange={setEntryOpen} />
       <AccountFormDialog open={accountOpen} onOpenChange={setAccountOpen} />
+      <ReceiveMoneyDialog open={receiveOpen} onOpenChange={setReceiveOpen} />
+      <PayMoneyDialog open={payOpen} onOpenChange={setPayOpen} />
     </div>
   );
 }
