@@ -4,23 +4,19 @@
  * MadrashaOS — Module Store (Zustand + persist)
  *
  * Tracks which modules the user has chosen to ENABLE in their sidebar.
- * Uses an ARRAY (not Set) for localStorage compatibility — Sets don't
- * serialize/deserialize properly with JSON.
+ * Uses an ARRAY for localStorage compatibility.
  *
- * Persisted to localStorage so the selection survives page reloads.
+ * Dashboard is ALWAYS enabled and can NEVER be disabled.
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { moduleTree } from "@/lib/nav/moduleTree";
 
-// All module IDs (flattened from moduleTree)
 export const ALL_MODULE_IDS: string[] = moduleTree.flatMap((g) => g.items.map((i) => i.id));
 
-// Modules that are always on (can't be disabled)
 const ALWAYS_ON = ["dashboard"];
 
-// Default: enable a "core" set for new madrashas
 const DEFAULT_ENABLED = [
   "dashboard",
   "organization",
@@ -35,7 +31,6 @@ const DEFAULT_ENABLED = [
 ];
 
 type ModuleStoreState = {
-  /** Array of enabled module IDs (JSON-serializable) */
   enabledModules: string[];
   toggleModule: (id: string) => void;
   enableModule: (id: string) => void;
@@ -44,32 +39,41 @@ type ModuleStoreState = {
   resetToDefaults: () => void;
 };
 
+/** Ensures enabledModules is always a valid array (never null/object/set) */
+function safeArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val;
+  if (val instanceof Set) return Array.from(val);
+  return [...DEFAULT_ENABLED];
+}
+
 export const useModuleStore = create<ModuleStoreState>()(
   persist(
     (set) => ({
-      enabledModules: DEFAULT_ENABLED,
+      enabledModules: [...DEFAULT_ENABLED],
 
       toggleModule: (id) => {
-        if (ALWAYS_ON.includes(id)) return;
+        if (ALWAYS_ON.includes(id)) return; // Dashboard can't be toggled
         set((state) => {
-          if (state.enabledModules.includes(id)) {
-            return { enabledModules: state.enabledModules.filter((m) => m !== id) };
+          const current = safeArray(state.enabledModules);
+          if (current.includes(id)) {
+            return { enabledModules: current.filter((m) => m !== id) };
           }
-          return { enabledModules: [...state.enabledModules, id] };
+          return { enabledModules: [...current, id] };
         });
       },
 
       enableModule: (id) => {
         set((state) => {
-          if (state.enabledModules.includes(id)) return state;
-          return { enabledModules: [...state.enabledModules, id] };
+          const current = safeArray(state.enabledModules);
+          if (current.includes(id)) return state;
+          return { enabledModules: [...current, id] };
         });
       },
 
       disableModule: (id) => {
         if (ALWAYS_ON.includes(id)) return;
         set((state) => ({
-          enabledModules: state.enabledModules.filter((m) => m !== id),
+          enabledModules: safeArray(state.enabledModules).filter((m) => m !== id),
         }));
       },
 
@@ -83,6 +87,15 @@ export const useModuleStore = create<ModuleStoreState>()(
     }),
     {
       name: "madrasha-module-store",
+      // Merge persisted state with defaults — handles corrupted/old format
+      merge: (persisted, current) => {
+        const persistedState = (persisted as { enabledModules?: unknown }) ?? {};
+        return {
+          ...current,
+          ...persistedState,
+          enabledModules: safeArray(persistedState.enabledModules),
+        };
+      },
     },
   ),
 );
@@ -91,13 +104,18 @@ export const useModuleStore = create<ModuleStoreState>()(
  * Returns the module tree filtered by BOTH:
  *   1. The user's permissions
  *   2. The user's module store selection
+ * Dashboard is always included regardless.
  */
 export function getEnabledVisibleModules(
   permissions: string[],
-  enabledModules: string[],
+  enabledModules: string[] | unknown,
 ) {
   const permSet = new Set(permissions);
-  const enabledSet = new Set(enabledModules);
+  const enabledArr = safeArray(enabledModules);
+  const enabledSet = new Set(enabledArr);
+  // Always ensure dashboard is in the set
+  enabledSet.add("dashboard");
+
   return moduleTree
     .map((group) => ({
       ...group,
