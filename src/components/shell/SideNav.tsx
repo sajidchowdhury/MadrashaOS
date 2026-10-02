@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { useSessionStore } from "@/stores/sessionStore";
-import { getVisibleModules, type ModuleDef } from "@/lib/nav/moduleTree";
+import { type ModuleDef } from "@/lib/nav/moduleTree";
+import { getEnabledVisibleModules, useModuleStore } from "@/stores/moduleStore";
 
 export function SideNav({
   className = "",
@@ -34,10 +35,11 @@ export function SideNav({
   const pathname = usePathname();
   const permissions = useSessionStore((s) => s.permissions);
   const setRole = useSessionStore((s) => s.setRole);
+  const enabledModules = useModuleStore((s) => s.enabledModules);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Filter modules by permissions
-  const visibleGroups = getVisibleModules(permissions);
+  // Filter modules by permissions AND enabled-modules store
+  const visibleGroups = getEnabledVisibleModules(permissions, enabledModules);
 
   function handleItemClick(mod: ModuleDef) {
     onNavigate?.();

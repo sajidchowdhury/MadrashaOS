@@ -14,6 +14,7 @@ import React from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { DevToolbar } from "@/components/dev/DevToolbar";
 import { HelpButton } from "@/components/shell/HelpButton";
+import { ModuleSelectorButton } from "@/components/shell/ModuleSelectorButton";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useCurrentUser } from "@/lib/query/client";
 
@@ -51,6 +52,7 @@ export default function AppGroupLayout({
     <>
       <AppShell>{children}</AppShell>
       <HelpButton />
+      <ModuleSelectorButton />
       <DevToolbar />
     </>
   );
