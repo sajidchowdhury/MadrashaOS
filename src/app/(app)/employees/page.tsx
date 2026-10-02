@@ -22,7 +22,7 @@
  */
 
 import * as React from "react";
-import { Briefcase, Search, Phone, UserPlus, Wallet, CheckCircle2, KeyRound } from "lucide-react";
+import { Briefcase, Search, Phone, UserPlus, Wallet, CheckCircle2, KeyRound, HandCoins, AlertCircle } from "lucide-react";
 import { useEmployees } from "@/lib/query/client";
 import { Button } from "@/components/ui/button";
 import { PaySalaryDialog } from "@/components/finance/PaySalaryDialog";
@@ -49,7 +49,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { queryClient } from "@/lib/query/client";
+import { queryClient, useAccounts } from "@/lib/query/client";
 import { formatDate, formatNumber } from "@/lib/i18n/format";
 
 /** Row shape produced by api.getEmployees() (camelCase via toCamel()). */
@@ -159,6 +159,53 @@ export default function EmployeesListPage() {
     name: string; email: string; password: string; code: string;
   } | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+
+  // --- Give Advance dialog state ---
+  const [advanceOpen, setAdvanceOpen] = React.useState(false);
+  const [advanceStaff, setAdvanceStaff] = React.useState<{
+    id: string; name: string; code?: string;
+  } | null>(null);
+  const [advanceAmount, setAdvanceAmount] = React.useState("");
+  const [advanceReason, setAdvanceReason] = React.useState("");
+  const [advanceDate, setAdvanceDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [advanceAccountId, setAdvanceAccountId] = React.useState("");
+  const [advanceSubmitting, setAdvanceSubmitting] = React.useState(false);
+  const [advanceError, setAdvanceError] = React.useState<string | null>(null);
+
+  async function handleGiveAdvance() {
+    setAdvanceError(null);
+    const amount = Number(advanceAmount) || 0;
+    if (amount <= 0) { setAdvanceError("Amount must be greater than 0."); return; }
+    if (!advanceAccountId) { setAdvanceError("Please select a Cash/Bank account."); return; }
+    if (!advanceStaff) return;
+    setAdvanceSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/employees/${advanceStaff.id}/advance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount,
+          reason: advanceReason.trim() || undefined,
+          advance_date: advanceDate,
+          account_id: advanceAccountId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAdvanceError(data?.error || `Failed (HTTP ${res.status})`);
+        setAdvanceSubmitting(false);
+        return;
+      }
+      toast({ title: "Advance given", description: `${advanceStaff.name} — ৳${amount.toLocaleString()}. Will be deducted from next salary.` });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      setAdvanceOpen(false);
+    } catch {
+      setAdvanceError("Network error — please try again.");
+    }
+    setAdvanceSubmitting(false);
+  }
   const [empName, setEmpName] = React.useState("");
   const [empNameBn, setEmpNameBn] = React.useState("");
   const [empDesignation, setEmpDesignation] = React.useState("");
@@ -525,6 +572,24 @@ export default function EmployeesListPage() {
                                 Reset Password
                               </Button>
                             </IfPermission>
+                            <IfPermission code="accounting.ledger.post">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={e.status !== "active"}
+                                onClick={() => {
+                                  setAdvanceStaff({ id: e.id, name: e.name, code: e.employeeCode });
+                                  setAdvanceAmount(""); setAdvanceReason("");
+                                  setAdvanceDate(new Date().toISOString().slice(0, 10));
+                                  setAdvanceAccountId(""); setAdvanceError(null);
+                                  setAdvanceOpen(true);
+                                }}
+                                aria-label={`Give advance to ${e.name}`}
+                              >
+                                <HandCoins className="h-4 w-4" />
+                                Advance
+                              </Button>
+                            </IfPermission>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -546,6 +611,73 @@ export default function EmployeesListPage() {
         staffCode={payStaff?.code}
         defaultSalary={payStaff?.salary}
       />
+
+      {/* ---------- Give Advance Dialog ---------- */}
+      <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HandCoins className="h-5 w-5 text-semantic-warning" />
+              Give Advance — {advanceStaff?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Give an advance payment against the employee&apos;s future salary.
+              This amount will be deducted from their next salary payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="adv-amount">Advance Amount (BDT) *</Label>
+              <Input
+                id="adv-amount"
+                type="number"
+                min={1}
+                placeholder="5000"
+                value={advanceAmount}
+                onChange={(e) => setAdvanceAmount(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="adv-reason">Reason</Label>
+              <Input
+                id="adv-reason"
+                placeholder="e.g. Medical emergency"
+                value={advanceReason}
+                onChange={(e) => setAdvanceReason(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="adv-account">Paid From *</Label>
+              <AdvanceAccountSelect
+                value={advanceAccountId}
+                onChange={setAdvanceAccountId}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="adv-date">Date</Label>
+              <Input
+                id="adv-date"
+                type="date"
+                value={advanceDate}
+                onChange={(e) => setAdvanceDate(e.target.value)}
+              />
+            </div>
+            {advanceError && (
+              <div role="alert" className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{advanceError}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdvanceOpen(false)}>Cancel</Button>
+            <Button onClick={handleGiveAdvance} disabled={advanceSubmitting}>
+              {advanceSubmitting ? "Giving…" : "Give Advance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ---------- Credentials Dialog (shown after employee creation) ---------- */}
       <Dialog open={credentialsOpen} onOpenChange={setCredentialsOpen}>
@@ -676,5 +808,38 @@ export default function EmployeesListPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/* --- Helper: Asset Account Select (for the Advance dialog) --- */
+function AdvanceAccountSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { data: accounts } = useAccounts();
+  const assetAccounts = ((accounts ?? []) as Array<Record<string, unknown>>)
+    .filter((a) => a.type === "asset");
+
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger id="adv-account" className="w-full">
+        <SelectValue placeholder="Select Cash or Bank account" />
+      </SelectTrigger>
+      <SelectContent>
+        {assetAccounts.length === 0 && (
+          <div className="px-3 py-2 text-caption text-text-muted">
+            No asset accounts found. Add a Cash/Bank account on the Accounting page.
+          </div>
+        )}
+        {assetAccounts.map((a) => (
+          <SelectItem key={a.id as string} value={a.id as string}>
+            {a.name as string}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

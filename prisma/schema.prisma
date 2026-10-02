@@ -245,6 +245,7 @@ model Organization {
   inventory_sales     InventorySale[]
   donors              Donor[]
   donor_pledges       DonorPledge[]
+  employee_advances   EmployeeAdvance[]
 
   @@index([deleted_at])
   @@index([created_at])
@@ -326,6 +327,7 @@ model Branch {
   inventory_sales     InventorySale[]
   donors              Donor[]
   donor_pledges       DonorPledge[]
+  employee_advances   EmployeeAdvance[]
 
   @@unique([organization_id, code])
   @@index([organization_id])
@@ -414,7 +416,8 @@ model User {
   approvals_delegated Approval[] @relation("ApprovalDelegatedTo")
 
   // Payroll — payslips where this user is the payee
-  payroll_records PayrollRecord[] @relation("PayrollPayee")
+  payroll_records   PayrollRecord[]    @relation("PayrollPayee")
+  employee_advances EmployeeAdvance[]  @relation("EmployeeAdvanceUser")
 
   @@unique([organization_id, email])
   @@index([organization_id, branch_id])
@@ -916,6 +919,39 @@ model Employee {
   @@index([joined_at])
   @@index([deleted_at])
   @@map("employees")
+}
+
+/// Employee Advance — advance payment given to an employee/teacher
+/// against their future salary. Deducted from the next salary payment.
+model EmployeeAdvance {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  branch_id        String?   @db.Uuid
+  staff_type       String    // 'employee' | 'teacher'
+  staff_id         String    @db.Uuid // Employee.id or Teacher.id
+  user_id          String    @db.Uuid // linked User (for name lookup)
+  amount           Decimal   @db.Decimal(14, 2)
+  advance_date     DateTime  @db.Date
+  reason           String?
+  status           String    @default("pending") // pending | deducted | written_off
+  deduction_month  Int?      // which month's salary it was deducted from
+  deduction_year   Int?
+  ledger_entry_id  String?   @db.Uuid // linked LedgerEntry
+  notes            String?
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization   Organization @relation(fields: [organization_id], references: [id])
+  branch         Branch?      @relation(fields: [branch_id], references: [id])
+  user           User         @relation("EmployeeAdvanceUser", fields: [user_id], references: [id])
+
+  @@index([organization_id, staff_id])
+  @@index([status])
+  @@index([user_id])
+  @@map("employee_advances")
 }
 
 /// Payroll — salary payment records (payslips).
