@@ -243,6 +243,8 @@ model Organization {
   approvals           Approval[]
   payroll_records     PayrollRecord[]
   inventory_sales     InventorySale[]
+  donors              Donor[]
+  donor_pledges       DonorPledge[]
 
   @@index([deleted_at])
   @@index([created_at])
@@ -322,6 +324,8 @@ model Branch {
   assets_transferred  Asset[]             @relation("AssetTransferredToBranch")
   payroll_records     PayrollRecord[]
   inventory_sales     InventorySale[]
+  donors              Donor[]
+  donor_pledges       DonorPledge[]
 
   @@unique([organization_id, code])
   @@index([organization_id])
@@ -1712,6 +1716,8 @@ model Donation {
   branch       Branch?      @relation(fields: [branch_id], references: [id])
   account      Account      @relation(fields: [account_id], references: [id])
   confirmer    User?        @relation("DonationConfirmedBy", fields: [confirmed_by], references: [id])
+  donor        Donor?       @relation(fields: [donor_id], references: [id])
+  donor_id     String?      @db.Uuid
 
   @@unique([organization_id, receipt_no])
   @@index([organization_id, branch_id])
@@ -1720,7 +1726,75 @@ model Donation {
   @@index([status])
   @@index([donation_date])
   @@index([deleted_at])
+  @@index([donor_id])
   @@map("donations")
+}
+
+/// Donor — a person/organization that donates to the madrasha.
+/// Tracks total donated + total pledged for easy management.
+model Donor {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  branch_id       String?   @db.Uuid
+  name            String
+  name_bn         String?
+  phone           String?
+  email           String?
+  address         String?
+  donor_type      String    @default("regular") // regular | one_time | zakat_donor | sadaqah_donor
+  total_donated   Decimal   @default(0) @db.Decimal(14, 2) // running total
+  total_pledged   Decimal   @default(0) @db.Decimal(14, 2) // total promised
+  notes           String?
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  organization   Organization   @relation(fields: [organization_id], references: [id])
+  branch         Branch?        @relation(fields: [branch_id], references: [id])
+  donations      Donation[]
+  pledges        DonorPledge[]
+
+  @@index([organization_id])
+  @@index([phone])
+  @@index([deleted_at])
+  @@map("donors")
+}
+
+/// DonorPledge — a promise to donate a certain amount (one-time or recurring).
+/// Tracks how much has been received against the pledge.
+model DonorPledge {
+  id               String    @id @default(uuid()) @db.Uuid
+  organization_id  String    @db.Uuid
+  donor_id         String    @db.Uuid
+  amount           Decimal   @db.Decimal(14, 2) // total pledged
+  pledge_type      String    @default("general") // general | zakat | sadaqah
+  frequency        String    @default("one_time") // one_time | monthly | yearly
+  start_date       DateTime  @db.Date
+  end_date        DateTime?  @db.Date // null = ongoing
+  amount_received  Decimal   @default(0) @db.Decimal(14, 2) // running total received
+  next_reminder    DateTime? @db.Date // next reminder date
+  status           String    @default("active") // active | fulfilled | cancelled
+  notes            String?
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+
+  organization   Organization @relation(fields: [organization_id], references: [id])
+  branch         Branch?      @relation(fields: [branch_id], references: [id])
+  donor          Donor        @relation(fields: [donor_id], references: [id])
+
+  branch_id      String?      @db.Uuid
+
+  @@index([organization_id])
+  @@index([donor_id])
+  @@index([status])
+  @@index([next_reminder])
+  @@map("donor_pledges")
 }
 
 // ============================================================

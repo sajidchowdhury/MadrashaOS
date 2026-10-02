@@ -20,7 +20,7 @@ import {
   LayoutDashboard, Building2, ShieldCheck, History, Lock, DatabaseBackup,
   GraduationCap, UserPlus, Users, UserCheck, Briefcase,
   ClipboardCheck, FileText, Award, CalendarDays, BookMarked,
-  Wallet, Calculator, HandCoins, Scale, Gift, Landmark, CreditCard,
+  Wallet, Calculator, HandCoins, Scale, Gift, Landmark, CreditCard, Heart,
   Package, ShoppingCart, Truck, Sofa, UtensilsCrossed, BookOpen, Bus,
   Bell, FileArchive, BarChart3, Settings,
 } from "lucide-react";
@@ -111,6 +111,7 @@ export const moduleTree: ModuleGroup[] = [
       { id: "zakat", labelKey: "shell.nav.zakat", icon: Scale, layer: "finance", permissionRequired: "zakat.view", phase: 2, route: "/zakat" },
       { id: "scholarship", labelKey: "shell.nav.scholarship", icon: Gift, layer: "finance", permissionRequired: "scholarship.view", phase: 2, route: "/scholarship" },
       { id: "donations", labelKey: "shell.nav.donations", icon: CreditCard, layer: "finance", permissionRequired: "donations.view", phase: 2, route: "/donations" },
+      { id: "donors", labelKey: "shell.nav.donors", icon: Heart, layer: "finance", permissionRequired: "donors.view", phase: 2, route: "/donors" },
     ],
   },
   {

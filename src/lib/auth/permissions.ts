@@ -87,6 +87,8 @@ export const PERMISSION_CODES = [
   "donations.view",
   "donations.create",
   "donations.create.public", // scope: public visitor (no login)
+  "donors.view",
+  "donors.create",
 
   // --- Operations (SRS §2.5) ---
   "inventory.view",
