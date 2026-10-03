@@ -183,7 +183,7 @@ const ROLE_PERMS: Record<string, string[]> = {
     "hostel.view", "hostel.allocate", "food.meal-plan", "library.view", "library.issue",
     "library.return", "transport.view", "transport.record-expense", "notices.view",
     "notices.compose", "notices.send", "documents.upload", "documents.download",
-    "reports.view", "dashboard.view", "pdf.generate", "approval.view",
+    "reports.view", "dashboard.view", "pdf.generate", "security.policy.edit", "approval.view",
   ],
   accountant: [
     "students.view", "guardians.view", "fees.view", "fees.payment.create",

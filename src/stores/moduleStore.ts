@@ -21,6 +21,7 @@ const DEFAULT_ENABLED = [
   "dashboard",
   "organization",
   "rbac",
+  "security",
   "employees",
   "fees",
   "accounting",

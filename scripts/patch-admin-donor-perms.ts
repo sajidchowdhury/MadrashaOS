@@ -1,8 +1,10 @@
 /**
- * MadrashaOS — Patch: grant donor/donation permissions to administrator role
+ * MadrashaOS — Patch: grant donor/donation + security permissions to administrator role
  *
- * One-off script that upserts the 4 missing role_permissions for the
- * `administrator` role so POST /api/v1/donors stops returning 403.
+ * One-off script that upserts the missing role_permissions for the
+ * `administrator` role so:
+ *   - POST /api/v1/donors stops returning 403
+ *   - GET /api/v1/security/policy stops returning 403
  *
  * Run: bun run scripts/patch-admin-donor-perms.ts
  */
@@ -15,6 +17,7 @@ const PERMS_TO_ADD = [
   "donations.create",
   "donors.view",
   "donors.create",
+  "security.policy.edit",
 ];
 
 async function main() {
