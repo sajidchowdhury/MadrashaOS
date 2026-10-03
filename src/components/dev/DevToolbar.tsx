@@ -99,42 +99,36 @@ export function DevToolbar({
     }
   };
 
-  /* --- Collapsed: floating DEV badge. When a flow is active, also show
-         a "2/5" pill so progress is visible without expanding. --- */
+  /* --- Collapsed: the floating DEV badge has been removed (the DevToolbar
+         is now opened via the Bug icon in the TopBar). When a flow is
+         active, we still render the "2/5" progress pill + FlowOverlay so
+         the walkthrough remains visible. When no flow is active and the
+         toolbar is collapsed, render nothing. --- */
   if (!expanded) {
+    if (!activeFlow) {
+      // No active flow + collapsed → only the FlowOverlay (which renders
+      // nothing when no flow is active). No floating badge.
+      return <FlowOverlay />;
+    }
     return (
       <>
         <div className="fixed bottom-4 end-4 z-50 flex items-center gap-1.5">
-          {activeFlow && (
-            <button
-              type="button"
-              onClick={handleNextStep}
-              className="flex items-center gap-1.5 rounded-full bg-primary-500 px-3 py-2 text-caption font-medium text-primary-foreground shadow-elevation-3 transition-all hover:bg-primary-700"
-              aria-label={
-                isComplete
-                  ? `Flow ${activeFlow.name} complete`
-                  : `Flow ${activeFlow.name} — step ${stepIndex + 1} of ${totalSteps}. Click to advance.`
-              }
-              title={step ? step.action : `${activeFlow.name} — complete`}
-            >
-              <ListChecks className="h-4 w-4" />
-              <span className="font-mono">
-                {isComplete ? "Done" : `${stepIndex + 1}/${totalSteps}`}
-              </span>
-              {!isComplete && <ArrowRight className="h-3 w-3" />}
-            </button>
-          )}
           <button
             type="button"
-            onClick={() => setExpanded(true)}
-            className="flex items-center gap-1.5 rounded-full bg-neutral-900 px-3 py-2 text-caption font-medium text-neutral-0 shadow-elevation-3 transition-all hover:bg-neutral-700"
-            aria-label={t("shell.dev.title")}
+            onClick={handleNextStep}
+            className="flex items-center gap-1.5 rounded-full bg-primary-500 px-3 py-2 text-caption font-medium text-primary-foreground shadow-elevation-3 transition-all hover:bg-primary-700"
+            aria-label={
+              isComplete
+                ? `Flow ${activeFlow.name} complete`
+                : `Flow ${activeFlow.name} — step ${stepIndex + 1} of ${totalSteps}. Click to advance.`
+            }
+            title={step ? step.action : `${activeFlow.name} — complete`}
           >
-            <Bug className="h-4 w-4" />
-            <span>{t("shell.dev.expand")}</span>
-            <span className="ms-1 rounded-full bg-primary-500 px-1.5 py-0.5 text-[10px] font-bold">
-              {ROLE_LABELS[role].native}
+            <ListChecks className="h-4 w-4" />
+            <span className="font-mono">
+              {isComplete ? "Done" : `${stepIndex + 1}/${totalSteps}`}
             </span>
+            {!isComplete && <ArrowRight className="h-3 w-3" />}
           </button>
         </div>
         <FlowOverlay />
