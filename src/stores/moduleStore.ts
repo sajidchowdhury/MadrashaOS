@@ -31,6 +31,7 @@ const DEFAULT_ENABLED = [
   "reports",
   "notices",
   "documents",
+  "branding",
   "settings",
 ];
 
