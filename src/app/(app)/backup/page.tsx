@@ -4,8 +4,7 @@
  * MadrashaOS — Backup & Restore page (SRS §2.1.6)
  *
  * Session 8.4: Wired to real API — GET /api/v1/backup lists BackupRecord
- * rows, POST /api/v1/backup runs a real pg_dump via child_process.exec.
- * Replaces the mock setTimeout + fake data.
+ * rows, POST /api/v1/backup runs a cross-platform JSON dump (no pg_dump).
  */
 
 import * as React from "react";
@@ -122,12 +121,13 @@ export default function BackupPage() {
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
             <div>
               <p className="text-body font-medium text-blue-900">
-                Production backups
+                Cross-platform backup
               </p>
               <p className="mt-1 text-caption text-blue-800">
-                For production, set up a daily cron job using <code className="font-mono">scripts/backup.sh</code>{" "}
-                (see DEPLOYMENT.md). This UI button runs an on-demand <code className="font-mono">pg_dump</code> —
-                suitable for manual backups but not for scheduled ones.
+                Backups are created as compressed JSON (<code className="font-mono">.json.gz</code>) using
+                Node&apos;s built-in libraries — no <code className="font-mono">pg_dump</code> or external
+                tools required. Works on Windows, Linux, and macOS. For automated scheduled backups
+                in production, see <code className="font-mono">scripts/backup.sh</code>.
               </p>
             </div>
           </div>

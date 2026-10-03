@@ -1,31 +1,57 @@
 /**
- * MadrashaOS — Backup API (Session 8.4)
+ * MadrashaOS — Backup API (Session 8.4, rewritten cross-platform)
  *
  * GET  /api/v1/backup — list backup records (perm: backup.run)
- * POST /api/v1/backup — run a manual pg_dump backup (perm: backup.run)
+ * POST /api/v1/backup — run a manual backup (perm: backup.run)
  *
- * The POST handler executes pg_dump via child_process.exec, stores the
- * .sql.gz file in backups/, and creates a BackupRecord row.
+ * The POST handler creates a backup by:
+ *   1. Querying all Prisma tables (tenant-scoped)
+ *   2. Serializing to JSON
+ *   3. Compressing with Node's built-in zlib (gzip)
+ *   4. Writing a .json.gz file to backups/
+ *   5. Computing SHA256 with Node's built-in crypto
  *
- * In production, use a cron job + pg_dump (see scripts/backup.sh).
- * This API endpoint is for manual/on-demand backups from the UI.
+ * This is cross-platform (Windows / Linux / macOS) — does NOT depend on
+ * pg_dump, gzip, sha256sum, or cut being installed on the host.
+ *
+ * In production, you can also use pg_dump via scripts/backup.sh on Linux,
+ * but this API endpoint works everywhere without external binaries.
  */
 
 import { db } from "@/lib/db";
-import { getTenantContext } from "@/lib/auth/with-tenant";
+import { getTenantContext, tenantWhere } from "@/lib/auth/with-tenant";
 import { withPermission } from "@/lib/auth/with-permission";
 import { jsonResponse, errorResponse, successResponse, parsePagination } from "@/lib/api/helpers";
-import { exec } from "child_process";
-import { promisify } from "util";
-import { mkdir, stat } from "fs/promises";
+import { mkdir, writeFile, stat } from "fs/promises";
 import { join } from "path";
+import { gzipSync } from "zlib";
 import { createHash } from "crypto";
-
-const execAsync = promisify(exec);
 
 export const dynamic = "force-dynamic";
 
 const BACKUP_DIR = join(process.cwd(), "backups");
+
+/**
+ * All Prisma model names (from prisma/schema.prisma).
+ * Used to iterate over every table for the JSON dump.
+ *
+ * NOTE: keep this in sync with the schema when adding new models.
+ */
+const ALL_MODELS = [
+  "organization", "branch", "user", "role", "permission", "rolePermission",
+  "auditLog", "moduleConfig", "securityPolicy", "backupRecord",
+  "class", "section", "student", "guardian", "studentGuardian",
+  "teacher", "employee", "employeeAdvance", "payrollRecord", "admission",
+  "teacherAssignment", "subject", "routine", "attendanceSession", "attendanceRecord",
+  "exam", "mark", "result", "studentHistory",
+  "account", "feePlan", "feeInstallment", "feePayment", "scholarship",
+  "ledgerEntry", "cashBankTransfer", "zakatTransaction",
+  "donation", "donor", "donorPledge",
+  "inventoryItem", "inventorySale", "purchase", "purchaseItem", "supplier",
+  "asset", "hostelRoom", "hostelBed", "mealPlan",
+  "libraryBook", "libraryIssue", "vehicle", "fuelLog",
+  "notice", "document", "report", "approval", "idempotencyRecord",
+] as const;
 
 /** GET /api/v1/backup — list backup records */
 export const GET = withPermission("backup.run", async (req: Request) => {
@@ -66,7 +92,7 @@ export const GET = withPermission("backup.run", async (req: Request) => {
   });
 });
 
-/** POST /api/v1/backup — run a manual backup */
+/** POST /api/v1/backup — run a manual backup (cross-platform, no pg_dump) */
 export const POST = withPermission("backup.run", async () => {
   const ctx = await getTenantContext();
   if (!ctx) return errorResponse("Unauthorized", 401);
@@ -75,7 +101,7 @@ export const POST = withPermission("backup.run", async () => {
   await mkdir(BACKUP_DIR, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const filename = `madrashaos_${timestamp}.sql.gz`;
+  const filename = `madrashaos_${timestamp}.json.gz`;
   const filepath = join(BACKUP_DIR, filename);
 
   // Create a BackupRecord (status: running)
@@ -92,21 +118,62 @@ export const POST = withPermission("backup.run", async () => {
   });
 
   try {
-    // Execute pg_dump (DATABASE_URL is read from env)
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) throw new Error("DATABASE_URL not set");
+    // --- Dump all tables via Prisma (tenant-scoped where applicable) ---
+    const dump: Record<string, unknown[]> = {};
+    const tenantScoped = tenantWhere(ctx);
+    let totalRows = 0;
 
-    // Use pg_dump with gzip compression
-    const cmd = `pg_dump "${dbUrl}" | gzip > "${filepath}"`;
-    await execAsync(cmd, { timeout: 120000 }); // 2 min timeout
+    for (const modelName of ALL_MODELS) {
+      // db is typed; cast to any to allow dynamic model access
+      const model = (db as Record<string, { findMany?: (args?: unknown) => Promise<unknown[]> } | undefined>)[modelName];
+      if (!model || typeof model.findMany !== "function") continue;
+
+      // Tenant-scoped tables get a where clause; others (organization, branch,
+      // role, permission) are global reference data and should be included
+      // without org filtering.
+      const isTenantScoped =
+        modelName !== "organization" &&
+        modelName !== "branch" &&
+        modelName !== "role" &&
+        modelName !== "permission" &&
+        modelName !== "idempotencyRecord";
+
+      const where = isTenantScoped
+        ? { organization_id: ctx.organization_id }
+        : {};
+
+      const rows = await model.findMany({ where, take: 10000 });
+      dump[modelName] = rows;
+      totalRows += rows.length;
+    }
+
+    // --- Serialize + compress (cross-platform: no external gzip) ---
+    const jsonStr = JSON.stringify(
+      {
+        _meta: {
+          version: 1,
+          format: "madrashaos-json-dump",
+          exported_at: new Date().toISOString(),
+          organization_id: ctx.organization_id,
+          branch_id: ctx.branch_id,
+          row_count: totalRows,
+          table_count: Object.keys(dump).length,
+        },
+        data: dump,
+      },
+      null,
+      0, // no pretty-print → smaller file
+    );
+
+    const compressed = gzipSync(Buffer.from(jsonStr, "utf-8"));
+    await writeFile(filepath, compressed);
 
     // Get file size
     const stats = await stat(filepath);
     const sizeBytes = BigInt(stats.size);
 
-    // Compute SHA256 checksum
-    const { exec } = await import("child_process");
-    const { stdout: hash } = await promisify(exec)(`sha256sum "${filepath}" | cut -d' ' -f1`);
+    // Compute SHA256 (cross-platform: uses Node's crypto, not sha256sum)
+    const hash = createHash("sha256").update(compressed).digest("hex");
 
     // Update the record
     const updated = await db.backupRecord.update({
@@ -116,7 +183,7 @@ export const POST = withPermission("backup.run", async () => {
         size_bytes: sizeBytes,
         storage_url: `/backups/${filename}`,
         storage_type: "local",
-        checksum_sha256: hash.trim() || null,
+        checksum_sha256: hash,
         completed_at: new Date(),
         updated_by: ctx.user_id ?? null,
       } as never,
@@ -131,36 +198,45 @@ export const POST = withPermission("backup.run", async () => {
         entity_id: record.id,
         action: "create",
         old_values: null,
-        new_values: { filename, size_bytes: Number(sizeBytes), status: "completed" } as never,
+        new_values: {
+          filename,
+          size_bytes: Number(sizeBytes),
+          row_count: totalRows,
+          tables: Object.keys(dump).length,
+          status: "completed",
+          format: "json-gz",
+        } as never,
         actor_user_id: ctx.user_id,
       } as never,
     });
 
+    const sizeMB = (Number(sizeBytes) / 1_000_000).toFixed(2);
     return successResponse(
       {
         id: updated.id,
         filename,
         size_bytes: Number(sizeBytes),
+        row_count: totalRows,
+        tables: Object.keys(dump).length,
         status: "completed",
         storage_url: `/backups/${filename}`,
-        message: `Backup completed — ${filename} (${(Number(sizeBytes) / 1_000_000).toFixed(1)} MB)`,
+        format: "json-gz",
+        message: `Backup completed — ${filename} (${sizeMB} MB, ${totalRows} rows from ${Object.keys(dump).length} tables)`,
       },
       "Backup completed successfully",
     );
   } catch (err) {
     // Mark the record as failed
+    const errMsg = err instanceof Error ? err.message : "Unknown error";
     await db.backupRecord.update({
       where: { id: record.id },
       data: {
         status: "failed",
-        error_message: err instanceof Error ? err.message : "Unknown error",
+        error_message: errMsg,
         completed_at: new Date(),
       } as never,
     });
 
-    return errorResponse(
-      `Backup failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-      500,
-    );
+    return errorResponse(`Backup failed: ${errMsg}`, 500);
   }
 });
