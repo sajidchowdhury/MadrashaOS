@@ -58,6 +58,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 1a) Public health check (Phase 6) — used by uptime monitors + orchestrators.
+  if (path === "/api/v1/health" && req.method.toUpperCase() === "GET") {
+    return NextResponse.next();
+  }
+
   // 1b) Public auth helper — check-email (Phase 0 fix G1).
   //     Used by the login UI to decide if the madrasha-code field is needed.
   if (path === "/api/v1/auth/check-email" && req.method.toUpperCase() === "GET") {
