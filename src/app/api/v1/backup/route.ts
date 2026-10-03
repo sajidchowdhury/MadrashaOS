@@ -198,7 +198,7 @@ export const POST = withPermission("backup.run", async () => {
       data: {
         status: "completed",
         size_bytes: sizeBytes,
-        storage_url: `/backups/${filename}`,
+        storage_url: `/api/v1/backup/${record.id}/download`,
         storage_type: "local",
         checksum_sha256: hash,
         completed_at: new Date(),

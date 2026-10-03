@@ -8,10 +8,14 @@
  */
 
 import * as React from "react";
-import { DatabaseBackup, Download, RotateCcw, Play, HardDrive, AlertCircle } from "lucide-react";
+import { DatabaseBackup, Download, RotateCcw, Play, HardDrive, AlertCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { IfPermission } from "@/components/auth/IfPermission";
 import { PermissionDenied, LoadingState, ErrorState } from "@/components/states";
 import {
@@ -38,6 +42,8 @@ export default function BackupPage() {
   const [backups, setBackups] = React.useState<BackupRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<BackupRecord | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   // Fetch real backup records on mount
   const fetchBackups = React.useCallback(async () => {
@@ -95,6 +101,40 @@ export default function BackupPage() {
     if (!bytes) return "—";
     if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(0)} KB`;
     return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/backup/${deleteTarget.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Delete failed",
+          description: data?.error || `Server returned ${res.status}.`,
+          variant: "destructive",
+        });
+        setDeleting(false);
+        return;
+      }
+      toast({
+        title: "Backup deleted",
+        description: data?.message || "The backup file and record have been removed.",
+      });
+      setDeleteTarget(null);
+      fetchBackups();
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setDeleting(false);
   };
 
   return (
@@ -192,8 +232,22 @@ export default function BackupPage() {
                                   </Button>
                                 </a>
                               )}
-                              <Button variant="ghost" size="sm" aria-label="Restore backup" disabled>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Restore backup"
+                                disabled
+                              >
                                 <RotateCcw className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Delete backup"
+                                className="text-semantic-danger hover:bg-danger-50 hover:text-semantic-danger"
+                                onClick={() => setDeleteTarget(b)}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -207,6 +261,40 @@ export default function BackupPage() {
           </Card>
         </div>
       </div>
+
+      {/* ---------- Delete Confirmation Dialog ---------- */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-semantic-danger" />
+              Delete Backup?
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently delete the backup file from the server and
+              remove the record from the database. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="rounded-md border border-border-default bg-surface-hover p-3 text-caption">
+              <p className="font-medium text-text-primary">{formatDate(new Date(deleteTarget.started_at), "en")}</p>
+              <p className="mt-0.5 text-text-secondary">
+                Type: <span className="capitalize">{deleteTarget.backup_type}</span> ·
+                Size: {formatSize(deleteTarget.size_bytes)}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              <Trash2 className="h-4 w-4" />
+              {deleting ? "Deleting…" : "Delete Backup"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </IfPermission>
   );
 }
