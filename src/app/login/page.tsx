@@ -208,13 +208,19 @@ export default function LoginPage() {
       }
       if (sessionRes.status === 200) {
         // No MFA required — fully authenticated.
+        // Phase 3: check the role to decide the redirect target.
+        // Super-admin → /platform, everyone else → /dashboard
+        const sessionBody = await sessionRes.json().catch(() => ({}));
+        const userRole = sessionBody?.user?.role ?? "";
+        const redirectPath = userRole === "super-admin" ? "/platform" : "/dashboard";
+
         setMode("success");
         toast({
           title: "Welcome back!",
           description: "You are now signed in.",
         });
         // Brief delay so the toast renders before the navigation.
-        setTimeout(() => router.replace("/dashboard"), 400);
+        setTimeout(() => router.replace(redirectPath), 400);
         return;
       }
 
@@ -279,7 +285,9 @@ export default function LoginPage() {
 
       if (!result || result.error) {
         // Fallback — the session is likely already valid; just navigate.
-        router.replace("/dashboard");
+        // Phase 3: super-admin → /platform
+        const fbSession = await fetch("/api/v1/auth/session", { cache: "no-store" }).then(r => r.json()).catch(() => ({}));
+        router.replace(fbSession?.user?.role === "super-admin" ? "/platform" : "/dashboard");
         return;
       }
 
@@ -288,7 +296,10 @@ export default function LoginPage() {
         title: "Verified",
         description: "Multi-factor authentication complete.",
       });
-      setTimeout(() => router.replace("/dashboard"), 400);
+      // Phase 3: fetch session to determine redirect target
+      const mfaSession = await fetch("/api/v1/auth/session", { cache: "no-store" }).then(r => r.json()).catch(() => ({}));
+      const mfaRedirect = mfaSession?.user?.role === "super-admin" ? "/platform" : "/dashboard";
+      setTimeout(() => router.replace(mfaRedirect), 400);
     } catch {
       setError("Network error. Please retry.");
       setSubmitting(false);

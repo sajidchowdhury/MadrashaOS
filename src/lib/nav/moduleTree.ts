@@ -139,7 +139,9 @@ export const moduleTree: ModuleGroup[] = [
     id: "platform",
     labelKey: "shell.nav.settings",
     items: [
+      { id: "platform-dashboard", labelKey: "shell.nav.dashboard", icon: LayoutDashboard, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform" },
       { id: "signup-requests", labelKey: "shell.nav.signup-requests", icon: Server, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform/signup-requests" },
+      { id: "tenants", labelKey: "shell.nav.tenants", icon: Building2, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform/tenants" },
       { id: "reports", labelKey: "shell.nav.reports", icon: BarChart3, layer: "platform", permissionRequired: "reports.view", phase: 3, route: "/reports" },
       { id: "settings", labelKey: "shell.nav.settings", icon: Settings, layer: "platform", permissionRequired: "organization.config.view", phase: 3, route: "/settings" },
     ],
@@ -182,7 +184,7 @@ export function getDashboardRouteForRole(role: string): string {
     case "student":
       return "/dashboard/guardian"; // student uses guardian-style dashboard (read-only)
     case "super-admin":
-      return "/dashboard/authority"; // super-admin sees authority dashboard
+      return "/platform"; // Phase 3: super-admin goes to platform dashboard
     case "administrator":
     default:
       return "/dashboard/authority"; // admin sees authority dashboard (most comprehensive)
