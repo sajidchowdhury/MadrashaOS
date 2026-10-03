@@ -8,10 +8,12 @@
  */
 
 import * as React from "react";
-import { DatabaseBackup, Download, RotateCcw, Play, HardDrive, AlertCircle, Trash2 } from "lucide-react";
+import { DatabaseBackup, Download, RotateCcw, Play, HardDrive, AlertCircle, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
@@ -44,6 +46,9 @@ export default function BackupPage() {
   const [error, setError] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<BackupRecord | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [restoreTarget, setRestoreTarget] = React.useState<BackupRecord | null>(null);
+  const [restoring, setRestoring] = React.useState(false);
+  const [confirmText, setConfirmText] = React.useState("");
 
   // Fetch real backup records on mount
   const fetchBackups = React.useCallback(async () => {
@@ -135,6 +140,43 @@ export default function BackupPage() {
       });
     }
     setDeleting(false);
+  };
+
+  const handleRestore = async () => {
+    if (!restoreTarget) return;
+    setRestoring(true);
+    try {
+      const res = await fetch(`/api/v1/backup/${restoreTarget.id}/restore`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Restore failed",
+          description: data?.error || `Server returned ${res.status}.`,
+          variant: "destructive",
+        });
+        setRestoring(false);
+        // keep dialog open so the user can read the error; reset confirm text
+        setConfirmText("");
+        return;
+      }
+      toast({
+        title: "Restore completed",
+        description: data?.data?.message || `Restored ${data?.data?.rows_inserted ?? 0} rows from ${data?.data?.tables_restored ?? 0} tables.`,
+      });
+      setRestoreTarget(null);
+      setConfirmText("");
+      fetchBackups();
+    } catch {
+      toast({
+        title: "Network error",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    setRestoring(false);
   };
 
   return (
@@ -236,7 +278,12 @@ export default function BackupPage() {
                                 variant="ghost"
                                 size="sm"
                                 aria-label="Restore backup"
-                                disabled
+                                title="Restore this backup"
+                                disabled={restoring}
+                                onClick={() => {
+                                  setRestoreTarget(b);
+                                  setConfirmText("");
+                                }}
                               >
                                 <RotateCcw className="h-4 w-4" />
                               </Button>
@@ -291,6 +338,96 @@ export default function BackupPage() {
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               <Trash2 className="h-4 w-4" />
               {deleting ? "Deleting…" : "Delete Backup"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Restore Confirmation Dialog (destructive — type to confirm) ---------- */}
+      <Dialog open={!!restoreTarget} onOpenChange={(o) => !o && !restoring && setRestoreTarget(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-semantic-danger">
+              <AlertTriangle className="h-5 w-5" />
+              Restore Backup?
+            </DialogTitle>
+            <DialogDescription>
+              This action will replace ALL current data with the backup snapshot.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Warning box */}
+          <div className="rounded-md border border-semantic-danger/40 bg-red-50 p-4 space-y-2">
+            <p className="flex items-start gap-2 text-body font-medium text-semantic-danger">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              WARNING: All current data will be lost!
+            </p>
+            <p className="text-caption text-red-800">
+              Restoring this backup will <strong>permanently delete</strong> all current
+              students, fees, attendance, finance records, and other data, then replace
+              it with the snapshot from <strong>{restoreTarget ? formatDate(new Date(restoreTarget.started_at), "en") : ""}</strong>.
+              This action <strong>CANNOT be undone</strong>.
+            </p>
+            <p className="text-caption text-red-700">
+              Tip: Download a fresh backup of the current state before restoring,
+              so you can recover if needed.
+            </p>
+          </div>
+
+          {/* Backup details */}
+          {restoreTarget && (
+            <div className="rounded-md border border-border-default bg-surface-hover p-3 text-caption">
+              <p className="font-medium text-text-primary">{formatDate(new Date(restoreTarget.started_at), "en")}</p>
+              <p className="mt-0.5 text-text-secondary">
+                Type: <span className="capitalize">{restoreTarget.backup_type}</span> ·
+                Size: {formatSize(restoreTarget.size_bytes)}
+              </p>
+            </div>
+          )}
+
+          {/* Type-to-confirm */}
+          <div className="space-y-2">
+            <Label htmlFor="restore-confirm" className="text-body font-medium text-text-primary">
+              To confirm, type <strong className="font-mono text-semantic-danger">RESTORE</strong> in the box below:
+            </Label>
+            <Input
+              id="restore-confirm"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="RESTORE"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              disabled={restoring}
+              className="font-mono"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setRestoreTarget(null); setConfirmText(""); }}
+              disabled={restoring}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRestore}
+              disabled={restoring || confirmText !== "RESTORE"}
+            >
+              {restoring ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Restoring…
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-4 w-4" />
+                  Restore Now
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
