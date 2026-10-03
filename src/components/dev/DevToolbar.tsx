@@ -47,12 +47,29 @@ import type { FlowDef } from "@/lib/flows/registry";
 import { useActiveFlowState, useWalkthrough } from "@/lib/flows/walkthrough";
 import { FlowOverlay } from "@/components/dev/FlowOverlay";
 import { Button } from "@/components/ui/button";
+import { useDevToolbarStore } from "@/stores/devToolbarStore";
 
-export function DevToolbar() {
+export function DevToolbar({
+  externalExpanded,
+  onExternalExpandedChange,
+}: {
+  externalExpanded?: boolean;
+  onExternalExpandedChange?: (open: boolean) => void;
+} = {}) {
   const { t } = useI18n();
   const { role, branch, network, permissions, setRole, setBranch, setNetwork } =
     useSessionStore();
-  const [expanded, setExpanded] = useState(false);
+
+  // Shared store so the TopBar bug-icon can open/close the toolbar
+  const storeOpen = useDevToolbarStore((s) => s.open);
+  const setStoreOpen = useDevToolbarStore((s) => s.setOpen);
+
+  // Use the external prop if provided, otherwise fall back to the shared store
+  const expanded = externalExpanded ?? storeOpen;
+  const setExpanded = (v: boolean) => {
+    setStoreOpen(v);
+    onExternalExpandedChange?.(v);
+  };
 
   /* --- Flow Walkthrough state --- */
   const router = useRouter();

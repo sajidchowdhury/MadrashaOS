@@ -31,6 +31,9 @@ import {
   LogOut,
   BellOff,
   Globe,
+  Sun,
+  Moon,
+  Bug,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -42,7 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/I18nProvider";
-import { ThemeToggle } from "@/components/dev/theme-toggle";
+import { useTheme } from "@/components/theme-provider";
 import { useNotices, useCurrentUser } from "@/lib/query/client";
 import { useSessionStore } from "@/stores/sessionStore";
 import { ROLE_LABELS, type Role } from "@/stores/types";
@@ -63,10 +66,13 @@ const AUDIENCE_TONE: Record<
 
 export function TopBar({
   onToggleMobileNav,
+  onToggleDevToolbar,
 }: {
   onToggleMobileNav?: () => void;
+  onToggleDevToolbar?: () => void;
 }) {
   const { t, locale, setLocale } = useI18n();
+  const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
   const role = useSessionStore((s) => s.role) as Role;
   const resetSession = useSessionStore((s) => s.reset);
@@ -215,8 +221,16 @@ export function TopBar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Theme toggle — icon only, always visible */}
-      <ThemeToggle variant="onPrimary" />
+      {/* Dev Toolbar trigger — opens the dev toolbar panel */}
+      <button
+        type="button"
+        onClick={onToggleDevToolbar}
+        className="rounded-md p-2 text-primary-foreground transition-colors hover:bg-primary-600 focus-visible:bg-primary-600"
+        aria-label="Open Dev Toolbar"
+        title="Dev Toolbar"
+      >
+        <Bug className="h-5 w-5" />
+      </button>
 
       {/* User dropdown — avatar + name (desktop), avatar only (mobile) */}
       <DropdownMenu>
@@ -279,6 +293,48 @@ export function TopBar({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <DropdownMenuSeparator />
+
+          {/* Light / Dark theme switch */}
+          <div className="px-2 py-1.5">
+            <div className="flex items-center gap-2 px-2 py-1 text-caption font-medium text-text-muted">
+              {resolvedTheme === "dark" ? (
+                <Moon className="h-3.5 w-3.5" />
+              ) : (
+                <Sun className="h-3.5 w-3.5" />
+              )}
+              Theme
+            </div>
+            <div className="mt-1 flex gap-1">
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-caption font-medium transition-colors ${
+                  resolvedTheme !== "dark"
+                    ? "bg-primary-500 text-primary-foreground"
+                    : "bg-neutral-100 text-text-secondary hover:bg-surface-hover"
+                }`}
+                aria-pressed={resolvedTheme !== "dark"}
+              >
+                <Sun className="h-3.5 w-3.5" />
+                Light
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-caption font-medium transition-colors ${
+                  resolvedTheme === "dark"
+                    ? "bg-primary-500 text-primary-foreground"
+                    : "bg-neutral-100 text-text-secondary hover:bg-surface-hover"
+                }`}
+                aria-pressed={resolvedTheme === "dark"}
+              >
+                <Moon className="h-3.5 w-3.5" />
+                Dark
+              </button>
             </div>
           </div>
 

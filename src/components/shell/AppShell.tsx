@@ -33,14 +33,19 @@ import { TopBar } from "./TopBar";
 import { SideNav } from "./SideNav";
 import { Footer } from "./Footer";
 import { MobileBottomActionBar } from "./MobileBottomActionBar";
+import { useDevToolbarStore } from "@/stores/devToolbarStore";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const toggleDevToolbar = useDevToolbarStore((s) => s.toggle);
   const pathname = usePathname();
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-canvas">
-      <TopBar onToggleMobileNav={() => setMobileNavOpen((v) => !v)} />
+      <TopBar
+        onToggleMobileNav={() => setMobileNavOpen((v) => !v)}
+        onToggleDevToolbar={toggleDevToolbar}
+      />
       <div className="flex flex-1">
         {/* Desktop side nav (md+) */}
         <SideNav className="hidden md:flex" />
