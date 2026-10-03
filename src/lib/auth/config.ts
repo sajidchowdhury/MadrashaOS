@@ -339,6 +339,47 @@ export const authConfig: NextAuthOptions = {
           },
         });
 
+        // Phase 4: trial + suspension enforcement.
+        // Super-admin (platform operator) bypasses this check entirely.
+        if (user.role.code !== "super-admin") {
+          const org = await db.organization.findFirst({
+            where: { id: user.organization_id, deleted_at: null },
+            select: { id: true, status: true, trial_ends_at: true, code: true },
+          });
+
+          if (!org) {
+            throw new Error("Your organization no longer exists. Contact the platform operator.");
+          }
+
+          if (org.status === "suspended") {
+            throw new Error(
+              "ACCOUNT_SUSPENDED: Your madrasha account has been suspended. " +
+              "Please contact the platform operator to reactivate your subscription.",
+            );
+          }
+
+          // Trial expiry check — if trial has ended and org is still active,
+          // auto-suspend it now (so subsequent logins are blocked consistently).
+          if (org.trial_ends_at && org.trial_ends_at < new Date() && org.status === "active") {
+            await db.organization.update({
+              where: { id: org.id },
+              data: {
+                status: "suspended",
+                suspended_at: new Date(),
+                suspended_reason: "Trial expired (auto-suspended)",
+              },
+            });
+            await db.subscription.updateMany({
+              where: { organization_id: org.id, deleted_at: null },
+              data: { status: "suspended" },
+            });
+            throw new Error(
+              "TRIAL_EXPIRED: Your 14-day trial has ended. " +
+              "Please contact the platform operator to activate your subscription.",
+            );
+          }
+        }
+
         // Fetch permissions for this role via the role_permissions junction.
         const rolePerms = await db.rolePermission.findMany({
           where: { role_id: user.role_id, deleted_at: null },

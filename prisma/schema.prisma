@@ -261,6 +261,7 @@ model Organization {
   signup_requests     TenantSignupRequest[] @relation("OrgFromSignupRequest")
   subscription        Subscription?
   invoices            Invoice[]
+  usage_snapshots     UsageSnapshot[]
 
   @@index([deleted_at])
   @@index([created_at])
@@ -2629,4 +2630,29 @@ model Invoice {
   @@index([due_date])
   @@index([deleted_at])
   @@map("invoices")
+}
+
+// ============================================================
+// USAGE METERING (Phase 4 — Billing)
+// ============================================================
+// Nightly snapshot of each tenant's usage (branch/student/user counts).
+// Drives the billing calculation: monthly_amount = branch_count × 300 BDT.
+// Created by a cron job or manual API trigger.
+// ============================================================
+
+model UsageSnapshot {
+  id               String   @id @default(uuid()) @db.Uuid
+  organization_id  String   @db.Uuid
+  snapshot_date    DateTime @db.Date
+  branch_count     Int
+  student_count    Int
+  user_count       Int
+  storage_bytes    BigInt?
+  created_at       DateTime @default(now()) @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, snapshot_date])
+  @@index([snapshot_date])
+  @@map("usage_snapshots")
 }

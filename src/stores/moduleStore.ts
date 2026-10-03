@@ -25,6 +25,7 @@ const DEFAULT_ENABLED = [
   "employees",
   "fees",
   "accounting",
+  "billing",
   "donations",
   "donors",
   "reports",

@@ -175,13 +175,29 @@ export default function LoginPage() {
       });
 
       if (!result || result.error) {
+        const errMsg = result?.error ?? "";
         // Phase 2: check for the MULTIPLE_ACCOUNTS error from the authorize callback
-        if (result?.error?.includes("MULTIPLE_ACCOUNTS")) {
+        if (errMsg.includes("MULTIPLE_ACCOUNTS")) {
           setError(
             "Multiple accounts exist with this email. Please enter your Madrasha Code below to identify your organization.",
           );
           setShowCodeField(true);
           setEmailMultiOrg(true);
+          setSubmitting(false);
+          return;
+        }
+        // Phase 4: trial expiry + suspension errors (show the full message)
+        if (errMsg.includes("TRIAL_EXPIRED")) {
+          setError(
+            "Your 14-day free trial has ended. Please contact the platform operator to activate your subscription and continue using MadrashaOS.",
+          );
+          setSubmitting(false);
+          return;
+        }
+        if (errMsg.includes("ACCOUNT_SUSPENDED")) {
+          setError(
+            "Your madrasha account has been suspended. Please contact the platform operator to reactivate your subscription.",
+          );
           setSubmitting(false);
           return;
         }

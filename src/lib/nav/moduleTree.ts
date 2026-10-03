@@ -22,7 +22,7 @@ import {
   ClipboardCheck, FileText, Award, CalendarDays, BookMarked,
   Wallet, Calculator, HandCoins, Scale, Gift, Landmark, CreditCard, Heart,
   Package, ShoppingCart, Truck, Sofa, UtensilsCrossed, BookOpen, Bus,
-  Bell, FileArchive, BarChart3, Settings, Server,
+  Bell, FileArchive, BarChart3, Settings, Server, DollarSign,
 } from "lucide-react";
 import type { MessageKey } from "@/lib/i18n/messages";
 
@@ -110,6 +110,7 @@ export const moduleTree: ModuleGroup[] = [
       { id: "cashbank", labelKey: "shell.nav.cashbank", icon: Landmark, layer: "finance", permissionRequired: "cashbank.transfer", phase: 2, route: "/cashbank" },
       { id: "zakat", labelKey: "shell.nav.zakat", icon: Scale, layer: "finance", permissionRequired: "zakat.view", phase: 2, route: "/zakat" },
       { id: "scholarship", labelKey: "shell.nav.scholarship", icon: Gift, layer: "finance", permissionRequired: "scholarship.view", phase: 2, route: "/scholarship" },
+      { id: "billing", labelKey: "shell.nav.billing", icon: CreditCard, layer: "finance", permissionRequired: "organization.config.view", phase: 0, route: "/billing" },
       { id: "donations", labelKey: "shell.nav.donations", icon: CreditCard, layer: "finance", permissionRequired: "donations.view", phase: 2, route: "/donations" },
       { id: "donors", labelKey: "shell.nav.donors", icon: Heart, layer: "finance", permissionRequired: "donors.view", phase: 2, route: "/donors" },
     ],
@@ -142,6 +143,7 @@ export const moduleTree: ModuleGroup[] = [
       { id: "platform-dashboard", labelKey: "shell.nav.dashboard", icon: LayoutDashboard, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform" },
       { id: "signup-requests", labelKey: "shell.nav.signup-requests", icon: Server, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform/signup-requests" },
       { id: "tenants", labelKey: "shell.nav.tenants", icon: Building2, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform/tenants" },
+      { id: "platform-billing", labelKey: "shell.nav.billing", icon: DollarSign, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform/billing" },
       { id: "reports", labelKey: "shell.nav.reports", icon: BarChart3, layer: "platform", permissionRequired: "reports.view", phase: 3, route: "/reports" },
       { id: "settings", labelKey: "shell.nav.settings", icon: Settings, layer: "platform", permissionRequired: "organization.config.view", phase: 3, route: "/settings" },
     ],
