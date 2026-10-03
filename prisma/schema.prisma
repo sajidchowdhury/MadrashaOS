@@ -178,12 +178,22 @@ model Organization {
   name             String
   name_bn          String
   slug             String    @unique
+  /// Short 6-char login code (uppercase alphanumeric, no O/0/I/1/L).
+  /// Users type this at login to resolve their madrasha.
+  code             String    @unique
   phone            String?
   email            String?
   address          String?
   logo_url         String?
   website_url      String?
   established_year Int?
+  /// active | suspended | deleted — controls login access (Phase 4)
+  status           String    @default("active")
+  /// When the trial ends (14 days from provisioning). NULL = not a trial.
+  trial_ends_at    DateTime? @db.Timestamptz
+  /// When the org was suspended (non-payment / policy violation)
+  suspended_at     DateTime? @db.Timestamptz
+  suspended_reason String?
   settings         Json      @default("{}")
   created_at       DateTime  @default(now()) @db.Timestamptz
   updated_at       DateTime  @updatedAt @db.Timestamptz
@@ -247,8 +257,15 @@ model Organization {
   donor_pledges       DonorPledge[]
   employee_advances   EmployeeAdvance[]
 
+  // Multi-tenant SaaS relations (Phase 0)
+  signup_requests     TenantSignupRequest[] @relation("OrgFromSignupRequest")
+  subscription        Subscription?
+  invoices            Invoice[]
+
   @@index([deleted_at])
   @@index([created_at])
+  @@index([status])
+  @@index([trial_ends_at])
   @@map("organizations")
 }
 
@@ -418,6 +435,9 @@ model User {
   // Payroll — payslips where this user is the payee
   payroll_records   PayrollRecord[]    @relation("PayrollPayee")
   employee_advances EmployeeAdvance[]  @relation("EmployeeAdvanceUser")
+
+  // Multi-tenant SaaS — platform admin who reviewed a signup request
+  reviewed_signup_requests TenantSignupRequest[] @relation("SignupRequestReviewer")
 
   @@unique([organization_id, email])
   @@index([organization_id, branch_id])
@@ -2495,4 +2515,118 @@ model IdempotencyRecord {
   @@index([expires_at])
   @@index([organization_id])
   @@map("idempotency_records")
+}
+
+// ============================================================
+// MULTI-TENANT SAAS LAYER (Phase 0 — Foundation)
+// ============================================================
+// These models enable the SaaS product layer:
+//   - TenantSignupRequest: inbound signup requests from new madrashas
+//   - Subscription: per-org billing state (1:1 with Organization)
+//   - Invoice: monthly billing records (300 BDT × branch count)
+//
+// None of these have organization_id in the tenant-scoped sense —
+// they ARE the platform-level tenant management tables.
+// ============================================================
+
+/// Inbound signup request from a new madrasha wanting to use MadrashaOS.
+/// Workflow: pending → approved → provisioned (or rejected → failed).
+/// Created via the public signup form; reviewed by a platform super-admin.
+model TenantSignupRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  // What the requester submitted
+  org_name        String
+  org_name_bn     String?
+  org_slug        String    @unique         // requested slug (URL-safe)
+  org_code        String    @unique         // requested 6-char login code
+  contact_name    String
+  contact_email   String                     // not unique — same person could request for multiple orgs
+  contact_phone   String
+  address         String?
+  estimated_branches Int   @default(1)
+  notes           String?                    // free-text from requester
+  // Workflow state: pending | approved | rejected | provisioned | failed
+  status          String    @default("pending")
+  reviewed_by     String?   @db.Uuid              // platform admin User
+  reviewed_at     DateTime? @db.Timestamptz
+  review_note     String?
+  // Link to the provisioned org (set after approval + provisioning)
+  provisioned_org_id String? @db.Uuid
+  // Audit
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt      @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+  created_by      String?   @db.Uuid
+  updated_by      String?   @db.Uuid
+
+  provisioned_org Organization? @relation("OrgFromSignupRequest", fields: [provisioned_org_id], references: [id])
+  reviewer        User?         @relation("SignupRequestReviewer", fields: [reviewed_by], references: [id])
+
+  @@index([status])
+  @@index([contact_email])
+  @@index([created_at])
+  @@index([deleted_at])
+  @@map("tenant_signup_requests")
+}
+
+/// Per-org billing state (1:1 with Organization).
+/// Phase 4 uses this for billing display; Phase 0 just defines the schema.
+model Subscription {
+  id                       String    @id @default(uuid()) @db.Uuid
+  organization_id          String    @unique @db.Uuid     // 1:1 per org
+  plan                     String    @default("trial")    // trial | starter | pro | suspended
+  status                   String    @default("trialing") // trialing | active | past_due | cancelled | suspended
+  branch_count_snapshot    Int       @default(0)          // last metered branch count
+  monthly_amount_bdt       Decimal   @default(300) @db.Decimal(10, 2)
+  currency                 String    @default("BDT")
+  current_period_start     DateTime  @db.Timestamptz
+  current_period_end       DateTime  @db.Timestamptz
+  trial_ends_at            DateTime? @db.Timestamptz
+  cancelled_at             DateTime? @db.Timestamptz
+  // Audit
+  created_at               DateTime  @default(now()) @db.Timestamptz
+  updated_at               DateTime  @updatedAt      @db.Timestamptz
+  deleted_at               DateTime? @db.Timestamptz
+  created_by               String?   @db.Uuid
+  updated_by               String?   @db.Uuid
+
+  organization Organization @relation(fields: [organization_id], references: [id])
+  invoices     Invoice[]
+
+  @@index([status])
+  @@index([trial_ends_at])
+  @@map("subscriptions")
+}
+
+/// Monthly billing invoice for a tenant.
+/// Amount = branch_count × unit_price_bdt (300 BDT per branch per month).
+/// Phase 4 generates these; Phase 0 just defines the schema.
+model Invoice {
+  id                String    @id @default(uuid()) @db.Uuid
+  subscription_id   String    @db.Uuid
+  organization_id   String    @db.Uuid              // denormalized for fast tenant queries
+  period_start      DateTime  @db.Timestamptz
+  period_end        DateTime  @db.Timestamptz
+  branch_count      Int                              // branches active in this period
+  unit_price_bdt    Decimal   @db.Decimal(10, 2)    // 300
+  amount_bdt        Decimal   @db.Decimal(10, 2)    // branch_count × unit_price_bdt
+  currency          String    @default("BDT")
+  status            String    @default("draft")    // draft | issued | paid | void | uncollectible
+  due_date          DateTime  @db.Timestamptz
+  paid_at           DateTime? @db.Timestamptz
+  // Audit
+  created_at        DateTime  @default(now()) @db.Timestamptz
+  updated_at        DateTime  @updatedAt      @db.Timestamptz
+  deleted_at        DateTime? @db.Timestamptz
+  created_by        String?   @db.Uuid
+  updated_by        String?   @db.Uuid
+
+  subscription Subscription @relation(fields: [subscription_id], references: [id])
+  organization Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([subscription_id, period_start])
+  @@index([organization_id, status])
+  @@index([due_date])
+  @@index([deleted_at])
+  @@map("invoices")
 }

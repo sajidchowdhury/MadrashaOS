@@ -44,6 +44,8 @@ function seedId(prefix: string): string {
 
 // Pre-allocated IDs for entities referenced by FK
 const IDS = {
+  // Platform org (SaaS operator) — super-admin lives here (Phase 0 fix G3)
+  platformOrg: "00000000-0000-0000-0000-000000000000",
   org: "00000000-0000-0000-0000-000000000001",
   branchDhaka: "00000000-0000-0000-0000-000000000010",
   branchCtg: "00000000-0000-0000-0000-000000000011",
@@ -305,8 +307,27 @@ async function main() {
   console.log("🌱 MadrashaOS — Database Seed (Phase B1.4)");
   console.log("===========================================\n");
 
-  // --- 1. Organization ---
-  console.log("[1/14] Creating organization...");
+  // --- 1. Organizations ---
+  // Phase 0 fix (G3): Create a dedicated "Platform" org for the SaaS operator.
+  // The super-admin user lives here (not in the demo tenant org) so they
+  // are not tied to any single tenant.
+  console.log("[1/14] Creating organizations (Platform + demo tenant)...");
+  const platformOrg = await prisma.organization.upsert({
+    where: { id: IDS.platformOrg },
+    update: {},
+    create: {
+      id: IDS.platformOrg,
+      name: "MadrashaOS Platform",
+      name_bn: "মাদরাসাওএস প্ল্যাটফর্ম",
+      slug: "platform",
+      code: "PLATFORM",
+      email: "platform@madrashaos.org",
+      settings: { isPlatform: true } as never,
+      status: "active",
+    } as never,
+  });
+  console.log(`  ✅ Platform org: ${platformOrg.name} (code: ${platformOrg.code})`);
+
   const org = await prisma.organization.upsert({
     where: { id: IDS.org },
     update: {},
@@ -315,14 +336,18 @@ async function main() {
       name: "Darul Uloom Madrasha",
       name_bn: "দারুল উলূম মাদরাসা",
       slug: "darul-uloom-madrasha",
+      code: "DUM001",
       phone: "+880 2 9661234",
       email: "info@madrashaos.org",
       address: "123 Mirpur Road, Dhanmondi, Dhaka 1209",
       established_year: 1998,
       settings: { locale: "en", currency: "BDT", academicYearStart: "January" } as any,
+      status: "active",
+      // 14-day trial from seeding (Phase 4 will enforce this)
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     } as any,
   });
-  console.log(`  ✅ Organization: ${org.name}`);
+  console.log(`  ✅ Tenant org: ${org.name} (code: ${org.code})`);
 
   // --- 2. Branches ---
   console.log("\n[2/14] Creating branches...");
@@ -376,11 +401,19 @@ async function main() {
     { id: IDS.roleStudent, code: "student", name: "Student", description: "Read-only on own records only" },
   ];
   for (const r of roleData) {
+    // Phase 0 fix (G3): super-admin role belongs to the PLATFORM org,
+    // not the demo tenant org. All other roles belong to the tenant org.
+    const roleOrgId = r.code === "super-admin" ? IDS.platformOrg : org.id;
     await prisma.role.upsert({
       where: { id: r.id },
       update: {},
-      create: { ...r, organization_id: org.id, is_system: true },
-    } as any);
+      create: {
+        ...r,
+        organization_id: roleOrgId,
+        is_system: true,
+        is_platform: r.code === "super-admin",
+      } as any,
+    });
   }
   console.log(`  ✅ ${roleData.length} roles created`);
 
@@ -416,13 +449,15 @@ async function main() {
   let permCount = 0;
   for (const [roleCode, perms] of Object.entries(ROLE_PERMS)) {
     const roleId = roleIdMap[roleCode];
+    // Phase 0 fix (G3): super-admin's role_permissions belong to the Platform org
+    const permOrgId = roleCode === "super-admin" ? IDS.platformOrg : org.id;
     for (const permCode of perms) {
       const perm = await prisma.permission.findUnique({ where: { code: permCode } });
       if (perm && roleId) {
         await prisma.rolePermission.upsert({
           where: { role_id_permission_id: { role_id: roleId, permission_id: perm.id } },
           update: {},
-          create: { role_id: roleId, permission_id: perm.id, organization_id: org.id } as any,
+          create: { role_id: roleId, permission_id: perm.id, organization_id: permOrgId } as any,
         });
         permCount++;
       }
@@ -431,25 +466,28 @@ async function main() {
   console.log(`  ✅ ${permCount} role-permission assignments created`);
 
   // --- 6. Users (8 personas) ---
+  // Phase 0 fix (G3): Super-admin user belongs to the PLATFORM org (not the
+  // demo tenant org) and has NO branch_id (org-level platform operator).
   console.log("\n[6/14] Creating users (with hashed passwords)...");
   const passwordHash = await bcrypt.hash("password123", 10);
   const usersData = [
-    { id: IDS.userSuperAdmin, role_id: IDS.roleSuperAdmin, name: "Super Admin", name_bn: "সুপার অ্যাডমিন", email: "superadmin@madrashaos.org", phone: "+880 1711 000001", branch_id: IDS.branchDhaka },
-    { id: IDS.userAuthority, role_id: IDS.roleAuthority, name: "Principal Ahmad", name_bn: "অধ্যক্ষ আহমদ", email: "principal@madrashaos.org", phone: "+880 1711 000002", branch_id: IDS.branchDhaka },
-    { id: IDS.userAdministrator, role_id: IDS.roleAdministrator, name: "Administrator Karim", name_bn: "প্রশাসক করিম", email: "admin@madrashaos.org", phone: "+880 1711 000003", branch_id: IDS.branchDhaka },
-    { id: IDS.userAccountant, role_id: IDS.roleAccountant, name: "Accountant Rahman", name_bn: "হিসাবরক্ষক রহমান", email: "accounts@madrashaos.org", phone: "+880 1711 000004", branch_id: IDS.branchDhaka },
-    { id: IDS.userTeacher, role_id: IDS.roleTeacher, name: "Teacher Bilal", name_bn: "শিক্ষক বিলাল", email: "bilal@madrashaos.org", phone: "+880 1711 000005", branch_id: IDS.branchDhaka },
-    { id: IDS.userStorekeeper, role_id: IDS.roleStorekeeper, name: "Storekeeper Yusuf", name_bn: "স্টোরকিপার ইউসুফ", email: "store@madrashaos.org", phone: "+880 1711 000006", branch_id: IDS.branchDhaka },
-    { id: IDS.userGuardian, role_id: IDS.roleGuardian, name: "Guardian Omar", name_bn: "অভিভাবক ওমর", email: "omar.parent@example.com", phone: "+880 1711 000007", branch_id: IDS.branchDhaka },
-    { id: IDS.userStudent, role_id: IDS.roleStudent, name: "Student Fatima", name_bn: "ছাত্রী ফাতিমা", email: "fatima@student.madrashaos.org", phone: "+880 1711 000008", branch_id: IDS.branchDhaka },
+    { id: IDS.userSuperAdmin, role_id: IDS.roleSuperAdmin, name: "Super Admin", name_bn: "সুপার অ্যাডমিন", email: "superadmin@madrashaos.org", phone: "+880 1711 000001", branch_id: null, org_id: IDS.platformOrg },
+    { id: IDS.userAuthority, role_id: IDS.roleAuthority, name: "Principal Ahmad", name_bn: "অধ্যক্ষ আহমদ", email: "principal@madrashaos.org", phone: "+880 1711 000002", branch_id: IDS.branchDhaka, org_id: org.id },
+    { id: IDS.userAdministrator, role_id: IDS.roleAdministrator, name: "Administrator Karim", name_bn: "প্রশাসক করিম", email: "admin@madrashaos.org", phone: "+880 1711 000003", branch_id: IDS.branchDhaka, org_id: org.id },
+    { id: IDS.userAccountant, role_id: IDS.roleAccountant, name: "Accountant Rahman", name_bn: "হিসাবরক্ষক রহমান", email: "accounts@madrashaos.org", phone: "+880 1711 000004", branch_id: IDS.branchDhaka, org_id: org.id },
+    { id: IDS.userTeacher, role_id: IDS.roleTeacher, name: "Teacher Bilal", name_bn: "শিক্ষক বিলাল", email: "bilal@madrashaos.org", phone: "+880 1711 000005", branch_id: IDS.branchDhaka, org_id: org.id },
+    { id: IDS.userStorekeeper, role_id: IDS.roleStorekeeper, name: "Storekeeper Yusuf", name_bn: "স্টোরকিপার ইউসুফ", email: "store@madrashaos.org", phone: "+880 1711 000006", branch_id: IDS.branchDhaka, org_id: org.id },
+    { id: IDS.userGuardian, role_id: IDS.roleGuardian, name: "Guardian Omar", name_bn: "অভিভাবক ওমর", email: "omar.parent@example.com", phone: "+880 1711 000007", branch_id: IDS.branchDhaka, org_id: org.id },
+    { id: IDS.userStudent, role_id: IDS.roleStudent, name: "Student Fatima", name_bn: "ছাত্রী ফাতিমা", email: "fatima@student.madrashaos.org", phone: "+880 1711 000008", branch_id: IDS.branchDhaka, org_id: org.id },
   ];
   for (const u of usersData) {
+    const { org_id, ...userData } = u;
     await prisma.user.upsert({
       where: { id: u.id },
       update: {},
       create: {
-        ...u,
-        organization_id: org.id,
+        ...userData,
+        organization_id: org_id,
         password_hash: passwordHash,
         status: "active",
         mfa_enabled: false,

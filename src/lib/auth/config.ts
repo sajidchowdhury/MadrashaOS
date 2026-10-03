@@ -217,6 +217,9 @@ export const authConfig: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        // Phase 0 fix (G1): optional madrasha code to resolve the tenant org.
+        // If the email exists in multiple orgs, the UI prompts for this code.
+        organizationCode: { label: "Madrasha Code", type: "text" },
       },
       /**
        * Validates email + password against the `users` table.
@@ -240,17 +243,29 @@ export const authConfig: NextAuthOptions = {
 
         const email = credentials.email.trim().toLowerCase();
         const password = credentials.password;
+        // Phase 0 fix (G1): support an optional "organizationCode" credential.
+        // If provided, filter users by the org's `code` field so that login
+        // resolves to the correct tenant. If NOT provided, and the email
+        // matches users in multiple orgs, return an error prompting for the code.
+        const orgCode = typeof credentials.organizationCode === "string"
+          ? credentials.organizationCode.trim().toUpperCase()
+          : "";
 
-        // Fetch the user row + role + permissions in one query.
-        // We use findFirst (not findUnique) because the unique constraint
-        // is (organization_id, email) — a super-admin with NULL org may
-        // share an email across tenants, which we disallow at seed time
-        // but defend against here.
+        // Build the where clause. If orgCode is provided, join to the org
+        // table via organization_id and filter by code.
+        const where = orgCode
+          ? {
+              email,
+              deleted_at: null,
+              organization: { code: orgCode, deleted_at: null },
+            }
+          : {
+              email,
+              deleted_at: null,
+            };
+
         const user = await db.user.findFirst({
-          where: {
-            email,
-            deleted_at: null,
-          },
+          where,
           select: {
             id: true,
             name: true,
@@ -274,6 +289,16 @@ export const authConfig: NextAuthOptions = {
         });
 
         if (!user) {
+          // If no orgCode was provided, check if the email exists in
+          // multiple orgs — if so, prompt for the madrasha code.
+          if (!orgCode) {
+            const count = await db.user.count({
+              where: { email, deleted_at: null },
+            });
+            if (count > 1) {
+              throw new Error("MULTIPLE_ACCOUNTS: Multiple accounts exist with this email. Please provide your madrasha code.");
+            }
+          }
           throw new Error("Invalid credentials");
         }
 

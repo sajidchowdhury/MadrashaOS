@@ -58,6 +58,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 1b) Public auth helper — check-email (Phase 0 fix G1).
+  //     Used by the login UI to decide if the madrasha-code field is needed.
+  if (path === "/api/v1/auth/check-email" && req.method.toUpperCase() === "GET") {
+    return NextResponse.next();
+  }
+
   // 2) Public donation submission — no login required (R10).
   //    Only the POST method is exempt; GET /api/v1/donations still
   //    requires login (donations listing is staff-only).

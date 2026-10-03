@@ -82,6 +82,18 @@ export async function hasPermission(code: string): Promise<boolean> {
 }
 
 /**
+ * Returns true if the current session is a platform super-admin (SaaS operator).
+ * These users live in the "Platform" org and have the `tenant.manage` permission.
+ * They are NOT scoped to a single tenant — their handlers must filter by an
+ * explicit orgId from the URL.
+ */
+export async function isPlatformAdmin(): Promise<boolean> {
+  const ctx = await getTenantContext();
+  if (!ctx) return false;
+  return ctx.role === "super-admin";
+}
+
+/**
  * Convenience: returns a Prisma `where` clause fragment scoped to the
  * current tenant. Spread it into your handler's query:
  *
@@ -99,8 +111,13 @@ export function tenantWhere(ctx: TenantContext): {
   branch_id?: string | null;
 } {
   if (ctx.role === "super-admin") {
-    // Super-admin sees across tenants — don't constrain.
-    return { organization_id: ctx.organization_id };
+    // Phase 0 fix (G2): Super-admin is the PLATFORM OPERATOR (SaaS company).
+    // They must see across ALL tenants — return an empty fragment so no
+    // org constraint is applied. Platform-admin handlers MUST filter
+    // explicitly by a URL-derived orgId (e.g. /api/v1/platform/tenants/:orgId).
+    // Returning { organization_id: ctx.organization_id } here was a bug —
+    // it constrained super-admin to the "Platform" org only.
+    return {} as { organization_id: string; branch_id?: string | null };
   }
   // Authority role may have null branch_id (org-level) — let them see
   // all branches in their org.
