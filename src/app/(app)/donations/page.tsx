@@ -22,7 +22,7 @@
 import * as React from "react";
 import {
   Heart, Plus, Search, Save, XCircle, AlertCircle,
-  CheckCircle2, ShieldCheck,
+  CheckCircle2, ShieldCheck, ChevronsUpDown, UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,15 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useAccounts, queryClient } from "@/lib/query/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/i18n/format";
+import { useRouter } from "next/navigation";
+
+type Donor = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  donor_type?: string | null;
+};
 
 type Donation = {
   id: string;
@@ -78,6 +87,7 @@ const TYPE_BADGE: Record<string, string> = {
 };
 
 export default function DonationsPage() {
+  const router = useRouter();
   const { hasPermission } = useSessionStore();
   const { toast } = useToast();
   const { data: accounts } = useAccounts();
@@ -96,8 +106,13 @@ export default function DonationsPage() {
   // Add donation dialog
   const [addOpen, setAddOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const [selectedDonorId, setSelectedDonorId] = React.useState("");
   const [donorName, setDonorName] = React.useState("");
   const [donorPhone, setDonorPhone] = React.useState("");
+  const [donorEmail, setDonorEmail] = React.useState("");
+  const [donorSearch, setDonorSearch] = React.useState("");
+  const [donors, setDonors] = React.useState<Donor[]>([]);
+  const [donorsLoading, setDonorsLoading] = React.useState(false);
   const [donAmount, setDonAmount] = React.useState("");
   const [donType, setDonType] = React.useState("general");
   const [donMethod, setDonMethod] = React.useState("cash");
@@ -151,13 +166,53 @@ export default function DonationsPage() {
   const nonZakatTotal = summary.general_total || 0;
   const grandTotal = summary.total_confirmed_amount || 0;
 
+  // Fetch donors for the searchable dropdown (called when dialog opens)
+  const fetchDonors = React.useCallback(async () => {
+    setDonorsLoading(true);
+    try {
+      const res = await fetch("/api/v1/donors?pageSize=500");
+      const data = await res.json().catch(() => ({}));
+      setDonors((data?.data ?? []) as Donor[]);
+    } catch {
+      setDonors([]);
+    }
+    setDonorsLoading(false);
+  }, []);
+
   function openAddDialog() {
-    setDonorName(""); setDonorPhone(""); setDonAmount("");
+    setSelectedDonorId("");
+    setDonorName(""); setDonorPhone(""); setDonorEmail(""); setDonorSearch("");
+    setDonAmount("");
     setDonType("general"); setDonMethod("cash"); setDonAccountId("");
     setDonDate(new Date().toISOString().slice(0, 10));
     setDonNotes(""); setDonAnonymous(false); setFormError(null);
     setAddOpen(true);
+    // Lazy-load donors list if not already loaded
+    if (donors.length === 0) fetchDonors();
   }
+
+  // When a donor is selected from the dropdown, sync the name + phone + email fields
+  function selectDonor(donorId: string) {
+    setSelectedDonorId(donorId);
+    const d = donors.find((x) => x.id === donorId);
+    if (d) {
+      setDonorName(d.name);
+      setDonorPhone(d.phone ?? "");
+      setDonorEmail(d.email ?? "");
+      setDonorSearch(d.name);
+    }
+  }
+
+  // Filtered donors for the dropdown (by search query)
+  const filteredDonors = React.useMemo(() => {
+    if (!donorSearch.trim()) return donors;
+    const q = donorSearch.trim().toLowerCase();
+    return donors.filter((d) =>
+      d.name.toLowerCase().includes(q) ||
+      (d.phone ?? "").toLowerCase().includes(q) ||
+      (d.email ?? "").toLowerCase().includes(q),
+    );
+  }, [donors, donorSearch]);
 
   async function handleAddDonation() {
     setFormError(null);
@@ -167,7 +222,7 @@ export default function DonationsPage() {
       return;
     }
     if (!donAnonymous && !donorName.trim()) {
-      setFormError("Donor name is required (or check Anonymous).");
+      setFormError("Please select a donor from the list (or check Anonymous).");
       return;
     }
     setSubmitting(true);
@@ -178,6 +233,7 @@ export default function DonationsPage() {
         body: JSON.stringify({
           donor_name: donAnonymous ? null : donorName.trim(),
           donor_phone: donorPhone.trim() || undefined,
+          donor_email: donorEmail.trim() || undefined,
           amount,
           donation_type: donType,
           account_id: donAccountId || undefined,
@@ -389,27 +445,38 @@ export default function DonationsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Donor name + Anonymous */}
-            <div className="flex items-end gap-3">
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="don-name">Donor Name</Label>
-                <Input
-                  id="don-name"
-                  placeholder="Omar Faruq"
-                  value={donorName}
-                  onChange={(e) => setDonorName(e.target.value)}
-                  disabled={donAnonymous}
-                />
+            {/* Donor — searchable dropdown + Anonymous toggle */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="don-search">Donor *</Label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={donAnonymous}
+                    onChange={(e) => setDonAnonymous(e.target.checked)}
+                    className="h-4 w-4 rounded border-border-default"
+                  />
+                  <span className="text-caption text-text-secondary">Anonymous</span>
+                </label>
               </div>
-              <label className="flex cursor-pointer items-center gap-2 pb-2">
-                <input
-                  type="checkbox"
-                  checked={donAnonymous}
-                  onChange={(e) => setDonAnonymous(e.target.checked)}
-                  className="h-4 w-4 rounded border-border-default"
+              {donAnonymous ? (
+                <div className="rounded-md border border-dashed border-border-default bg-surface-hover px-3 py-2 text-caption text-text-muted">
+                  Donation will be recorded as Anonymous (no donor linked).
+                </div>
+              ) : (
+                <DonorCombobox
+                  donors={filteredDonors}
+                  loading={donorsLoading}
+                  selectedId={selectedDonorId}
+                  search={donorSearch}
+                  onSearchChange={setDonorSearch}
+                  onSelect={selectDonor}
+                  onAddNew={() => {
+                    setAddOpen(false);
+                    router.push("/donors");
+                  }}
                 />
-                <span className="text-caption text-text-secondary">Anonymous</span>
-              </label>
+              )}
             </div>
 
             {/* Phone */}
@@ -528,6 +595,142 @@ export default function DonationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * DonorCombobox — searchable dropdown for selecting an existing donor.
+ *
+ * - Type to filter by name / phone / email
+ * - Click a result to select (syncs name + phone into the parent form)
+ * - "Add new donor" link at the bottom routes to /donors
+ * - Shows the selected donor's name as a chip when picked
+ * ---------------------------------------------------------------- */
+function DonorCombobox({
+  donors,
+  loading,
+  selectedId,
+  search,
+  onSearchChange,
+  onSelect,
+  onAddNew,
+}: {
+  donors: Donor[];
+  loading: boolean;
+  selectedId: string;
+  search: string;
+  onSearchChange: (v: string) => void;
+  onSelect: (donorId: string) => void;
+  onAddNew: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const selectedDonor = donors.find((d) => d.id === selectedId);
+
+  return (
+    <div className="relative">
+      {/* Search input / selected chip */}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+        <Input
+          ref={inputRef}
+          id="don-search"
+          placeholder="Search donor by name, phone, or email…"
+          className="ps-9 pe-9"
+          value={selectedDonor ? selectedDonor.name : search}
+          onChange={(e) => {
+            onSearchChange(e.target.value);
+            if (selectedId) onSelect(""); // clear selection when user types
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          aria-label="Search donor"
+        />
+        <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-border-default bg-surface-card shadow-lg">
+          {loading && (
+            <div className="px-3 py-4 text-center text-caption text-text-muted">
+              Loading donors…
+            </div>
+          )}
+          {!loading && donors.length === 0 && (
+            <div className="px-3 py-4 text-center">
+              <p className="text-caption text-text-secondary">
+                {search.trim()
+                  ? `No donors match "${search.trim()}".`
+                  : "No donors found yet."}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onAddNew();
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary-500 px-3 py-1.5 text-caption font-medium text-primary-foreground hover:bg-primary-600"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Add new donor
+              </button>
+            </div>
+          )}
+          {!loading &&
+            donors.slice(0, 50).map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => {
+                  onSelect(d.id);
+                  setOpen(false);
+                  inputRef.current?.blur();
+                }}
+                className={`flex w-full items-center justify-between border-b border-border-default px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-surface-hover ${
+                  d.id === selectedId ? "bg-primary-50" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-body font-medium text-text-primary">{d.name}</p>
+                  {(d.phone || d.email) && (
+                    <p className="truncate text-caption text-text-muted">
+                      {[d.phone, d.email].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+                {d.donor_type && d.donor_type !== "regular" && (
+                  <span className="ms-2 shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium capitalize text-text-secondary">
+                    {d.donor_type.replace("_", " ")}
+                  </span>
+                )}
+                {d.id === selectedId && (
+                  <CheckCircle2 className="ms-2 h-4 w-4 shrink-0 text-semantic-success" />
+                )}
+              </button>
+            ))}
+          {!loading && donors.length > 50 && (
+            <div className="border-t border-border-default px-3 py-2 text-center text-caption text-text-muted">
+              Showing first 50 — refine your search to see more.
+            </div>
+          )}
+          {!loading && donors.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onAddNew();
+              }}
+              className="flex w-full items-center gap-2 border-t-2 border-border-default bg-surface-hover px-3 py-2 text-left text-caption font-medium text-primary-600 hover:bg-primary-50"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Add new donor…
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

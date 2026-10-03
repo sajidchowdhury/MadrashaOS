@@ -1,0 +1,602 @@
+     1→"use client";
+     2→
+     3→/**
+     4→ * MadrashaOS — Donor Management Page
+     5→ *
+     6→ * Route: /donors
+     7→ *
+     8→ * Features:
+     9→ *   - Donor list with search (by name/phone/email)
+    10→ *   - Summary cards: Total Donors, Total Donated, Total Pledged
+    11→ *   - Add Donor dialog (name, phone, email, type, address)
+    12→ *   - Add Pledge dialog (amount, type, frequency, start date)
+    13→ *   - View pledges per donor (expandable row)
+    14→ *   - Filter by donor type (regular/zakat_donor/sadaqah_donor/one_time)
+    15→ *
+    16→ * Data: real API (GET /api/v1/donors, POST /api/v1/donors,
+    17→ * POST /api/v1/donors/:id/pledges)
+    18→ */
+    19→
+    20→import * as React from "react";
+    21→import {
+    22→  Heart, Plus, Search, Save, XCircle, AlertCircle,
+    23→  Phone, Mail, CalendarDays, TrendingUp,
+    24→} from "lucide-react";
+    25→import { Button } from "@/components/ui/button";
+    26→import { Input } from "@/components/ui/input";
+    27→import { Label } from "@/components/ui/label";
+    28→import { Textarea } from "@/components/ui/textarea";
+    29→import { Badge } from "@/components/ui/badge";
+    30→import {
+    31→  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+    32→} from "@/components/ui/table";
+    33→import {
+    34→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    35→} from "@/components/ui/select";
+    36→import {
+    37→  Dialog, DialogContent, DialogDescription, DialogFooter,
+    38→  DialogHeader, DialogTitle,
+    39→} from "@/components/ui/dialog";
+    40→import { IfPermission } from "@/components/auth/IfPermission";
+    41→import {
+    42→  LoadingState, ErrorState, PermissionDenied,
+    43→} from "@/components/states";
+    44→import { EmptyState } from "@/components/ui/empty-state";
+    45→import { useSessionStore } from "@/stores/sessionStore";
+    46→import { useToast } from "@/hooks/use-toast";
+    47→import { formatCurrency, formatDate } from "@/lib/i18n/format";
+    48→
+    49→type Donor = {
+    50→  id: string;
+    51→  name: string;
+    52→  name_bn: string | null;
+    53→  phone: string | null;
+    54→  email: string | null;
+    55→  address: string | null;
+    56→  donor_type: string;
+    57→  total_donated: number;
+    58→  total_pledged: number;
+    59→  notes: string | null;
+    60→  is_active: boolean;
+    61→  donation_count: number;
+    62→  pledge_count: number;
+    63→};
+    64→
+    65→type Pledge = {
+    66→  id: string;
+    67→  amount: number;
+    68→  pledge_type: string;
+    69→  frequency: string;
+    70→  start_date: string;
+    71→  end_date: string | null;
+    72→  amount_received: number;
+    73→  next_reminder: string | null;
+    74→  status: string;
+    75→  notes: string | null;
+    76→};
+    77→
+    78→const TYPE_BADGE: Record<string, string> = {
+    79→  regular: "bg-primary-50 text-primary-700",
+    80→  one_time: "bg-neutral-100 text-text-secondary",
+    81→  zakat_donor: "bg-accent-50 text-accent-700",
+    82→  sadaqah_donor: "bg-success-50 text-semantic-success",
+    83→};
+    84→
+    85→const TYPE_LABELS: Record<string, string> = {
+    86→  regular: "Regular",
+    87→  one_time: "One-time",
+    88→  zakat_donor: "Zakat Donor",
+    89→  sadaqah_donor: "Sadaqah Donor",
+    90→};
+    91→
+    92→export default function DonorsPage() {
+    93→  const { hasPermission } = useSessionStore();
+    94→  const { toast } = useToast();
+    95→
+    96→  const [donors, setDonors] = React.useState<Donor[]>([]);
+    97→  const [loading, setLoading] = React.useState(true);
+    98→  const [error, setError] = React.useState(false);
+    99→  const [search, setSearch] = React.useState("");
+   100→  const [typeFilter, setTypeFilter] = React.useState("all");
+   101→  const [expandedDonorId, setExpandedDonorId] = React.useState<string | null>(null);
+   102→  const [pledges, setPledges] = React.useState<Record<string, Pledge[]>>({});
+   103→
+   104→  // Add donor dialog
+   105→  const [addOpen, setAddOpen] = React.useState(false);
+   106→  const [addSubmitting, setAddSubmitting] = React.useState(false);
+   107→  const [donorName, setDonorName] = React.useState("");
+   108→  const [donorNameBn, setDonorNameBn] = React.useState("");
+   109→  const [donorPhone, setDonorPhone] = React.useState("");
+   110→  const [donorEmail, setDonorEmail] = React.useState("");
+   111→  const [donorAddress, setDonorAddress] = React.useState("");
+   112→  const [donorType, setDonorType] = React.useState("regular");
+   113→  const [donorNotes, setDonorNotes] = React.useState("");
+   114→  const [addError, setAddError] = React.useState<string | null>(null);
+   115→
+   116→  // Add pledge dialog
+   117→  const [pledgeOpen, setPledgeOpen] = React.useState(false);
+   118→  const [pledgeDonorId, setPledgeDonorId] = React.useState<string | null>(null);
+   119→  const [pledgeDonorName, setPledgeDonorName] = React.useState("");
+   120→  const [pledgeSubmitting, setPledgeSubmitting] = React.useState(false);
+   121→  const [pledgeAmount, setPledgeAmount] = React.useState("");
+   122→  const [pledgeType, setPledgeType] = React.useState("general");
+   123→  const [pledgeFrequency, setPledgeFrequency] = React.useState("one_time");
+   124→  const [pledgeStartDate, setPledgeStartDate] = React.useState(new Date().toISOString().slice(0, 10));
+   125→  const [pledgeReminder, setPledgeReminder] = React.useState("");
+   126→  const [pledgeNotes, setPledgeNotes] = React.useState("");
+   127→  const [pledgeError, setPledgeError] = React.useState<string | null>(null);
+   128→
+   129→  const canView = hasPermission("donors.view");
+   130→
+   131→  const fetchDonors = React.useCallback(async () => {
+   132→    setLoading(true);
+   133→    setError(false);
+   134→    try {
+   135→      const res = await fetch("/api/v1/donors?pageSize=100");
+   136→      const data = await res.json().catch(() => ({}));
+   137→      setDonors((data?.data ?? []) as Donor[]);
+   138→    } catch {
+   139→      setError(true);
+   140→    }
+   141→    setLoading(false);
+   142→  }, []);
+   143→
+   144→  React.useEffect(() => {
+   145→    fetchDonors();
+   146→  }, [fetchDonors]);
+   147→
+   148→  const filtered = React.useMemo(() => {
+   149→    const q = search.trim().toLowerCase();
+   150→    return donors.filter((d) => {
+   151→      if (typeFilter !== "all" && d.donor_type !== typeFilter) return false;
+   152→      if (!q) return true;
+   153→      return (
+   154→        d.name.toLowerCase().includes(q) ||
+   155→        (d.phone ?? "").includes(q) ||
+   156→        (d.email ?? "").toLowerCase().includes(q)
+   157→      );
+   158→    });
+   159→  }, [donors, search, typeFilter]);
+   160→
+   161→  const totalDonated = donors.reduce((s, d) => s + d.total_donated, 0);
+   162→  const totalPledged = donors.reduce((s, d) => s + d.total_pledged, 0);
+   163→
+   164→  async function handleAddDonor() {
+   165→    setAddError(null);
+   166→    if (!donorName.trim()) {
+   167→      setAddError("Donor name is required.");
+   168→      return;
+   169→    }
+   170→    setAddSubmitting(true);
+   171→    try {
+   172→      const res = await fetch("/api/v1/donors", {
+   173→        method: "POST",
+   174→        headers: { "Content-Type": "application/json" },
+   175→        body: JSON.stringify({
+   176→          name: donorName.trim(),
+   177→          name_bn: donorNameBn.trim() || undefined,
+   178→          phone: donorPhone.trim() || undefined,
+   179→          email: donorEmail.trim() || undefined,
+   180→          address: donorAddress.trim() || undefined,
+   181→          donor_type: donorType,
+   182→          notes: donorNotes.trim() || undefined,
+   183→        }),
+   184→      });
+   185→      const data = await res.json().catch(() => ({}));
+   186→      if (!res.ok) {
+   187→        setAddError(data?.error || `Failed (HTTP ${res.status})`);
+   188→        setAddSubmitting(false);
+   189→        return;
+   190→      }
+   191→      toast({ title: "Donor added", description: donorName });
+   192→      setDonorName(""); setDonorNameBn(""); setDonorPhone(""); setDonorEmail("");
+   193→      setDonorAddress(""); setDonorType("regular"); setDonorNotes("");
+   194→      setAddOpen(false);
+   195→      fetchDonors();
+   196→    } catch {
+   197→      setAddError("Network error — please try again.");
+   198→    }
+   199→    setAddSubmitting(false);
+   200→  }
+   201→
+   202→  function openPledgeDialog(donorId: string, donorName: string) {
+   203→    setPledgeDonorId(donorId);
+   204→    setPledgeDonorName(donorName);
+   205→    setPledgeAmount(""); setPledgeType("general"); setPledgeFrequency("one_time");
+   206→    setPledgeStartDate(new Date().toISOString().slice(0, 10));
+   207→    setPledgeReminder(""); setPledgeNotes(""); setPledgeError(null);
+   208→    setPledgeOpen(true);
+   209→  }
+   210→
+   211→  async function handleAddPledge() {
+   212→    setPledgeError(null);
+   213→    const amount = Number(pledgeAmount) || 0;
+   214→    if (amount <= 0) { setPledgeError("Amount must be greater than 0."); return; }
+   215→    if (!pledgeDonorId) { setPledgeError("No donor selected."); return; }
+   216→    setPledgeSubmitting(true);
+   217→    try {
+   218→      const res = await fetch(`/api/v1/donors/${pledgeDonorId}/pledges`, {
+   219→        method: "POST",
+   220→        headers: { "Content-Type": "application/json" },
+   221→        body: JSON.stringify({
+   222→          amount,
+   223→          pledge_type: pledgeType,
+   224→          frequency: pledgeFrequency,
+   225→          start_date: pledgeStartDate,
+   226→          next_reminder: pledgeReminder || undefined,
+   227→          notes: pledgeNotes.trim() || undefined,
+   228→        }),
+   229→      });
+   230→      const data = await res.json().catch(() => ({}));
+   231→      if (!res.ok) {
+   232→        setPledgeError(data?.error || `Failed (HTTP ${res.status})`);
+   233→        setPledgeSubmitting(false);
+   234→        return;
+   235→      }
+   236→      toast({ title: "Pledge created", description: `${pledgeDonorName} — ৳${amount.toLocaleString()} (${pledgeFrequency})` });
+   237→      setPledgeOpen(false);
+   238→      fetchDonors();
+   239→      // If the donor is expanded, refresh pledges
+   240→      if (expandedDonorId === pledgeDonorId) {
+   241→        fetchPledges(pledgeDonorId);
+   242→      }
+   243→    } catch {
+   244→      setPledgeError("Network error — please try again.");
+   245→    }
+   246→    setPledgeSubmitting(false);
+   247→  }
+   248→
+   249→  async function fetchPledges(donorId: string) {
+   250→    try {
+   251→      const res = await fetch(`/api/v1/donors/${donorId}/pledges`);
+   252→      const data = await res.json().catch(() => ({}));
+   253→      setPledges((prev) => ({ ...prev, [donorId]: (data?.data ?? []) as Pledge[] }));
+   254→    } catch {
+   255→      // Non-fatal
+   256→    }
+   257→  }
+   258→
+   259→  function toggleExpand(donorId: string) {
+   260→    if (expandedDonorId === donorId) {
+   261→      setExpandedDonorId(null);
+   262→    } else {
+   263→      setExpandedDonorId(donorId);
+   264→      fetchPledges(donorId);
+   265→    }
+   266→  }
+   267→
+   268→  if (!canView) {
+   269→    return (
+   270→      <div className="px-4 py-8 md:px-8 md:py-12">
+   271→        <div className="mx-auto max-w-[var(--grid-max-width)]">
+   272→          <PermissionDenied resource="Donors" />
+   273→        </div>
+   274→      </div>
+   275→    );
+   276→  }
+   277→
+   278→  return (
+   279→    <div className="px-4 py-8 md:px-8 md:py-12">
+   280→      <div className="mx-auto max-w-[var(--grid-max-width)] space-y-6">
+   281→        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   282→          <div>
+   283→            <h1 className="flex items-center gap-2 text-display font-bold text-text-primary">
+   284→              <Heart className="h-7 w-7 text-primary-500" aria-hidden />
+   285→              Donors
+   286→            </h1>
+   287→            <p className="mt-1 text-body text-text-secondary">
+   288→              Manage donors, track pledges, and view donation history.
+   289→            </p>
+   290→          </div>
+   291→          <IfPermission code="donors.create">
+   292→            <Button onClick={() => { setAddError(null); setAddOpen(true); }}>
+   293→              <Plus className="h-4 w-4" />
+   294→              Add Donor
+   295→            </Button>
+   296→          </IfPermission>
+   297→        </header>
+   298→
+   299→        {/* Summary cards */}
+   300→        <div className="grid gap-4 sm:grid-cols-3">
+   301→          <div className="rounded-lg border border-border-default bg-surface-card p-4">
+   302→            <p className="text-caption font-medium uppercase tracking-wide text-text-muted">Total Donors</p>
+   303→            <p className="mt-1 font-mono text-display font-bold text-primary-500">{donors.length}</p>
+   304→          </div>
+   305→          <div className="rounded-lg border border-border-default bg-surface-card p-4">
+   306→            <p className="text-caption font-medium uppercase tracking-wide text-text-muted">Total Donated</p>
+   307→            <p className="mt-1 font-mono text-display font-bold text-semantic-success">{formatCurrency(totalDonated, "en")}</p>
+   308→          </div>
+   309→          <div className="rounded-lg border-2 border-accent-200 bg-accent-50 p-4">
+   310→            <p className="text-caption font-medium uppercase tracking-wide text-accent-700">Total Pledged</p>
+   311→            <p className="mt-1 font-mono text-display font-bold text-accent-700">{formatCurrency(totalPledged, "en")}</p>
+   312→          </div>
+   313→        </div>
+   314→
+   315→        {/* Search + filter */}
+   316→        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+   317→          <div className="relative flex-1">
+   318→            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+   319→            <Input placeholder="Search by name, phone, or email…" className="ps-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+   320→          </div>
+   321→          <Select value={typeFilter} onValueChange={setTypeFilter}>
+   322→            <SelectTrigger className="w-full sm:w-48" aria-label="Filter by type">
+   323→              <SelectValue />
+   324→            </SelectTrigger>
+   325→            <SelectContent>
+   326→              <SelectItem value="all">All types</SelectItem>
+   327→              <SelectItem value="regular">Regular</SelectItem>
+   328→              <SelectItem value="zakat_donor">Zakat Donor</SelectItem>
+   329→              <SelectItem value="sadaqah_donor">Sadaqah Donor</SelectItem>
+   330→              <SelectItem value="one_time">One-time</SelectItem>
+   331→            </SelectContent>
+   332→          </Select>
+   333→        </div>
+   334→
+   335→        {/* Body */}
+   336→        {loading && <LoadingState pattern="table" rows={5} />}
+   337→        {error && <ErrorState onRetry={fetchDonors} />}
+   338→
+   339→        {!loading && !error && filtered.length === 0 && (
+   340→          <EmptyState
+   341→            illustration="fees"
+   342→            title="No donors found"
+   343→            description={search ? `No matches for "${search}".` : "No donors recorded yet. Click 'Add Donor' to create one."}
+   344→          />
+   345→        )}
+   346→
+   347→        {/* Donors table */}
+   348→        {!loading && !error && filtered.length > 0 && (
+   349→          <div className="overflow-hidden rounded-lg border border-border-default bg-surface-card">
+   350→            <Table>
+   351→              <TableHeader>
+   352→                <TableRow className="bg-neutral-50 hover:bg-neutral-50">
+   353→                  <TableHead className="px-4">Donor</TableHead>
+   354→                  <TableHead className="px-4">Type</TableHead>
+   355→                  <TableHead className="px-4 text-end">Donated</TableHead>
+   356→                  <TableHead className="px-4 text-end">Pledged</TableHead>
+   357→                  <TableHead className="px-4 text-end">Actions</TableHead>
+   358→                </TableRow>
+   359→              </TableHeader>
+   360→              <TableBody>
+   361→                {filtered.map((d) => (
+   362→                  <React.Fragment key={d.id}>
+   363→                    <TableRow className="hover:bg-surface-hover">
+   364→                      <TableCell className="px-4 py-3">
+   365→                        <button
+   366→                          type="button"
+   367→                          onClick={() => toggleExpand(d.id)}
+   368→                          className="flex items-center gap-2 text-start"
+   369→                        >
+   370→                          <div>
+   371→                            <p className="text-body font-medium text-text-primary">{d.name}</p>
+   372→                            {d.name_bn && <p className="text-caption text-text-muted" lang="bn">{d.name_bn}</p>}
+   373→                            <div className="flex items-center gap-3 text-caption text-text-muted">
+   374→                              {d.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{d.phone}</span>}
+   375→                              {d.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{d.email}</span>}
+   376→                            </div>
+   377→                          </div>
+   378→                        </button>
+   379→                      </TableCell>
+   380→                      <TableCell className="px-4 py-3">
+   381→                        <Badge variant="outline" className={TYPE_BADGE[d.donor_type] ?? ""}>
+   382→                          {TYPE_LABELS[d.donor_type] ?? d.donor_type}
+   383→                        </Badge>
+   384→                      </TableCell>
+   385→                      <TableCell className="px-4 py-3 text-end font-mono text-body text-semantic-success">
+   386→                        {formatCurrency(d.total_donated, "en")}
+   387→                      </TableCell>
+   388→                      <TableCell className="px-4 py-3 text-end font-mono text-body text-accent-700">
+   389→                        {d.total_pledged > 0 ? formatCurrency(d.total_pledged, "en") : "—"}
+   390→                      </TableCell>
+   391→                      <TableCell className="px-4 py-3 text-end">
+   392→                        <IfPermission code="donors.create">
+   393→                          <Button size="sm" variant="ghost" onClick={() => openPledgeDialog(d.id, d.name)}>
+   394→                            <Plus className="h-3.5 w-3.5" />
+   395→                            Pledge
+   396→                          </Button>
+   397→                        </IfPermission>
+   398→                      </TableCell>
+   399→                    </TableRow>
+   400→
+   401→                    {/* Expanded pledges row */}
+   402→                    {expandedDonorId === d.id && (
+   403→                      <TableRow className="bg-surface-hover">
+   404→                        <TableCell colSpan={5} className="px-8 py-3">
+   405→                          {pledges[d.id]?.length === 0 ? (
+   406→                            <p className="text-caption text-text-muted">No pledges for this donor.</p>
+   407→                          ) : (
+   408→                            <div className="space-y-2">
+   409→                              <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">Pledges</p>
+   410→                              {(pledges[d.id] ?? []).map((p) => (
+   411→                                <div key={p.id} className="flex items-center justify-between rounded-md border border-border-default bg-surface-card px-3 py-2">
+   412→                                  <div className="flex items-center gap-3">
+   413→                                    <Badge variant="outline" className={p.pledge_type === "zakat" ? "bg-accent-50 text-accent-700" : "bg-primary-50 text-primary-700"}>
+   414→                                      <span className="capitalize">{p.pledge_type}</span>
+   415→                                    </Badge>
+   416→                                    <span className="text-caption text-text-secondary capitalize">{p.frequency}</span>
+   417→                                    <span className="text-caption text-text-muted">From {formatDate(new Date(p.start_date), "en")}</span>
+   418→                                    {p.next_reminder && (
+   419→                                      <Badge variant="outline" className="bg-warning-50 text-semantic-warning">
+   420→                                        <CalendarDays className="h-3 w-3" />
+   421→                                        Reminder: {formatDate(new Date(p.next_reminder), "en")}
+   422→                                      </Badge>
+   423→                                    )}
+   424→                                  </div>
+   425→                                  <div className="flex items-center gap-4 text-end">
+   426→                                    <div>
+   427→                                      <p className="text-caption text-text-muted">Promised</p>
+   428→                                      <p className="font-mono text-body font-bold text-accent-700">{formatCurrency(p.amount, "en")}</p>
+   429→                                    </div>
+   430→                                    <div>
+   431→                                      <p className="text-caption text-text-muted">Received</p>
+   432→                                      <p className="font-mono text-body font-bold text-semantic-success">{formatCurrency(p.amount_received, "en")}</p>
+   433→                                    </div>
+   434→                                    <Badge variant="outline" className={p.status === "active" ? "bg-success-50 text-semantic-success" : "bg-neutral-100 text-text-muted"}>
+   435→                                      {p.status}
+   436→                                    </Badge>
+   437→                                  </div>
+   438→                                </div>
+   439→                              ))}
+   440→                            </div>
+   441→                          )}
+   442→                        </TableCell>
+   443→                      </TableRow>
+   444→                    )}
+   445→                  </React.Fragment>
+   446→                ))}
+   447→              </TableBody>
+   448→            </Table>
+   449→          </div>
+   450→        )}
+   451→      </div>
+   452→
+   453→      {/* ---------- Add Donor Dialog ---------- */}
+   454→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   455→        <DialogContent className="sm:max-w-lg">
+   456→          <DialogHeader>
+   457→            <DialogTitle className="flex items-center gap-2">
+   458→              <Plus className="h-5 w-5 text-primary-500" />
+   459→              Add Donor
+   460→            </DialogTitle>
+   461→            <DialogDescription>
+   462→              Create a new donor record. Pledges can be added later.
+   463→            </DialogDescription>
+   464→          </DialogHeader>
+   465→          <div className="space-y-4">
+   466→            <div className="grid grid-cols-2 gap-3">
+   467→              <div className="space-y-1.5">
+   468→                <Label htmlFor="donor-name">Name (English) *</Label>
+   469→                <Input id="donor-name" placeholder="Omar Faruq" value={donorName} onChange={(e) => setDonorName(e.target.value)} />
+   470→              </div>
+   471→              <div className="space-y-1.5">
+   472→                <Label htmlFor="donor-name-bn">নাম (বাংলা)</Label>
+   473→                <Input id="donor-name-bn" placeholder="ওমর ফারুক" value={donorNameBn} onChange={(e) => setDonorNameBn(e.target.value)} lang="bn" />
+   474→              </div>
+   475→            </div>
+   476→            <div className="grid grid-cols-2 gap-3">
+   477→              <div className="space-y-1.5">
+   478→                <Label htmlFor="donor-phone">Phone</Label>
+   479→                <Input id="donor-phone" placeholder="+880 1XXX-XXXXXX" value={donorPhone} onChange={(e) => setDonorPhone(e.target.value)} />
+   480→              </div>
+   481→              <div className="space-y-1.5">
+   482→                <Label htmlFor="donor-email">Email</Label>
+   483→                <Input id="donor-email" type="email" placeholder="donor@example.com" value={donorEmail} onChange={(e) => setDonorEmail(e.target.value)} />
+   484→              </div>
+   485→            </div>
+   486→            <div className="grid grid-cols-2 gap-3">
+   487→              <div className="space-y-1.5">
+   488→                <Label htmlFor="donor-type">Donor Type</Label>
+   489→                <Select value={donorType} onValueChange={setDonorType}>
+   490→                  <SelectTrigger id="donor-type" className="w-full">
+   491→                    <SelectValue />
+   492→                  </SelectTrigger>
+   493→                  <SelectContent>
+   494→                    <SelectItem value="regular">Regular</SelectItem>
+   495→                    <SelectItem value="zakat_donor">Zakat Donor</SelectItem>
+   496→                    <SelectItem value="sadaqah_donor">Sadaqah Donor</SelectItem>
+   497→                    <SelectItem value="one_time">One-time</SelectItem>
+   498→                  </SelectContent>
+   499→                </Select>
+   500→              </div>
+   501→              <div className="space-y-1.5">
+   502→                <Label htmlFor="donor-address">Address</Label>
+   503→                <Input id="donor-address" placeholder="Dhaka, Bangladesh" value={donorAddress} onChange={(e) => setDonorAddress(e.target.value)} />
+   504→              </div>
+   505→            </div>
+   506→            <div className="space-y-1.5">
+   507→              <Label htmlFor="donor-notes">Notes (optional)</Label>
+   508→              <Textarea id="donor-notes" placeholder="e.g. Donates every Ramadan" value={donorNotes} onChange={(e) => setDonorNotes(e.target.value)} rows={2} />
+   509→            </div>
+   510→            {addError && (
+   511→              <div role="alert" className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger">
+   512→                <AlertCircle className="h-4 w-4 shrink-0" /><span>{addError}</span>
+   513→              </div>
+   514→            )}
+   515→          </div>
+   516→          <DialogFooter>
+   517→            <Button variant="outline" onClick={() => setAddOpen(false)}><XCircle className="h-4 w-4" />Cancel</Button>
+   518→            <Button onClick={handleAddDonor} disabled={addSubmitting}>
+   519→              <Save className="h-4 w-4" />{addSubmitting ? "Adding…" : "Add Donor"}
+   520→            </Button>
+   521→          </DialogFooter>
+   522→        </DialogContent>
+   523→      </Dialog>
+   524→
+   525→      {/* ---------- Add Pledge Dialog ---------- */}
+   526→      <Dialog open={pledgeOpen} onOpenChange={setPledgeOpen}>
+   527→        <DialogContent className="sm:max-w-md">
+   528→          <DialogHeader>
+   529→            <DialogTitle className="flex items-center gap-2">
+   530→              <TrendingUp className="h-5 w-5 text-accent-500" />
+   531→              Add Pledge — {pledgeDonorName}
+   532→            </DialogTitle>
+   533→            <DialogDescription>
+   534→              Record a pledge (promise to donate). Track amount promised vs received.
+   535→            </DialogDescription>
+   536→          </DialogHeader>
+   537→          <div className="space-y-4">
+   538→            <div className="grid grid-cols-2 gap-3">
+   539→              <div className="space-y-1.5">
+   540→                <Label htmlFor="pl-amount">Pledge Amount (BDT) *</Label>
+   541→                <Input id="pl-amount" type="number" min={1} placeholder="50000" value={pledgeAmount} onChange={(e) => setPledgeAmount(e.target.value)} className="font-mono" />
+   542→              </div>
+   543→              <div className="space-y-1.5">
+   544→                <Label htmlFor="pl-type">Pledge Type</Label>
+   545→                <Select value={pledgeType} onValueChange={setPledgeType}>
+   546→                  <SelectTrigger id="pl-type" className="w-full">
+   547→                    <SelectValue />
+   548→                  </SelectTrigger>
+   549→                  <SelectContent>
+   550→                    <SelectItem value="general">General (Non-Zakat)</SelectItem>
+   551→                    <SelectItem value="zakat">Zakat</SelectItem>
+   552→                    <SelectItem value="sadaqah">Sadaqah</SelectItem>
+   553→                  </SelectContent>
+   554→                </Select>
+   555→              </div>
+   556→            </div>
+   557→            <div className="grid grid-cols-2 gap-3">
+   558→              <div className="space-y-1.5">
+   559→                <Label htmlFor="pl-freq">Frequency</Label>
+   560→                <Select value={pledgeFrequency} onValueChange={setPledgeFrequency}>
+   561→                  <SelectTrigger id="pl-freq" className="w-full">
+   562→                    <SelectValue />
+   563→                  </SelectTrigger>
+   564→                  <SelectContent>
+   565→                    <SelectItem value="one_time">One-time</SelectItem>
+   566→                    <SelectItem value="monthly">Monthly</SelectItem>
+   567→                    <SelectItem value="yearly">Yearly</SelectItem>
+   568→                  </SelectContent>
+   569→                </Select>
+   570→              </div>
+   571→              <div className="space-y-1.5">
+   572→                <Label htmlFor="pl-start">Start Date</Label>
+   573→                <Input id="pl-start" type="date" value={pledgeStartDate} onChange={(e) => setPledgeStartDate(e.target.value)} />
+   574→              </div>
+   575→            </div>
+   576→            <div className="space-y-1.5">
+   577→              <Label htmlFor="pl-reminder">Next Reminder Date (optional)</Label>
+   578→              <Input id="pl-reminder" type="date" value={pledgeReminder} onChange={(e) => setPledgeReminder(e.target.value)} />
+   579→              <p className="text-caption text-text-muted">When to remind the donor about this pledge.</p>
+   580→            </div>
+   581→            <div className="space-y-1.5">
+   582→              <Label htmlFor="pl-notes">Notes (optional)</Label>
+   583→              <Textarea id="pl-notes" placeholder="e.g. Promised during Ramadan" value={pledgeNotes} onChange={(e) => setPledgeNotes(e.target.value)} rows={2} />
+   584→            </div>
+   585→            {pledgeError && (
+   586→              <div role="alert" className="flex items-start gap-2 rounded-md border border-semantic-danger/40 bg-danger-50 px-3 py-2 text-caption text-semantic-danger">
+   587→                <AlertCircle className="h-4 w-4 shrink-0" /><span>{pledgeError}</span>
+   588→              </div>
+   589→            )}
+   590→          </div>
+   591→          <DialogFooter>
+   592→            <Button variant="outline" onClick={() => setPledgeOpen(false)}><XCircle className="h-4 w-4" />Cancel</Button>
+   593→            <Button onClick={handleAddPledge} disabled={pledgeSubmitting}>
+   594→              <Save className="h-4 w-4" />{pledgeSubmitting ? "Creating…" : "Create Pledge"}
+   595→            </Button>
+   596→          </DialogFooter>
+   597→        </DialogContent>
+   598→      </Dialog>
+   599→    </div>
+   600→  );
+   601→}
+   602→
