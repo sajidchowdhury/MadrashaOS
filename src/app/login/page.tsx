@@ -482,7 +482,13 @@ export default function LoginPage() {
 
               <CardFooter className="flex flex-col gap-2">
                 <p className="text-center text-caption text-muted-foreground">
-                  Need access? Contact your Madrasha administrator.
+                  New madrasha?{" "}
+                  <Link
+                    href="/signup"
+                    className="font-medium text-primary-500 hover:underline"
+                  >
+                    Request access
+                  </Link>
                 </p>
               </CardFooter>
             </Card>

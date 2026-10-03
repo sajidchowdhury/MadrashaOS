@@ -64,6 +64,20 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 1c) Public tenant signup request (Phase 1).
+  //     New madrashas submit a signup request — no login required.
+  //     Only POST is public; GET (list) requires platform-admin login.
+  if (
+    path === "/api/v1/tenant/signup-requests" &&
+    req.method.toUpperCase() === "POST"
+  ) {
+    return NextResponse.next();
+  }
+
+  // 1d) Public signup page (Phase 1) — the /signup route is a public form.
+  //     No middleware auth check for browser navigations to /signup.
+  //     (Non-/api routes are passed through by default per the matcher below.)
+
   // 2) Public donation submission — no login required (R10).
   //    Only the POST method is exempt; GET /api/v1/donations still
   //    requires login (donations listing is staff-only).

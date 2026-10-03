@@ -22,7 +22,7 @@ import {
   ClipboardCheck, FileText, Award, CalendarDays, BookMarked,
   Wallet, Calculator, HandCoins, Scale, Gift, Landmark, CreditCard, Heart,
   Package, ShoppingCart, Truck, Sofa, UtensilsCrossed, BookOpen, Bus,
-  Bell, FileArchive, BarChart3, Settings,
+  Bell, FileArchive, BarChart3, Settings, Server,
 } from "lucide-react";
 import type { MessageKey } from "@/lib/i18n/messages";
 
@@ -139,6 +139,7 @@ export const moduleTree: ModuleGroup[] = [
     id: "platform",
     labelKey: "shell.nav.settings",
     items: [
+      { id: "signup-requests", labelKey: "shell.nav.signup-requests", icon: Server, layer: "platform", permissionRequired: "tenant.manage", phase: 0, route: "/platform/signup-requests" },
       { id: "reports", labelKey: "shell.nav.reports", icon: BarChart3, layer: "platform", permissionRequired: "reports.view", phase: 3, route: "/reports" },
       { id: "settings", labelKey: "shell.nav.settings", icon: Settings, layer: "platform", permissionRequired: "organization.config.view", phase: 3, route: "/settings" },
     ],
