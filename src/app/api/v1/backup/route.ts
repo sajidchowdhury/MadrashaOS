@@ -124,7 +124,7 @@ export const POST = withPermission("backup.run", async () => {
     let totalRows = 0;
 
     for (const modelName of ALL_MODELS) {
-      // db is typed; cast to any to allow dynamic model access
+      // db is typed; cast to allow dynamic model access
       const model = (db as Record<string, { findMany?: (args?: unknown) => Promise<unknown[]> } | undefined>)[modelName];
       if (!model || typeof model.findMany !== "function") continue;
 
@@ -148,6 +148,23 @@ export const POST = withPermission("backup.run", async () => {
     }
 
     // --- Serialize + compress (cross-platform: no external gzip) ---
+    // Prisma returns BigInt (for BigInt columns) and Decimal (for Decimal
+    // columns) which JSON.stringify can't handle by default. Use a custom
+    // replacer that converts them to strings (preserving precision).
+    const jsonSafeReplacer = (_key: string, value: unknown): unknown => {
+      if (typeof value === "bigint") return value.toString();
+      if (value && typeof value === "object" && "toString" in value) {
+        // Prisma Decimal objects expose a toString() → "123.45"
+        const proto = Object.getPrototypeOf(value);
+        const ctorName = proto?.constructor?.name ?? "";
+        if (ctorName === "PrismaDecimal" || ctorName === "Decimal") {
+          return String(value);
+        }
+      }
+      if (value instanceof Date) return value.toISOString();
+      return value;
+    };
+
     const jsonStr = JSON.stringify(
       {
         _meta: {
@@ -161,7 +178,7 @@ export const POST = withPermission("backup.run", async () => {
         },
         data: dump,
       },
-      null,
+      jsonSafeReplacer,
       0, // no pretty-print → smaller file
     );
 
