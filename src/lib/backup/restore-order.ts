@@ -96,6 +96,7 @@ export const SKIP_INSERT = new Set<string>([
   "permission", // code-shipped; backup copy may be stale
   "idempotencyRecord", // operational cache
   "backupRecord", // backup history is preserved, not restored
+  "auditLog", // audit trail is preserved, not re-inserted (would violate unique PK)
 ]);
 
 /** Tables that should be upserted (not bulk createMany). */

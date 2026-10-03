@@ -201,11 +201,11 @@ export default function BackupPage() {
 
           <div className="flex items-start gap-3 rounded-lg border border-semantic-info/30 bg-blue-50 p-4">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-body font-medium text-blue-900">
                 Cross-platform backup
               </p>
-              <p className="mt-1 text-caption text-blue-800">
+              <p className="mt-1 text-caption text-blue-800 break-words">
                 Backups are created as compressed JSON (<code className="font-mono">.json.gz</code>) using
                 Node&apos;s built-in libraries — no <code className="font-mono">pg_dump</code> or external
                 tools required. Works on Windows, Linux, and macOS. For automated scheduled backups
@@ -234,7 +234,7 @@ export default function BackupPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-xl border border-border-default">
+                <div className="overflow-x-auto rounded-xl border border-border-default">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-neutral-50">
@@ -243,7 +243,7 @@ export default function BackupPage() {
                         <TableHead className="text-caption font-semibold uppercase text-text-muted">Status</TableHead>
                         <TableHead className="text-caption font-semibold uppercase text-text-muted">Started</TableHead>
                         <TableHead className="text-caption font-semibold uppercase text-text-muted">Completed</TableHead>
-                        <TableHead className="pe-4 text-end text-caption font-semibold uppercase text-text-muted">Actions</TableHead>
+                        <TableHead className="pe-4 text-end min-w-[160px] text-caption font-semibold uppercase text-text-muted">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -266,10 +266,10 @@ export default function BackupPage() {
                             {b.completed_at ? formatDate(new Date(b.completed_at), "en") : "—"}
                           </TableCell>
                           <TableCell className="pe-4 text-end">
-                            <div className="flex justify-end gap-1">
+                            <div className="flex justify-end gap-1 nowrap">
                               {b.storage_url && b.status === "completed" && (
-                                <a href={b.storage_url} target="_blank" rel="noopener noreferrer">
-                                  <Button variant="ghost" size="sm" aria-label="Download backup">
+                                <a href={b.storage_url} target="_blank" rel="noopener noreferrer" className="inline-flex">
+                                  <Button variant="ghost" size="sm" aria-label="Download backup" title="Download">
                                     <Download className="h-4 w-4" />
                                   </Button>
                                 </a>
@@ -291,6 +291,7 @@ export default function BackupPage() {
                                 variant="ghost"
                                 size="sm"
                                 aria-label="Delete backup"
+                                title="Delete"
                                 className="text-semantic-danger hover:bg-danger-50 hover:text-semantic-danger"
                                 onClick={() => setDeleteTarget(b)}
                               >
