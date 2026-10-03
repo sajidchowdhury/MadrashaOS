@@ -24,6 +24,8 @@ const DEFAULT_ENABLED = [
   "employees",
   "fees",
   "accounting",
+  "donations",
+  "donors",
   "reports",
   "notices",
   "documents",
@@ -44,6 +46,19 @@ function safeArray(val: unknown): string[] {
   if (Array.isArray(val)) return val;
   if (val instanceof Set) return Array.from(val);
   return [...DEFAULT_ENABLED];
+}
+
+/**
+ * Merge persisted modules with defaults: ensures any newly-added default
+ * module is present even for existing users with old persisted state.
+ * (e.g. when donors/donations are added to DEFAULT_ENABLED later)
+ */
+function mergeWithDefaults(arr: string[]): string[] {
+  const set = new Set(arr);
+  for (const id of DEFAULT_ENABLED) set.add(id);
+  // Keep only valid module IDs
+  const validIds = new Set(ALL_MODULE_IDS);
+  return Array.from(set).filter((id) => validIds.has(id));
 }
 
 export const useModuleStore = create<ModuleStoreState>()(
@@ -88,12 +103,13 @@ export const useModuleStore = create<ModuleStoreState>()(
     {
       name: "madrasha-module-store",
       // Merge persisted state with defaults — handles corrupted/old format
+      // AND ensures newly-added default modules appear for existing users.
       merge: (persisted, current) => {
         const persistedState = (persisted as { enabledModules?: unknown }) ?? {};
         return {
           ...current,
           ...persistedState,
-          enabledModules: safeArray(persistedState.enabledModules),
+          enabledModules: mergeWithDefaults(safeArray(persistedState.enabledModules)),
         };
       },
     },

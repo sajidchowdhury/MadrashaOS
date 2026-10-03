@@ -3,16 +3,20 @@
 /**
  * MadrashaOS — Receive Money Dialog
  *
- * Records money coming IN to the madrasha (donations, other income, etc.)
- * without using debit/credit jargon. The user picks a category and the
- * receiving account; the system handles the double-entry behind the scenes.
+ * Records money coming IN to the madrasha (donations, fee income, etc.)
+ * without debit/credit jargon. The user picks a FUND (Zakat vs General),
+ * a category, and the receiving account; the system handles double-entry.
+ *
+ * Fund isolation (SRS C6/D18): Zakat money is sacred — when "Zakat" fund
+ * is selected, only zakat-fund asset + income accounts are offered, and
+ * the ledger entry is tagged fund:"zakat".
  *
  * Behind the scenes: Creates a LedgerEntry (debit Cash/Bank, credit Income account)
  */
 
 import * as React from "react";
 import {
-  ArrowDownToLine, Save, XCircle, AlertCircle,
+  ArrowDownToLine, Save, XCircle, AlertCircle, ShieldCheck,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -37,16 +41,18 @@ type Account = {
   fund: string;
 };
 
+type FundType = "general" | "zakat";
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
 /**
- * Income categories — each maps to an income account.
- * The system finds a matching income account by name keyword.
+ * Income categories — each maps to an income account by name keyword.
+ * Categories with (Zakat) suffix are only offered when fund === "zakat".
  */
-const INCOME_CATEGORIES = [
+const INCOME_CATEGORIES_GENERAL = [
   { value: "Donation (General)", keyword: "donation" },
   { value: "Donation (Sadaqah)", keyword: "sadaqah" },
   { value: "Fee Income", keyword: "fee" },
@@ -55,14 +61,19 @@ const INCOME_CATEGORIES = [
   { value: "Other Income", keyword: "income" },
 ] as const;
 
+const INCOME_CATEGORIES_ZAKAT = [
+  { value: "Zakat Received", keyword: "zakat" },
+  { value: "Zakat Donation", keyword: "donation" },
+  { value: "Other Zakat Income", keyword: "income" },
+] as const;
+
 export function ReceiveMoneyDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
   const { data: accounts } = useAccounts();
 
   const allAccounts = (accounts ?? []) as Account[];
-  const assetAccounts = allAccounts.filter((a) => a.type === "asset");
-  const incomeAccounts = allAccounts.filter((a) => a.type === "income");
 
+  const [fund, setFund] = React.useState<FundType>("general");
   const [amount, setAmount] = React.useState("");
   const [receivedFrom, setReceivedFrom] = React.useState("");
   const [intoAccountId, setIntoAccountId] = React.useState("");
@@ -74,22 +85,35 @@ export function ReceiveMoneyDialog({ open, onOpenChange }: Props) {
 
   React.useEffect(() => {
     if (open) {
+      setFund("general");
       setAmount(""); setReceivedFrom(""); setIntoAccountId("");
       setCategory(""); setDate(new Date().toISOString().slice(0, 10));
       setNotes(""); setError(null);
     }
   }, [open]);
 
+  // Filter accounts by the selected fund (zakat vs general).
+  // Accounts with no fund field default to "general".
+  const fundAssetAccounts = React.useMemo(
+    () => allAccounts.filter((a) => a.type === "asset" && (a.fund ?? "general") === fund),
+    [allAccounts, fund],
+  );
+  const fundIncomeAccounts = React.useMemo(
+    () => allAccounts.filter((a) => a.type === "income" && (a.fund ?? "general") === fund),
+    [allAccounts, fund],
+  );
+
+  const categories = fund === "zakat" ? INCOME_CATEGORIES_ZAKAT : INCOME_CATEGORIES_GENERAL;
+
   // Find the best income account for the selected category
-  const selectedCategory = INCOME_CATEGORIES.find((c) => c.value === category);
+  const selectedCategory = categories.find((c) => c.value === category);
   const targetIncomeAccount = React.useMemo(() => {
     if (!selectedCategory) return null;
-    // Try to find an income account whose name contains the keyword
-    const match = incomeAccounts.find((a) =>
-      a.name.toLowerCase().includes(selectedCategory.keyword.toLowerCase())
+    const match = fundIncomeAccounts.find((a) =>
+      a.name.toLowerCase().includes(selectedCategory.keyword.toLowerCase()),
     );
-    return match ?? incomeAccounts[0] ?? null;
-  }, [selectedCategory, incomeAccounts]);
+    return match ?? fundIncomeAccounts[0] ?? null;
+  }, [selectedCategory, fundIncomeAccounts]);
 
   const amountNum = Number(amount) || 0;
 
@@ -108,29 +132,31 @@ export function ReceiveMoneyDialog({ open, onOpenChange }: Props) {
       return;
     }
     if (!targetIncomeAccount) {
-      setError("No income account found. Go to Accounting → Add Account → Type: Income to create one.");
+      setError(
+        `No ${fund === "zakat" ? "zakat-fund" : "general-fund"} income account found. ` +
+        `Go to Accounting → Add Account → Type: Income, Fund: ${fund} to create one.`,
+      );
       return;
     }
 
     setSubmitting(true);
     try {
-      // Generate voucher number
       const year = new Date().getFullYear();
-      const lastLedger = await fetch(`/api/v1/ledger?pageSize=1`).then(r => r.json()).catch(() => ({}));
       const voucherNo = `JV-${year}-${Date.now().toString().slice(-6)}`;
 
+      const fundLabel = fund === "zakat" ? "[Zakat] " : "";
       const res = await fetch("/api/v1/ledger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           voucher_no: voucherNo,
           date: date,
-          narration: `Received: ${category} — from ${receivedFrom || "—"} — ৳${amountNum}`,
-          debit_account_id: intoAccountId,       // Cash/Bank (asset increases)
-          credit_account_id: targetIncomeAccount.id, // Income (income increases)
+          narration: `${fundLabel}Received: ${category} — from ${receivedFrom || "—"} — ৳${amountNum}`,
+          debit_account_id: intoAccountId,            // Cash/Bank (asset increases)
+          credit_account_id: targetIncomeAccount.id,  // Income (income increases)
           amount: amountNum,
           status: "posted",
-          fund: "general",
+          fund: fund,                                  // zakat or general
           source_type: "manual",
         }),
       });
@@ -141,16 +167,11 @@ export function ReceiveMoneyDialog({ open, onOpenChange }: Props) {
         return;
       }
 
-      // Update account balances
-      await fetch(`/api/v1/accounts/${intoAccountId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }).catch(() => {});
-
       toast({
         title: "Money received",
-        description: `${formatCurrency(amountNum, "en")} — ${category}${receivedFrom ? ` from ${receivedFrom}` : ""}`,
+        description:
+          `${formatCurrency(amountNum, "en")} — ${category}${receivedFrom ? ` from ${receivedFrom}` : ""}` +
+          (fund === "zakat" ? " (Zakat fund)" : ""),
       });
       queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
@@ -171,10 +192,48 @@ export function ReceiveMoneyDialog({ open, onOpenChange }: Props) {
           </DialogTitle>
           <DialogDescription>
             Record money coming in — donations, fee income, sale income, etc.
+            Choose the fund first: Zakat money is sacred and never mixed.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Fund selector — Zakat vs General */}
+          <div className="space-y-1.5">
+            <Label>Fund *</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setFund("general"); setCategory(""); setIntoAccountId(""); }}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-caption font-medium transition-colors ${
+                  fund === "general"
+                    ? "border-primary-500 bg-primary-50 text-primary-700"
+                    : "border-border-default bg-surface-card text-text-secondary hover:bg-surface-hover"
+                }`}
+              >
+                <ArrowDownToLine className="h-4 w-4" />
+                General Fund
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFund("zakat"); setCategory(""); setIntoAccountId(""); }}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-caption font-medium transition-colors ${
+                  fund === "zakat"
+                    ? "border-accent-500 bg-accent-50 text-accent-700"
+                    : "border-border-default bg-surface-card text-text-secondary hover:bg-surface-hover"
+                }`}
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Zakat Fund
+              </button>
+            </div>
+            {fund === "zakat" && (
+              <p className="flex items-start gap-1.5 rounded-md border border-accent-200 bg-accent-50 px-2.5 py-1.5 text-[11px] text-accent-700">
+                <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />
+                Zakat money is sacred — it will only be received into Zakat-fund accounts and distributed to eligible recipients only.
+              </p>
+            )}
+          </div>
+
           {/* Amount */}
           <div className="space-y-1.5">
             <Label htmlFor="rcv-amount">Amount (BDT) *</Label>
@@ -208,27 +267,29 @@ export function ReceiveMoneyDialog({ open, onOpenChange }: Props) {
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {INCOME_CATEGORIES.map((c) => (
+                {categories.map((c) => (
                   <SelectItem key={c.value} value={c.value}>{c.value}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Received into (account) */}
+          {/* Received into (account) — filtered by fund */}
           <div className="space-y-1.5">
-            <Label htmlFor="rcv-into">Received Into *</Label>
+            <Label htmlFor="rcv-into">
+              Received Into * <span className="text-text-muted">({fund === "zakat" ? "Zakat" : "General"} fund accounts)</span>
+            </Label>
             <Select value={intoAccountId} onValueChange={setIntoAccountId}>
               <SelectTrigger id="rcv-into" className="w-full">
-                <SelectValue placeholder="Select Cash or Bank account" />
+                <SelectValue placeholder={`Select ${fund === "zakat" ? "Zakat" : "Cash/Bank"} account`} />
               </SelectTrigger>
               <SelectContent>
-                {assetAccounts.length === 0 && (
+                {fundAssetAccounts.length === 0 && (
                   <div className="px-3 py-2 text-caption text-text-muted">
-                    No asset accounts. Add a Cash/Bank account first.
+                    No {fund === "zakat" ? "zakat-fund" : ""} asset accounts. Add a Cash/Bank account with fund=&ldquo;{fund}&rdquo; first.
                   </div>
                 )}
-                {assetAccounts.map((a) => (
+                {fundAssetAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.name} {a.code ? `· ${a.code}` : ""}
                   </SelectItem>

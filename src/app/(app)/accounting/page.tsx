@@ -1,34 +1,35 @@
 "use client";
 
 /**
- * MadrashaOS — Accounting / Ledger Explorer (C3.4 — Finance · Accounting)
+ * MadrashaOS — Accounting / Daily Ledger (redesigned)
  *
- * Full-width ledger explorer per SRS §2.4.3 (Double-Entry Ledger) with:
- *   - FilterBar (date range + status filter)
- *   - Table: Voucher No · Date · Narration · Debit · Credit · Amount ·
- *            Status badge · Posted By · Running balance (cumulative)
- *   - "New Entry" button gated by `accounting.ledger.post`
+ * Optimized for the daily workflow of the accountant who spends most of
+ * their time here. What they expect to see:
  *
- * The New-Entry dialog enforces the double-entry invariant
- * "Debits must equal credits" via the LedgerEntryForm component.
+ *   1. Only TODAY's posts by default (quick "Today" / "All time" toggle)
+ *   2. Date-range search to view any period's report
+ *   3. NO Chart of Accounts table (kept on a separate admin screen)
+ *   4. Report columns: Voucher No · Date · Narration · Debit · Credit ·
+ *      Amount · Running Balance  (no Status / Posted By clutter)
+ *   5. NO KPI strip (Total Movement / Entries Shown / Pending Review)
+ *   6. Receive Money (with Zakat-wise vs Normal fund) + Pay Money
+ *   7. Receive Donation quick-link to /donations + Donor panel in sidebar
  *
- *   Loading → LoadingState pattern="table"
- *   Error   → ErrorState + retry
- *   Empty   → EmptyState illustration="fees"
+ * Fund separation summary cards (General / Zakat) are kept because they
+ * are operationally critical for a madrasha accountant.
  */
 
 import * as React from "react";
-import { Calculator, Plus, Search, Download, Landmark, ArrowDownToLine, ArrowUpFromLine, Settings } from "lucide-react";
+import {
+  Search, ArrowDownToLine, ArrowUpFromLine,
+  CalendarDays, CalendarRange, Heart,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { FilterBar } from "@/components/ui/filter-bar";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { IfPermission } from "@/components/auth/IfPermission";
 import { LoadingState, ErrorState, PermissionDenied } from "@/components/states";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -36,58 +37,90 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { formatCurrency, formatDate } from "@/lib/i18n/format";
 import { useLedgerEntries, useAccounts } from "@/lib/query/client";
-import { users } from "@/lib/mock/fixtures/users";
-import { LedgerEntryForm } from "@/components/finance/LedgerEntryForm";
-import { AccountFormDialog } from "@/components/finance/AccountFormDialog";
 import { ReceiveMoneyDialog } from "@/components/finance/ReceiveMoneyDialog";
 import { PayMoneyDialog } from "@/components/finance/PayMoneyDialog";
 import { PdfDownloadButton } from "@/components/pdf/PdfPreview";
+import { useRouter } from "next/navigation";
 
-type StatusFilter = "all" | "posted" | "pending" | "rejected";
+/** Today's date in YYYY-MM-DD (local, not UTC) — used as the default filter. */
+function todayLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+type LedgerEntry = {
+  id: string;
+  voucherNo: string;
+  date: string;
+  narration: string;
+  debitAccount?: string;
+  debitAccountName?: string;
+  creditAccount?: string;
+  creditAccountName?: string;
+  amount: number;
+  fund?: string;
+  status?: string;
+  postedBy?: string;
+};
 
 export default function AccountingPage() {
   const { locale } = useI18n();
+  const router = useRouter();
   const hasPermission = useSessionStore((s) => s.hasPermission);
   const canView = hasPermission("accounting.ledger.view");
 
   const { data: ledger, isLoading, isError, refetch } = useLedgerEntries();
   const { data: accounts } = useAccounts();
 
-  const [fromDate, setFromDate] = React.useState<string>("");
-  const [toDate, setToDate] = React.useState<string>("");
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
+  // Default to TODAY so the accountant sees only today's posts on landing.
+  const today = todayLocal();
+  const [fromDate, setFromDate] = React.useState<string>(today);
+  const [toDate, setToDate] = React.useState<string>(today);
   const [search, setSearch] = React.useState("");
-  const [entryOpen, setEntryOpen] = React.useState(false);
-  const [accountOpen, setAccountOpen] = React.useState(false);
   const [receiveOpen, setReceiveOpen] = React.useState(false);
   const [payOpen, setPayOpen] = React.useState(false);
 
-  const accountName = (id: string) => accounts?.find((a) => a.id === id)?.name ?? id;
-  const postedBy = (id: string) => users.find((u) => u.id === id)?.name ?? id;
+  // Quick toggle: "Today" vs "All time"
+  const [dateMode, setDateMode] = React.useState<"today" | "all">("today");
 
-  const filtered = React.useMemo(() => {
+  const accountName = (entry: LedgerEntry, side: "debit" | "credit") => {
+    const direct = side === "debit" ? entry.debitAccountName : entry.creditAccountName;
+    if (direct) return direct;
+    const id = side === "debit" ? entry.debitAccount : entry.creditAccount;
+    const acct = (accounts as Array<{ id: string; name: string }> | undefined)?.find((a) => a.id === id);
+    return acct?.name ?? id ?? "—";
+  };
+
+  const filtered = React.useMemo<LedgerEntry[]>(() => {
     if (!ledger) return [];
-    return ledger
-      .filter((e) => {
-        if (statusFilter !== "all" && e.status !== statusFilter) return false;
+    const list = (ledger as LedgerEntry[]).filter((e) => {
+      if (dateMode === "today") {
+        // Compare YYYY-MM-DD portion of the entry date against today.
+        const entryDate = String(e.date).slice(0, 10);
+        if (entryDate !== today) return false;
+      } else {
         if (fromDate && e.date < fromDate) return false;
         if (toDate && e.date > toDate) return false;
-        if (search.trim()) {
-          const q = search.trim().toLowerCase();
-          if (
-            !e.voucherNo.toLowerCase().includes(q) &&
-            !e.narration.toLowerCase().includes(q)
-          ) {
-            return false;
-          }
+      }
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        if (
+          !e.voucherNo?.toLowerCase().includes(q) &&
+          !e.narration?.toLowerCase().includes(q)
+        ) {
+          return false;
         }
-        return true;
-      })
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  }, [ledger, statusFilter, fromDate, toDate, search]);
+      }
+      return true;
+    });
+    // Chronological (oldest first) so running balance reads naturally.
+    return list.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }, [ledger, dateMode, fromDate, toDate, search, today]);
 
-  // Running balance: cumulative sum of entry amounts (in chronological order).
-  // Computed via slice+reduce per index so no variable is reassigned (lint-safe).
+  // Running balance: cumulative sum of entry amounts (chronological).
   const withBalance = React.useMemo(() => {
     return filtered.map((entry, idx) => ({
       ...entry,
@@ -105,40 +138,51 @@ export default function AccountingPage() {
     );
   }
 
-  const totalDebits = withBalance.reduce((s, e) => s + e.amount, 0);
-  const pendingCount = withBalance.filter((e) => e.status === "pending").length;
-  const activeFilters = (statusFilter !== "all" ? 1 : 0) + (fromDate ? 1 : 0) + (toDate ? 1 : 0);
+  const activeFilters = (dateMode === "all" ? (fromDate ? 1 : 0) + (toDate ? 1 : 0) : 1) + (search.trim() ? 1 : 0);
 
   const clearFilters = () => {
-    setStatusFilter("all");
-    setFromDate("");
-    setToDate("");
+    setDateMode("today");
+    setFromDate(today);
+    setToDate(today);
     setSearch("");
   };
+
+  function switchToToday() {
+    setDateMode("today");
+    setFromDate(today);
+    setToDate(today);
+  }
+
+  function switchToAllTime() {
+    setDateMode("all");
+    setFromDate("");
+    setToDate("");
+  }
 
   return (
     <div className="px-4 py-8 md:px-8 md:py-12">
       <div className="mx-auto max-w-[var(--grid-max-width)] space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-display font-bold text-text-primary">Ledger Explorer</h1>
+            <h1 className="text-display font-bold text-text-primary">Daily Ledger</h1>
             <p className="mt-1 text-body text-text-secondary">
-              Double-entry journal vouchers with running balance.
+              {dateMode === "today"
+                ? `Showing today's posts (${formatDate(new Date(), locale)}).`
+                : "Showing all entries in the selected date range."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {/* C5.1 / Task 5-a — Download Statement (LedgerStatement PDF template) */}
+          <div className="flex flex-wrap items-center gap-2">
             <PdfDownloadButton
               templateId="ledger-statement"
               locale={locale}
-              from={fromDate || undefined}
-              to={toDate || undefined}
+              from={dateMode === "today" ? today : fromDate || undefined}
+              to={dateMode === "today" ? today : toDate || undefined}
               accountName="All Accounts"
               label="Download Statement"
               variant="outline"
               size="default"
               icon="download"
-              fileName={`ledger-statement-${fromDate || "all"}-to-${toDate || "now"}.pdf`}
+              fileName={`ledger-statement-${dateMode === "today" ? today : `${fromDate || "all"}-to-${toDate || "now"}`}.pdf`}
             />
             <IfPermission code="accounting.ledger.post">
               <div className="flex flex-wrap gap-2">
@@ -150,48 +194,16 @@ export default function AccountingPage() {
                   <ArrowUpFromLine className="h-4 w-4" />
                   Pay Money
                 </Button>
-                <Button variant="outline" onClick={() => setAccountOpen(true)}>
-                  <Landmark className="h-4 w-4" />
-                  Add Account
-                </Button>
-                <Button variant="ghost" onClick={() => setEntryOpen(true)} title="Advanced journal entry (debit/credit)">
-                  <Settings className="h-4 w-4" />
-                  Advanced
+                <Button variant="outline" onClick={() => router.push("/donations")}>
+                  <Heart className="h-4 w-4" />
+                  Receive Donation
                 </Button>
               </div>
             </IfPermission>
           </div>
         </header>
 
-        {/* KPI strip */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-lg border border-border-default bg-surface-card p-4">
-            <p className="text-caption font-medium uppercase tracking-wider text-text-muted">
-              Total Movement
-            </p>
-            <p className="mt-1 font-mono text-display font-bold text-primary-500">
-              {formatCurrency(totalDebits, locale)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border-default bg-surface-card p-4">
-            <p className="text-caption font-medium uppercase tracking-wider text-text-muted">
-              Entries Shown
-            </p>
-            <p className="mt-1 font-mono text-display font-bold text-text-primary">
-              {withBalance.length}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border-default bg-surface-card p-4">
-            <p className="text-caption font-medium uppercase tracking-wider text-text-muted">
-              Pending Review
-            </p>
-            <p className="mt-1 font-mono text-display font-bold text-semantic-warning">
-              {pendingCount}
-            </p>
-          </div>
-        </div>
-
-        {/* Fund separation summary cards */}
+        {/* Fund separation summary cards (operationally critical) */}
         <div className="grid gap-4 sm:grid-cols-2">
           {(() => {
             const allAccts = (accounts ?? []) as Array<{ type: string; fund: string; balance: number }>;
@@ -228,39 +240,61 @@ export default function AccountingPage() {
           })()}
         </div>
 
-        {/* Filter bar */}
+        {/* Date-mode quick toggle + filter bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-md border border-border-default bg-surface-card p-0.5">
+            <button
+              type="button"
+              onClick={switchToToday}
+              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-caption font-medium transition-colors ${
+                dateMode === "today"
+                  ? "bg-primary-500 text-primary-foreground"
+                  : "text-text-secondary hover:bg-surface-hover"
+              }`}
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={switchToAllTime}
+              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-caption font-medium transition-colors ${
+                dateMode === "all"
+                  ? "bg-primary-500 text-primary-foreground"
+                  : "text-text-secondary hover:bg-surface-hover"
+              }`}
+            >
+              <CalendarRange className="h-3.5 w-3.5" />
+              Date Range
+            </button>
+          </div>
+        </div>
+
         <FilterBar activeCount={activeFilters} onClear={activeFilters > 0 ? clearFilters : undefined}>
-          <div className="flex items-center gap-2">
-            <label htmlFor="from-date" className="text-caption text-text-secondary">From</label>
-            <Input
-              id="from-date"
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="h-8 w-36"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="to-date" className="text-caption text-text-secondary">To</label>
-            <Input
-              id="to-date"
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="h-8 w-36"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-            <SelectTrigger size="sm" className="w-32" aria-label="Filter by status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="posted">Posted</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
+          {dateMode === "all" && (
+            <>
+              <div className="flex items-center gap-2">
+                <label htmlFor="from-date" className="text-caption text-text-secondary">From</label>
+                <Input
+                  id="from-date"
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="h-8 w-36"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="to-date" className="text-caption text-text-secondary">To</label>
+                <Input
+                  id="to-date"
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="h-8 w-36"
+                />
+              </div>
+            </>
+          )}
           <div className="relative flex-1 min-w-48">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-text-muted" />
             <Input
@@ -273,20 +307,30 @@ export default function AccountingPage() {
           </div>
         </FilterBar>
 
-        {/* Body */}
+        {/* Body — the daily report table */}
         {isLoading && <LoadingState pattern="table" rows={8} />}
         {isError && <ErrorState onRetry={() => refetch()} />}
         {!isLoading && !isError && withBalance.length === 0 && (
           <EmptyState
             illustration="fees"
-            title="No ledger entries"
-            description="Adjust your filters or post a new entry to get started."
+            title={dateMode === "today" ? "No posts today" : "No ledger entries found"}
+            description={
+              dateMode === "today"
+                ? "Nothing has been posted today yet. Use Receive Money / Pay Money to record an entry."
+                : "Adjust your filters or date range to see entries."
+            }
             action={
               <IfPermission code="accounting.ledger.post">
-                <Button onClick={() => setEntryOpen(true)}>
-                  <Plus className="h-4 w-4" />
-                  Post First Entry
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => setReceiveOpen(true)} className="bg-semantic-success hover:bg-semantic-success/90">
+                    <ArrowDownToLine className="h-4 w-4" />
+                    Receive Money
+                  </Button>
+                  <Button onClick={() => setPayOpen(true)} variant="destructive">
+                    <ArrowUpFromLine className="h-4 w-4" />
+                    Pay Money
+                  </Button>
+                </div>
               </IfPermission>
             }
           />
@@ -304,52 +348,34 @@ export default function AccountingPage() {
                     <TableHead className="px-4">Credit</TableHead>
                     <TableHead className="px-4 text-end">Amount</TableHead>
                     <TableHead className="px-4 text-end">Running Balance</TableHead>
-                    <TableHead className="px-4">Status</TableHead>
-                    <TableHead className="px-4">Posted By</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {withBalance.map((e) => {
-                    const statusVariant =
-                      e.status === "posted"
-                        ? "border-semantic-success/40 text-semantic-success"
-                        : e.status === "pending"
-                          ? "border-semantic-warning/40 text-semantic-warning"
-                          : "border-semantic-danger/40 text-semantic-danger";
-                    return (
-                      <TableRow key={e.id}>
-                        <TableCell className="px-4 py-3 font-mono text-caption text-text-primary">
-                          {e.voucherNo}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-caption text-text-secondary">
-                          {formatDate(new Date(e.date), locale)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-body text-text-primary">
-                          {e.narration}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-body text-text-secondary">
-                          {accountName(e.debitAccount)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-body text-text-secondary">
-                          {accountName(e.creditAccount)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-end font-mono text-body text-text-primary">
-                          {formatCurrency(e.amount, locale)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-end font-mono text-body text-primary-700">
-                          {formatCurrency(e.balance, locale)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3">
-                          <Badge variant="outline" className={statusVariant}>
-                            <span className="capitalize">{e.status}</span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-caption text-text-secondary">
-                          {postedBy(e.postedBy)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {withBalance.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="px-4 py-3 font-mono text-caption text-text-primary">
+                        {e.voucherNo}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-caption text-text-secondary">
+                        {formatDate(new Date(e.date), locale)}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-body text-text-primary">
+                        {e.narration}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-body text-text-secondary">
+                        {accountName(e, "debit")}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-body text-text-secondary">
+                        {accountName(e, "credit")}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-end font-mono text-body text-text-primary">
+                        {formatCurrency(e.amount, locale)}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-end font-mono text-body text-primary-700">
+                        {formatCurrency(e.balance, locale)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -358,97 +384,15 @@ export default function AccountingPage() {
 
         {!isLoading && !isError && withBalance.length > 0 && (
           <p className="text-caption text-text-muted">
-            Showing {withBalance.length} of {ledger?.length ?? 0} entries ·
+            {dateMode === "today"
+              ? `Showing ${withBalance.length} post(s) from today.`
+              : `Showing ${withBalance.length} of ${ledger?.length ?? 0} entries.`}
+            {" · "}
             Running balance is cumulative in chronological order.
           </p>
         )}
-
-        {/* ---------- Chart of Accounts ---------- */}
-        <section aria-labelledby="accounts-heading">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 id="accounts-heading" className="flex items-center gap-2 text-subtitle font-semibold text-text-primary">
-              <Landmark className="h-4 w-4 text-primary-500" />
-              Chart of Accounts ({accounts?.length ?? 0})
-            </h2>
-            <IfPermission code="accounting.ledger.post">
-              <Button size="sm" variant="outline" onClick={() => setAccountOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Add Account
-              </Button>
-            </IfPermission>
-          </div>
-
-          {accounts && accounts.length > 0 ? (
-            <div className="overflow-hidden rounded-lg border border-border-default bg-surface-card">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-neutral-50">
-                    <TableHead className="px-4">Code</TableHead>
-                    <TableHead className="px-4">Name</TableHead>
-                    <TableHead className="px-4">Type</TableHead>
-                    <TableHead className="px-4">Fund</TableHead>
-                    <TableHead className="px-4 text-end">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {accounts.map((a) => (
-                    <TableRow key={a.id} className="hover:bg-surface-hover">
-                      <TableCell className="px-4 py-2 font-mono text-caption font-semibold text-text-primary">
-                        {a.code}
-                      </TableCell>
-                      <TableCell className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-body font-medium text-text-primary">{a.name}</span>
-                          {a.isCash && (
-                            <Badge variant="outline" className="bg-success-50 text-semantic-success">Cash</Badge>
-                          )}
-                          {a.isBank && (
-                            <Badge variant="outline" className="bg-primary-50 text-primary-700">Bank</Badge>
-                          )}
-                        </div>
-                        {a.nameBn && (
-                          <p className="text-caption text-text-muted" lang="bn">{a.nameBn}</p>
-                        )}
-                      </TableCell>
-                      <TableCell className="px-4 py-2">
-                        <Badge variant="outline" className="capitalize">
-                          {a.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-4 py-2 text-caption text-text-secondary">
-                        {a.fund ?? "general"}
-                      </TableCell>
-                      <TableCell className="px-4 py-2 text-end font-mono text-body">
-                        <span className={Number(a.balance) > 0 ? "text-semantic-success" : "text-text-muted"}>
-                          {formatCurrency(Number(a.balance), locale)}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-border-default bg-surface-card p-6 text-center">
-              <Landmark className="mx-auto mb-2 h-8 w-8 text-text-muted" />
-              <p className="text-body font-medium text-text-primary">No accounts yet</p>
-              <p className="mt-1 text-caption text-text-secondary">
-                Add accounts (Cash, Bank, Fee Income, Salary Expense, …) before
-                creating ledger entries.
-              </p>
-              <IfPermission code="accounting.ledger.post">
-                <Button size="sm" className="mt-3" onClick={() => setAccountOpen(true)}>
-                  <Plus className="h-4 w-4" />
-                  Add Account
-                </Button>
-              </IfPermission>
-            </div>
-          )}
-        </section>
       </div>
 
-      <LedgerEntryForm open={entryOpen} onOpenChange={setEntryOpen} />
-      <AccountFormDialog open={accountOpen} onOpenChange={setAccountOpen} />
       <ReceiveMoneyDialog open={receiveOpen} onOpenChange={setReceiveOpen} />
       <PayMoneyDialog open={payOpen} onOpenChange={setPayOpen} />
     </div>
