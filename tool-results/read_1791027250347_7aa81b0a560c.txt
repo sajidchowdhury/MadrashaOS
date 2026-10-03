@@ -1,0 +1,1021 @@
+     1→/**
+     2→ * MadrashaOS — Database Seed Script
+     3→ *
+     4→ * Phase B1.4 — Seed Data
+     5→ *
+     6→ * Seeds the PostgreSQL database with the same data the mock fixtures
+     7→ * contain, so the UI looks identical after the swap from mockApi to
+     8→ * the real database.
+     9→ *
+    10→ * Seed data:
+    11→ *   - 1 Organization (Darul Uloom Madrasha) + 3 Branches
+    12→ *   - 8 Users (1 per persona) with hashed passwords
+    13→ *   - 8 Roles + 110+ Permissions + RolePermission junction
+    14→ *   - 4 Classes + 8 Sections
+    15→ *   - 8 Guardians + 40 Students (with bn/en/ar names)
+    16→ *   - 40 FeePlans (3 installments each = 120 installments)
+    17→ *   - 8 FeePayments (recent receipts)
+    18→ *   - 8 Accounts (incl. isolated Zakat fund per SRS §3.7 / C6)
+    19→ *   - 12 LedgerEntries (1 month of activity, 2 pending)
+    20→ *   - 4 AttendanceSessions (Class 5-A across 4 days)
+    21→ *   - 10 InventoryItems (3 low-stock)
+    22→ *   - 5 Notices + 6 Approvals
+    23→ *
+    24→ * Usage: bunx prisma db seed
+    25→ *   Or: bun run prisma/seed.ts
+    26→ */
+    27→
+    28→import { PrismaClient, Gender, StudentStatus, AttendanceStatus, LedgerStatus, AccountType, FundType, FeeMethod, ApprovalType, ApprovalStatus, NoticeAudience } from "../src/generated/prisma";
+    29→// eslint-disable-next-line @typescript-eslint/no-require-imports
+    30→const bcrypt = require("bcryptjs");
+    31→
+    32→const prisma = new PrismaClient();
+    33→
+    34→/* ============================================================
+    35→ *  Helper: generate UUIDs (deterministic for seed reproducibility)
+    36→ * ============================================================ */
+    37→
+    38→// Simple deterministic ID generator (not crypto-secure — seed data only)
+    39→let idCounter = 0;
+    40→function seedId(prefix: string): string {
+    41→  idCounter++;
+    42→  return `${prefix}-${idCounter.toString().padStart(4, "0")}`;
+    43→}
+    44→
+    45→// Pre-allocated IDs for entities referenced by FK
+    46→const IDS = {
+    47→  org: "00000000-0000-0000-0000-000000000001",
+    48→  branchDhaka: "00000000-0000-0000-0000-000000000010",
+    49→  branchCtg: "00000000-0000-0000-0000-000000000011",
+    50→  branchSyl: "00000000-0000-0000-0000-000000000012",
+    51→  // Users (8 personas)
+    52→  userSuperAdmin: "00000000-0000-0000-0001-000000000001",
+    53→  userAuthority: "00000000-0000-0000-0001-000000000002",
+    54→  userAdministrator: "00000000-0000-0000-0001-000000000003",
+    55→  userAccountant: "00000000-0000-0000-0001-000000000004",
+    56→  userTeacher: "00000000-0000-0000-0001-000000000005",
+    57→  userStorekeeper: "00000000-0000-0000-0001-000000000006",
+    58→  userGuardian: "00000000-0000-0000-0001-000000000007",
+    59→  userStudent: "00000000-0000-0000-0001-000000000008",
+    60→  // Roles
+    61→  roleSuperAdmin: "00000000-0000-0000-0002-000000000001",
+    62→  roleAuthority: "00000000-0000-0000-0002-000000000002",
+    63→  roleAdministrator: "00000000-0000-0000-0002-000000000003",
+    64→  roleAccountant: "00000000-0000-0000-0002-000000000004",
+    65→  roleTeacher: "00000000-0000-0000-0002-000000000005",
+    66→  roleStorekeeper: "00000000-0000-0000-0002-000000000006",
+    67→  roleGuardian: "00000000-0000-0000-0002-000000000007",
+    68→  roleStudent: "00000000-0000-0000-0002-000000000008",
+    69→  // Classes
+    70→  class1: "00000000-0000-0000-0003-000000000001",
+    71→  class3: "00000000-0000-0000-0003-000000000002",
+    72→  class5: "00000000-0000-0000-0003-000000000003",
+    73→  class8: "00000000-0000-0000-0003-000000000004",
+    74→
+    75→// Sections
+    76→section1A: "00000000-0000-0000-0005-000000000001",
+    77→section1B: "00000000-0000-0000-0005-000000000002",
+    78→section3A: "00000000-0000-0000-0005-000000000003",
+    79→section5A: "00000000-0000-0000-0005-000000000004",
+    80→section5B: "00000000-0000-0000-0005-000000000005",
+    81→section8A: "00000000-0000-0000-0005-000000000006",
+    82→
+    83→  // Accounts
+    84→  accCash: "00000000-0000-0000-0004-000000000001",
+    85→  accBank: "00000000-0000-0000-0004-000000000002",
+    86→  accMobile: "00000000-0000-0000-0004-000000000003",
+    87→  accIncomeFees: "00000000-0000-0000-0004-000000000004",
+    88→  accExpense: "00000000-0000-0000-0004-000000000005",
+    89→  accZakatFund: "00000000-0000-0000-0004-000000000006",
+    90→  accDonation: "00000000-0000-0000-0004-000000000007",
+    91→  accSalary: "00000000-0000-0000-0004-000000000008",
+    92→} as const;
+    93→
+    94→/* ============================================================
+    95→ *  Permission codes (from src/lib/auth/permissions.ts)
+    96→ * ============================================================ */
+    97→
+    98→const PERMISSION_CODES = [
+    99→  // Foundation
+   100→  "organization.branch.switch", "organization.branch.create", "organization.config.view", "organization.config.edit",
+   101→  "organization.module.toggle", "rbac.role.view", "rbac.role.create", "rbac.role.update",
+   102→  "rbac.permission.assign", "audit.view", "audit.export", "security.policy.edit",
+   103→  "backup.run", "backup.restore",
+   104→  // People
+   105→  "students.view", "students.create", "students.update", "students.promote",
+   106→  "students.notes.view", "students.notes.edit", "admission.view", "admission.approve",
+   107→  "admission.reject", "guardians.view", "guardians.view.own", "teachers.view",
+   108→  "teachers.create", "teachers.assign", "employees.view", "employees.create",
+   109→  // Academic
+   110→  "academic.structure.view", "academic.structure.edit", "attendance.view",
+   111→  "attendance.take", "attendance.view.own", "exams.view", "exams.enter-marks",
+   112→  "exams.publish", "results.view", "results.view.own", "results.generate",
+   113→  // Finance
+   114→  "fees_view", "fees.payment.create", "fees.payment.create.own", "fees.plan.view",
+   115→  "fees.plan.edit", "scholarship.view", "scholarship.approve", "accounting.ledger.view",
+   116→  "accounting.ledger.post", "cashbank.transfer", "zakat.view", "zakat.receive",
+   117→  "zakat.distribute", "donations.view", "donations.create", "donations.create.public",
+   118→  // Operations
+   119→  "inventory.view", "inventory.receive", "inventory.issue", "inventory.sale", "purchase.view",
+   120→  "purchase.create", "purchase.approve", "suppliers.view", "assets.view",
+   121→  "assets.transfer", "assets.dispose", "hostel.view", "hostel.allocate",
+   122→  "food.meal-plan", "library.view", "library.issue", "library.return",
+   123→  "transport.view", "transport.record-expense",
+   124→  // Communication & Platform
+   125→  "notices.view", "notices.compose", "notices.send", "documents.upload",
+   126→  "documents.download", "reports.view", "reports.finance.view", "reports.finance.export",
+   127→  "dashboard.view", "dashboard.view.authority", "dashboard.view.accountant",
+   128→  "dashboard.view.teacher", "dashboard.view.storekeeper", "dashboard.view.guardian",
+   129→  "pdf.generate", "approval.view", "approval.approve", "approval.reject",
+   130→  "approval.delegate",
+   131→  // Platform-level
+   132→  "tenant.provision", "tenant.manage",
+   133→];
+   134→
+   135→// Fix: use dotted codes as in the frontend (replace underscore with dot)
+   136→const PERM_CODES = PERMISSION_CODES.map((c) => c.replace(/^fees_/, "fees."));
+   137→
+   138→/* ============================================================
+   139→ *  Role → Permission mapping (from src/lib/auth/role-permissions.ts)
+   140→ * ============================================================ */
+   141→
+   142→const ROLE_PERMS: Record<string, string[]> = {
+   143→  "super-admin": [
+   144→    "organization.branch.switch", "organization.branch.create", "organization.config.view", "organization.config.edit",
+   145→    "organization.module.toggle", "rbac.role.view", "rbac.role.create", "rbac.role.update",
+   146→    "rbac.permission.assign", "audit.view", "audit.export", "security.policy.edit",
+   147→    "backup.run", "backup.restore", "tenant.provision", "tenant.manage",
+   148→    "dashboard.view", "notices.view", "notices.compose", "notices.send",
+   149→    "documents.upload", "documents.download", "reports.view", "approval.view",
+   150→    "approval.approve", "approval.reject", "approval.delegate", "pdf.generate",
+   151→  ],
+   152→  authority: [
+   153→    "organization.branch.switch", "organization.branch.create", "organization.config.view", "rbac.role.view",
+   154→    "audit.view", "audit.export", "students.view", "students.notes.view",
+   155→    "admission.view", "admission.approve", "admission.reject", "guardians.view",
+   156→    "teachers.view", "academic.structure.view", "attendance.view", "exams.view",
+   157→    "exams.enter-marks", "exams.publish",
+   158→    "results.view", "results.generate", "fees.view", "fees.plan.view",
+   159→    "fees.payment.create", "scholarship.view", "scholarship.approve", "accounting.ledger.view",
+   160→    "accounting.ledger.post", "zakat.view", "donations.view", "donors.view", "donors.create",
+   161→    "inventory.view", "inventory.sale", "purchase.view",
+   162→    "purchase.approve", "suppliers.view", "assets.view", "hostel.view",
+   163→    "library.view", "transport.view", "notices.view", "notices.compose",
+   164→    "notices.send", "documents.upload", "documents.download", "reports.view",
+   165→    "reports.finance.view", "reports.finance.export", "dashboard.view",
+   166→    "dashboard.view.authority", "pdf.generate", "approval.view", "approval.approve",
+   167→    "approval.reject", "approval.delegate",
+   168→  ],
+   169→  administrator: [
+   170→    "organization.branch.switch", "organization.branch.create", "organization.config.view", "organization.config.edit", "organization.module.toggle",
+   171→    "rbac.role.view", "rbac.role.create", "rbac.role.update", "rbac.permission.assign",
+   172→    "audit.view", "backup.run", "students.view", "students.create", "students.update",
+   173→    "students.promote", "students.notes.view", "students.notes.edit", "admission.view",
+   174→    "admission.approve", "admission.reject", "guardians.view", "teachers.view",
+   175→    "teachers.create", "teachers.assign", "employees.view", "employees.create",
+   176→    "academic.structure.view", "academic.structure.edit", "attendance.view",
+   177→    "attendance.take", "exams.view", "exams.enter-marks", "exams.publish",
+   178→    "results.view", "results.generate", "fees.view", "fees.plan.view",
+   179→    "fees.plan.edit", "fees.payment.create", "scholarship.view", "accounting.ledger.view",
+   180→    "accounting.ledger.post", "donations.view", "donations.create", "donors.view", "donors.create",
+   181→    "inventory.view", "inventory.sale",
+   182→    "purchase.view", "suppliers.view", "assets.view", "assets.transfer", "assets.dispose",
+   183→    "hostel.view", "hostel.allocate", "food.meal-plan", "library.view", "library.issue",
+   184→    "library.return", "transport.view", "transport.record-expense", "notices.view",
+   185→    "notices.compose", "notices.send", "documents.upload", "documents.download",
+   186→    "reports.view", "dashboard.view", "pdf.generate", "security.policy.edit", "approval.view",
+   187→  ],
+   188→  accountant: [
+   189→    "students.view", "guardians.view", "fees.view", "fees.payment.create",
+   190→    "fees.plan.view", "fees.plan.edit", "scholarship.view", "scholarship.approve",
+   191→    "accounting.ledger.view", "accounting.ledger.post", "cashbank.transfer",
+   192→    "zakat.view", "zakat.receive", "zakat.distribute", "donations.view",
+   193→    "donations.create", "donors.view", "donors.create",
+   194→    "suppliers.view", "inventory.view", "purchase.view",
+   195→    "purchase.create", "assets.view", "transport.view", "transport.record-expense",
+   196→    "notices.view", "documents.upload", "documents.download", "reports.view",
+   197→    "reports.finance.view", "reports.finance.export", "dashboard.view",
+   198→    "dashboard.view.accountant", "pdf.generate", "approval.view",
+   199→  ],
+   200→  teacher: [
+   201→    "students.view", "guardians.view", "academic.structure.view", "attendance.view",
+   202→    "attendance.view.own", "attendance.take", "exams.view", "exams.enter-marks",
+   203→    "results.view", "notices.view", "documents.download", "dashboard.view",
+   204→    "dashboard.view.teacher",
+   205→  ],
+   206→  storekeeper: [
+   207→    "inventory.view", "inventory.receive", "inventory.issue", "inventory.sale", "purchase.view",
+   208→    "purchase.create", "suppliers.view", "assets.view", "notices.view",
+   209→    "documents.upload", "documents.download", "dashboard.view",
+   210→    "dashboard.view.storekeeper",
+   211→  ],
+   212→  guardian: [
+   213→    "guardians.view.own", "attendance.view.own", "results.view.own", "fees.view",
+   214→    "fees.payment.create.own", "fees.plan.view", "notices.view", "documents.download",
+   215→    "dashboard.view", "dashboard.view.guardian", "pdf.generate",
+   216→  ],
+   217→  student: [
+   218→    "attendance.view.own", "results.view.own", "fees.view", "fees.plan.view",
+   219→    "notices.view", "documents.download", "dashboard.view",
+   220→  ],
+   221→};
+   222→
+   223→/* ============================================================
+   224→ *  Student name pools (from mock fixtures)
+   225→ * ============================================================ */
+   226→
+   227→const FIRST_NAMES_EN = [
+   228→  "Ahmad", "Fatima", "Muhammad", "Aisha", "Omar", "Khadija", "Bilal", "Zainab",
+   229→  "Yusuf", "Maryam", "Hamza", "Hafsa", "Ibrahim", "Amina", "Ismail", "Ruqayyah",
+   230→  "Daud", "Sara", "Sulaiman", "Hawa", "Musa", "Lubaba", "Isa", "Maymunah",
+   231→  "Yahya", "Safiya", "Zakariya", "Sumayya", "Tariq", "Asma", "Khalid", "Nusaybah",
+   232→  "Salman", "Umm", "Jafar", "Kulthum", "Hasan", "Rayhana", "Husain", "Umm",
+   233→];
+   234→const FIRST_NAMES_BN = [
+   235→  "আহমদ", "ফাতিমা", "মুহাম্মদ", "আয়েশা", "ওমর", "খাদিজা", "বিলাল", "জয়নব",
+   236→  "ইউসুফ", "মরিয়ম", "হামজা", "হাফসা", "ইব্রাহিম", "আমিনা", "ইসমাঈল", "রুকাইয়া",
+   237→  "দাউদ", "সারা", "সুলাইমান", "হাওয়া", "মুসা", "লুবাবা", "ঈসা", "মাইমুনা",
+   238→  "ইয়াহইয়া", "সাফিয়া", "জাকারিয়া", "সুমাইয়া", "তারিক", "আসমা", "খালিদ", "নুসাইবা",
+   239→  "সালমান", "উম্ম", "জাফর", "কুলসুম", "হাসান", "রায়হানা", "হুসাইন", "উম্ম",
+   240→];
+   241→const SURNAMES = ["Hossain", "Akter", "Rahman", "Chowdhury", "Begum", "Ahmed", "Islam", "Khan"];
+   242→const SURNAMES_BN = ["হোসেন", "আক্তার", "রহমান", "চৌধুরী", "বেগম", "আহমেদ", "ইসলাম", "খান"];
+   243→
+   244→function generateStudents(): Array<{
+   245→  code: string; name: string; name_bn: string; name_ar?: string;
+   246→  classId: string; section: string; guardianId: string; roll: number;
+   247→  gender: Gender; dob: string; admittedAt: string;
+   248→}> {
+   249→  const students: Array<{
+   250→    code: string; name: string; name_bn: string; name_ar?: string;
+   251→    classId: string; section: string; guardianId: string; roll: number;
+   252→    gender: Gender; dob: string; admittedAt: string;
+   253→  }> = [];
+   254→  let roll = 1;
+   255→  // Class 1 Section A — 8 students
+   256→  for (let i = 0; i < 8; i++) {
+   257→    students.push(makeStudent(i, roll++, IDS.class1, "A", "g-1"));
+   258→  }
+   259→  // Class 3 Section A — 10 students
+   260→  for (let i = 8; i < 18; i++) {
+   261→    students.push(makeStudent(i, roll++, IDS.class3, "A", "g-2"));
+   262→  }
+   263→  // Class 5 Section A — 12 students (the famous Class 5-A)
+   264→  for (let i = 18; i < 30; i++) {
+   265→    students.push(makeStudent(i, roll++, IDS.class5, "A", "g-3"));
+   266→  }
+   267→  // Class 5 Section B — 10 students
+   268→  for (let i = 30; i < 40; i++) {
+   269→    students.push(makeStudent(i, roll++, IDS.class5, "B", "g-4"));
+   270→  }
+   271→  return students;
+   272→}
+   273→
+   274→function makeStudent(
+   275→  i: number, roll: number, classId: string, section: string, _guardianKey: string,
+   276→) {
+   277→  const gender: Gender = i % 2 === 0 ? "male" : "female";
+   278→  const firstEn = FIRST_NAMES_EN[i % FIRST_NAMES_EN.length];
+   279→  const firstBn = FIRST_NAMES_BN[i % FIRST_NAMES_BN.length];
+   280→  const surname = SURNAMES[i % SURNAMES.length];
+   281→  const surnameBn = SURNAMES_BN[i % SURNAMES_BN.length];
+   282→  const year = 2010 + (i % 6);
+   283→  const month = ((i % 12) + 1).toString().padStart(2, "0");
+   284→  const day = ((i % 28) + 1).toString().padStart(2, "0");
+   285→  return {
+   286→    code: `MOS-2026-${(i + 1).toString().padStart(3, "0")}`,
+   287→    name: `${firstEn} ${surname}`,
+   288→    name_bn: `${firstBn} ${surnameBn}`,
+   289→    name_ar: i % 4 === 0 ? `${firstEn} بن ${surname}` : undefined,
+   290→    classId,
+   291→    section,
+   292→    guardianId: _guardianKey,
+   293→    roll,
+   294→    gender,
+   295→    dob: `${year}-${month}-${day}`,
+   296→    admittedAt: "2026-01-15",
+   297→  };
+   298→}
+   299→
+   300→/* ============================================================
+   301→ *  Main seed function
+   302→ * ============================================================ */
+   303→
+   304→async function main() {
+   305→  console.log("🌱 MadrashaOS — Database Seed (Phase B1.4)");
+   306→  console.log("===========================================\n");
+   307→
+   308→  // --- 1. Organization ---
+   309→  console.log("[1/14] Creating organization...");
+   310→  const org = await prisma.organization.upsert({
+   311→    where: { id: IDS.org },
+   312→    update: {},
+   313→    create: {
+   314→      id: IDS.org,
+   315→      name: "Darul Uloom Madrasha",
+   316→      name_bn: "দারুল উলূম মাদরাসা",
+   317→      slug: "darul-uloom-madrasha",
+   318→      phone: "+880 2 9661234",
+   319→      email: "info@madrashaos.org",
+   320→      address: "123 Mirpur Road, Dhanmondi, Dhaka 1209",
+   321→      established_year: 1998,
+   322→      settings: { locale: "en", currency: "BDT", academicYearStart: "January" } as any,
+   323→    } as any,
+   324→  });
+   325→  console.log(`  ✅ Organization: ${org.name}`);
+   326→
+   327→  // --- 2. Branches ---
+   328→  console.log("\n[2/14] Creating branches...");
+   329→  const branches = await Promise.all([
+   330→    prisma.branch.upsert({
+   331→      where: { id: IDS.branchDhaka },
+   332→      update: {},
+   333→      create: {
+   334→        id: IDS.branchDhaka, organization_id: org.id,
+   335→        code: "dhaka", name: "Dhaka Main Branch", name_bn: "ঢাকা মূল শাখা",
+   336→        address: "123 Mirpur Road, Dhanmondi, Dhaka 1209",
+   337→        phone: "+880 2 9661234", email: "dhaka@madrashaos.org",
+   338→        established_year: 1998, is_active: true,
+   339→      } as any,
+   340→    }),
+   341→    prisma.branch.upsert({
+   342→      where: { id: IDS.branchCtg },
+   343→      update: {},
+   344→      create: {
+   345→        id: IDS.branchCtg, organization_id: org.id,
+   346→        code: "chittagong", name: "Chittagong Branch", name_bn: "চট্টগ্রাম শাখা",
+   347→        address: "45 Agrabad Commercial Area, Chittagong 4100",
+   348→        phone: "+880 31 2545678", email: "ctg@madrashaos.org",
+   349→        established_year: 2005, is_active: true,
+   350→      } as any,
+   351→    }),
+   352→    prisma.branch.upsert({
+   353→      where: { id: IDS.branchSyl },
+   354→      update: {},
+   355→      create: {
+   356→        id: IDS.branchSyl, organization_id: org.id,
+   357→        code: "sylhet", name: "Sylhet Branch", name_bn: "সিলেট শাখা",
+   358→        address: "78 Zindabazar, Sylhet 3100",
+   359→        phone: "+880 821 712345", email: "sylhet@madrashaos.org",
+   360→        established_year: 2012, is_active: true,
+   361→      } as any,
+   362→    }),
+   363→  ]);
+   364→  console.log(`  ✅ ${branches.length} branches created`);
+   365→
+   366→  // --- 3. Roles ---
+   367→  console.log("\n[3/14] Creating roles...");
+   368→  const roleData = [
+   369→    { id: IDS.roleSuperAdmin, code: "super-admin", name: "Super Admin", description: "Platform operator with full access" },
+   370→    { id: IDS.roleAuthority, code: "authority", name: "Authority (Principal)", description: "Madrasha head/principal — all-branch read + approve" },
+   371→    { id: IDS.roleAdministrator, code: "administrator", name: "Administrator", description: "Office admin — tenant-wide CRUD except financial posting" },
+   372→    { id: IDS.roleAccountant, code: "accountant", name: "Accountant", description: "Finance CRUD; cannot edit student academic info" },
+   373→    { id: IDS.roleTeacher, code: "teacher", name: "Teacher", description: "Own classes + sections; no financial data" },
+   374→    { id: IDS.roleStorekeeper, code: "storekeeper", name: "Storekeeper", description: "Inventory + purchase CRUD; no finance or student data" },
+   375→    { id: IDS.roleGuardian, code: "guardian", name: "Guardian (Parent)", description: "Read-only on own linked children" },
+   376→    { id: IDS.roleStudent, code: "student", name: "Student", description: "Read-only on own records only" },
+   377→  ];
+   378→  for (const r of roleData) {
+   379→    await prisma.role.upsert({
+   380→      where: { id: r.id },
+   381→      update: {},
+   382→      create: { ...r, organization_id: org.id, is_system: true },
+   383→    } as any);
+   384→  }
+   385→  console.log(`  ✅ ${roleData.length} roles created`);
+   386→
+   387→  // --- 4. Permissions ---
+   388→  console.log("\n[4/14] Creating permissions...");
+   389→  for (const code of PERM_CODES) {
+   390→    const [mod, resource, action] = code.split(".");
+   391→    await prisma.permission.upsert({
+   392→      where: { code },
+   393→      update: {},
+   394→      create: {
+   395→        code,
+   396→        module: mod || "general",
+   397→        name: `${resource || "all"}.${action || "view"}`,
+   398→        description: `${action || "view"} permission for ${resource || "all"} in ${mod || "general"}`,
+   399→      } as any,
+   400→    });
+   401→  }
+   402→  console.log(`  ✅ ${PERM_CODES.length} permissions created`);
+   403→
+   404→  // --- 5. Role-Permission junction ---
+   405→  console.log("\n[5/14] Creating role-permission assignments...");
+   406→  const roleIdMap: Record<string, string> = {
+   407→    "super-admin": IDS.roleSuperAdmin,
+   408→    authority: IDS.roleAuthority,
+   409→    administrator: IDS.roleAdministrator,
+   410→    accountant: IDS.roleAccountant,
+   411→    teacher: IDS.roleTeacher,
+   412→    storekeeper: IDS.roleStorekeeper,
+   413→    guardian: IDS.roleGuardian,
+   414→    student: IDS.roleStudent,
+   415→  };
+   416→  let permCount = 0;
+   417→  for (const [roleCode, perms] of Object.entries(ROLE_PERMS)) {
+   418→    const roleId = roleIdMap[roleCode];
+   419→    for (const permCode of perms) {
+   420→      const perm = await prisma.permission.findUnique({ where: { code: permCode } });
+   421→      if (perm && roleId) {
+   422→        await prisma.rolePermission.upsert({
+   423→          where: { role_id_permission_id: { role_id: roleId, permission_id: perm.id } },
+   424→          update: {},
+   425→          create: { role_id: roleId, permission_id: perm.id, organization_id: org.id } as any,
+   426→        });
+   427→        permCount++;
+   428→      }
+   429→    }
+   430→  }
+   431→  console.log(`  ✅ ${permCount} role-permission assignments created`);
+   432→
+   433→  // --- 6. Users (8 personas) ---
+   434→  console.log("\n[6/14] Creating users (with hashed passwords)...");
+   435→  const passwordHash = await bcrypt.hash("password123", 10);
+   436→  const usersData = [
+   437→    { id: IDS.userSuperAdmin, role_id: IDS.roleSuperAdmin, name: "Super Admin", name_bn: "সুপার অ্যাডমিন", email: "superadmin@madrashaos.org", phone: "+880 1711 000001", branch_id: IDS.branchDhaka },
+   438→    { id: IDS.userAuthority, role_id: IDS.roleAuthority, name: "Principal Ahmad", name_bn: "অধ্যক্ষ আহমদ", email: "principal@madrashaos.org", phone: "+880 1711 000002", branch_id: IDS.branchDhaka },
+   439→    { id: IDS.userAdministrator, role_id: IDS.roleAdministrator, name: "Administrator Karim", name_bn: "প্রশাসক করিম", email: "admin@madrashaos.org", phone: "+880 1711 000003", branch_id: IDS.branchDhaka },
+   440→    { id: IDS.userAccountant, role_id: IDS.roleAccountant, name: "Accountant Rahman", name_bn: "হিসাবরক্ষক রহমান", email: "accounts@madrashaos.org", phone: "+880 1711 000004", branch_id: IDS.branchDhaka },
+   441→    { id: IDS.userTeacher, role_id: IDS.roleTeacher, name: "Teacher Bilal", name_bn: "শিক্ষক বিলাল", email: "bilal@madrashaos.org", phone: "+880 1711 000005", branch_id: IDS.branchDhaka },
+   442→    { id: IDS.userStorekeeper, role_id: IDS.roleStorekeeper, name: "Storekeeper Yusuf", name_bn: "স্টোরকিপার ইউসুফ", email: "store@madrashaos.org", phone: "+880 1711 000006", branch_id: IDS.branchDhaka },
+   443→    { id: IDS.userGuardian, role_id: IDS.roleGuardian, name: "Guardian Omar", name_bn: "অভিভাবক ওমর", email: "omar.parent@example.com", phone: "+880 1711 000007", branch_id: IDS.branchDhaka },
+   444→    { id: IDS.userStudent, role_id: IDS.roleStudent, name: "Student Fatima", name_bn: "ছাত্রী ফাতিমা", email: "fatima@student.madrashaos.org", phone: "+880 1711 000008", branch_id: IDS.branchDhaka },
+   445→  ];
+   446→  for (const u of usersData) {
+   447→    await prisma.user.upsert({
+   448→      where: { id: u.id },
+   449→      update: {},
+   450→      create: {
+   451→        ...u,
+   452→        organization_id: org.id,
+   453→        password_hash: passwordHash,
+   454→        status: "active",
+   455→        mfa_enabled: false,
+   456→      } as any,
+   457→    });
+   458→  }
+   459→  console.log(`  ✅ ${usersData.length} users created (password: "password123" for all)`);
+   460→
+   461→  // --- 7. Classes + Sections ---
+   462→  console.log("\n[7/14] Creating classes and sections...");
+   463→  const classData = [
+   464→    { id: IDS.class1, name: "Class 1", name_bn: "প্রথম শ্রেণী", level: 1, sections: ["A", "B"] },
+   465→    { id: IDS.class3, name: "Class 3", name_bn: "তৃতীয় শ্রেণী", level: 3, sections: ["A"] },
+   466→    { id: IDS.class5, name: "Class 5", name_bn: "পঞ্চম শ্রেণী", level: 5, sections: ["A", "B"] },
+   467→    { id: IDS.class8, name: "Class 8", name_bn: "অষ্টম শ্রেণী", level: 8, sections: ["A"] },
+   468→  ];
+   469→  for (const c of classData) {
+   470→    await prisma.class.upsert({
+   471→      where: { id: c.id },
+   472→      update: {},
+   473→      create: {
+   474→        id: c.id, organization_id: org.id, branch_id: IDS.branchDhaka,
+   475→        name: c.name, name_bn: c.name_bn, level: c.level,
+   476→      } as any,
+   477→    });
+   478→
+   479→
+   480→const sectionIds: Record<string, string> = {
+   481→  [`${IDS.class1}-A`]: IDS.section1A,
+   482→  [`${IDS.class1}-B`]: IDS.section1B,
+   483→  [`${IDS.class3}-A`]: IDS.section3A,
+   484→  [`${IDS.class5}-A`]: IDS.section5A,
+   485→  [`${IDS.class5}-B`]: IDS.section5B,
+   486→  [`${IDS.class8}-A`]: IDS.section8A,
+   487→};
+   488→
+   489→for (const secName of c.sections) {
+   490→  const sectionId = sectionIds[`${c.id}-${secName}`];
+   491→
+   492→  if (!sectionId) {
+   493→    throw new Error(`Missing section ID for ${c.name} / ${secName}`);
+   494→  }
+   495→
+   496→  await prisma.section.upsert({
+   497→    where: { id: sectionId },
+   498→    update: {},
+   499→    create: {
+   500→      id: sectionId,
+   501→      organization_id: org.id,
+   502→      class_id: c.id,
+   503→      name: secName,
+   504→    } as any,
+   505→  });
+   506→}
+   507→  }
+   508→  console.log(`  ✅ ${classData.length} classes + ${classData.reduce((s, c) => s + c.sections.length, 0)} sections created`);
+   509→
+   510→  // --- 8. Guardians ---
+   511→  console.log("\n[8/14] Creating guardians...");
+   512→  const guardianData = [
+   513→    { name: "Omar Faruq", name_bn: "ওমর ফারুক", phone: "+880 1711 000007", email: "omar.parent@example.com", occupation: "Business" },
+   514→    { name: "Aisha Begum", name_bn: "আয়েশা বেগম", phone: "+880 1711 000010", email: "aisha.parent@example.com", occupation: "Teacher" },
+   515→    { name: "Bilal Ahmed", name_bn: "বিলাল আহমেদ", phone: "+880 1711 000011", email: "bilal.parent@example.com", occupation: "Engineer" },
+   516→    { name: "Khadija Sultana", name_bn: "খাদিজা সুলতানা", phone: "+880 1711 000012", email: "khadija.parent@example.com", occupation: "Doctor" },
+   517→    { name: "Yusuf Khan", name_bn: "ইউসুফ খান", phone: "+880 1711 000013", email: "yusuf.parent@example.com", occupation: "Govt Service" },
+   518→    { name: "Zainab Akter", name_bn: "জয়নব আক্তার", phone: "+880 1711 000014", email: "zainab.parent@example.com", occupation: "Homemaker" },
+   519→    { name: "Hamza Rahman", name_bn: "হামজা রহমান", phone: "+880 1711 000015", email: "hamza.parent@example.com", occupation: "Business" },
+   520→    { name: "Maryam Chowdhury", name_bn: "মরিয়ম চৌধুরী", phone: "+880 1711 000016", email: "maryam.parent@example.com", occupation: "NGO Worker" },
+   521→  ];
+   522→  const guardianIds: string[] = [];
+   523→  for (let i = 0; i < guardianData.length; i++) {
+   524→    const g = guardianData[i];
+   525→    const gid = `00000000-0000-0000-0005-${(i + 1).toString().padStart(12, "0")}`;
+   526→    guardianIds.push(gid);
+   527→    // Link the first guardian (Omar Faruq) to the guardian user account
+   528→    // so the guardian role can log in and see their children's data.
+   529→    const userId = i === 0 ? IDS.userGuardian : null;
+   530→    await prisma.guardian.upsert({
+   531→      where: { id: gid },
+   532→      update: { user_id: userId },
+   533→      create: {
+   534→        id: gid, organization_id: org.id, branch_id: IDS.branchDhaka,
+   535→        name: g.name, name_bn: g.name_bn, phone: g.phone, email: g.email,
+   536→        occupation: g.occupation, user_id: userId,
+   537→      } as any,
+   538→    });
+   539→  }
+   540→  console.log(`  ✅ ${guardianData.length} guardians created`);
+   541→
+   542→  // --- 9. Students (40) ---
+   543→  console.log("\n[9/14] Creating 40 students...");
+   544→
+   545→const studentData = generateStudents();
+   546→const studentIds: string[] = [];
+   547→
+   548→const sectionIds: Record<string, string> = {
+   549→  [`${IDS.class1}-A`]: IDS.section1A,
+   550→  [`${IDS.class1}-B`]: IDS.section1B,
+   551→  [`${IDS.class3}-A`]: IDS.section3A,
+   552→  [`${IDS.class5}-A`]: IDS.section5A,
+   553→  [`${IDS.class5}-B`]: IDS.section5B,
+   554→  [`${IDS.class8}-A`]: IDS.section8A,
+   555→};
+   556→
+   557→for (let i = 0; i < studentData.length; i++) {
+   558→  const s = studentData[i];
+   559→  if (!s) continue;
+   560→
+   561→  const sid = `00000000-0000-0000-0006-${(i + 1)
+   562→    .toString()
+   563→    .padStart(12, "0")}`;
+   564→
+   565→  studentIds.push(sid);
+   566→
+   567→  const guardianIdx = i < 8 ? 0 : i < 18 ? 1 : i < 30 ? 2 : 3;
+   568→  const guardianId = guardianIds[guardianIdx];
+   569→
+   570→  const sectionId = sectionIds[`${s.classId}-${s.section}`];
+   571→
+   572→  if (!sectionId) {
+   573→    throw new Error(`Missing section ID for ${s.classId} / ${s.section}`);
+   574→  }
+   575→
+   576→  if (!guardianId) {
+   577→    throw new Error(`Missing guardian ID for student ${s.code}`);
+   578→  }
+   579→
+   580→  await prisma.student.upsert({
+   581→    where: { id: sid },
+   582→    update: {},
+   583→    create: {
+   584→      id: sid,
+   585→      organization_id: org.id,
+   586→      branch_id: IDS.branchDhaka,
+   587→      code: s.code,
+   588→      name: s.name,
+   589→      name_bn: s.name_bn,
+   590→      name_ar: s.name_ar,
+   591→      class_id: s.classId,
+   592→      section_id: sectionId,
+   593→      roll: s.roll,
+   594→      gender: s.gender,
+   595→      dob: new Date(s.dob),
+   596→      admitted_at: new Date(s.admittedAt),
+   597→      status: StudentStatus.active,
+   598→    } as any,
+   599→  });
+   600→
+   601→  await prisma.studentGuardian.upsert({
+   602→    where: {
+   603→      student_id_guardian_id: {
+   604→        student_id: sid,
+   605→        guardian_id: guardianId,
+   606→      },
+   607→    },
+   608→    update: {},
+   609→    create: {
+   610→      id: `00000000-0000-0000-0008-${(i + 1)
+   611→        .toString()
+   612→        .padStart(12, "0")}`,
+   613→      organization_id: org.id,
+   614→      branch_id: IDS.branchDhaka,
+   615→      student_id: sid,
+   616→      guardian_id: guardianId,
+   617→      relation: "father",
+   618→      is_primary: true,
+   619→      can_pickup: true,
+   620→      receive_sms: true,
+   621→      receive_email: false,
+   622→    } as any,
+   623→  });
+   624→}
+   625→
+   626→  console.log(`  ✅ ${studentData.length} students created`);
+   627→
+   628→  // --- 10. Accounts ---
+   629→  console.log("\n[10/14] Creating accounts (incl. Zakat fund)...");
+   630→  const accountData = [
+   631→    { id: IDS.accCash, code: "1000", name: "Cash on Hand", type: AccountType.asset, fund: FundType.general, balance: 245000 },
+   632→    { id: IDS.accBank, code: "1010", name: "Bank — Sonali", type: AccountType.asset, fund: FundType.general, balance: 845000 },
+   633→    { id: IDS.accMobile, code: "1020", name: "Mobile Wallet (bKash)", type: AccountType.asset, fund: FundType.general, balance: 18500 },
+   634→    { id: IDS.accIncomeFees, code: "4000", name: "Fee Income", type: AccountType.income, fund: FundType.general, balance: 180000 },
+   635→    { id: IDS.accExpense, code: "5000", name: "Operating Expenses", type: AccountType.expense, fund: FundType.general, balance: 95000 },
+   636→    { id: IDS.accZakatFund, code: "3000", name: "Zakat Fund", type: AccountType.liability, fund: FundType.zakat, balance: 125000 },
+   637→    { id: IDS.accDonation, code: "4100", name: "Donation Income", type: AccountType.income, fund: FundType.general, balance: 42000 },
+   638→    { id: IDS.accSalary, code: "5100", name: "Salary Expense", type: AccountType.expense, fund: FundType.general, balance: 320000 },
+   639→  ];
+   640→  for (const a of accountData) {
+   641→    await prisma.account.upsert({
+   642→      where: { id: a.id },
+   643→      update: {},
+   644→      create: {
+   645→        id: a.id, organization_id: org.id, branch_id: IDS.branchDhaka,
+   646→        code: a.code, name: a.name, type: a.type, fund: a.fund,
+   647→        balance: a.balance, is_active: true,
+   648→      } as any,
+   649→    });
+   650→  }
+   651→  console.log(`  ✅ ${accountData.length} accounts created (incl. Zakat fund with fund='zakat')`);
+   652→
+   653→  // --- 11. Fee Plans + Installments ---
+   654→  console.log("\n[11/14] Creating fee plans (40 plans × 3 installments)...");
+   655→  for (let i = 0; i < studentIds.length; i++) {
+   656→    const sid = studentIds[i];
+   657→    if (!sid) continue;
+   658→    const fpId = `00000000-0000-0000-0007-${(i + 1).toString().padStart(12, "0")}`;
+   659→    await prisma.feePlan.upsert({
+   660→      where: { id: fpId },
+   661→      update: {},
+   662→create: {
+   663→  id: fpId,
+   664→  organization_id: org.id,
+   665→  branch_id: IDS.branchDhaka,
+   666→student_id: sid,
+   667→academic_year: 2026,
+   668→total_amount: 4500,
+   669→net_payable: 4500,
+   670→} as any,
+   671→    });
+   672→    // 3 installments per plan
+   673→    const installments = [
+   674→      { label: "January 2026", amount: 1500, dueDate: "2026-01-10", paid: i < 30, paidDate: i < 30 ? "2026-01-08" : null, receiptNo: i < 30 ? `RCP-2026-${(i + 1).toString().padStart(4, "0")}` : null },
+   675→      { label: "March 2026", amount: 1500, dueDate: "2026-03-10", paid: i < 20, paidDate: i < 20 ? "2026-03-05" : null, receiptNo: i < 20 ? `RCP-2026-${(1000 + i).toString().padStart(4, "0")}` : null },
+   676→      { label: "June 2026", amount: 1500, dueDate: "2026-06-10", paid: false, paidDate: null, receiptNo: null },
+   677→    ];
+   678→    for (let j = 0; j < installments.length; j++) {
+   679→      const inst = installments[j];
+   680→      if (!inst) continue;
+   681→await prisma.feeInstallment.upsert({
+   682→  where: {
+   683→    id: `00000000-0000-0000-0009-${(i * 3 + j + 1)
+   684→      .toString()
+   685→      .padStart(12, "0")}`,
+   686→  },
+   687→  update: {},
+   688→  create: {
+   689→    id: `00000000-0000-0000-0009-${(i * 3 + j + 1)
+   690→      .toString()
+   691→      .padStart(12, "0")}`,
+   692→    organization: {
+   693→      connect: { id: org.id },
+   694→    },
+   695→    branch: {
+   696→      connect: { id: IDS.branchDhaka },
+   697→    },
+   698→    fee_plan: {
+   699→      connect: { id: fpId },
+   700→    },
+   701→    student: {
+   702→      connect: { id: sid },
+   703→    },
+   704→    label: inst.label,
+   705→    amount: inst.amount,
+   706→    due_date: new Date(inst.dueDate),
+   707→    is_paid: inst.paid,
+   708→    paid_date: inst.paidDate ? new Date(inst.paidDate) : null,
+   709→    receipt_no: inst.receiptNo,
+   710→  } as any,
+   711→});
+   712→    }
+   713→  }
+   714→  console.log(`  ✅ 40 fee plans + 120 installments created`);
+   715→
+   716→  // --- 12. Fee Payments (8 recent receipts) ---
+   717→  console.log("\n[12/14] Creating fee payments (8 receipts)...");
+   718→
+   719→  const paymentsData = [
+   720→    { studentIdx: 0, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1001", collectedAt: "2026-09-16", amount: 1500 },
+   721→    { studentIdx: 1, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1002", collectedAt: "2026-09-15", amount: 1500 },
+   722→    { studentIdx: 2, method: FeeMethod.bank, accountId: IDS.accBank, receiptNo: "RCP-2026-1003", collectedAt: "2026-09-14", amount: 1500 },
+   723→    { studentIdx: 3, method: FeeMethod.mobile, accountId: IDS.accMobile, receiptNo: "RCP-2026-1004", collectedAt: "2026-09-13", amount: 1500 },
+   724→    { studentIdx: 4, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1005", collectedAt: "2026-09-12", amount: 1500 },
+   725→    { studentIdx: 5, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1006", collectedAt: "2026-09-11", amount: 1500 },
+   726→    { studentIdx: 6, method: FeeMethod.bank, accountId: IDS.accBank, receiptNo: "RCP-2026-1007", collectedAt: "2026-09-10", amount: 1500 },
+   727→    { studentIdx: 7, method: FeeMethod.cash, accountId: IDS.accCash, receiptNo: "RCP-2026-1008", collectedAt: "2026-09-09", amount: 1500 },
+   728→  ];
+   729→
+   730→  for (let i = 0; i < paymentsData.length; i++) {
+   731→    const p = paymentsData[i];
+   732→    if (!p) continue;
+   733→
+   734→    const sid = studentIds[p.studentIdx];
+   735→    if (!sid) continue;
+   736→
+   737→    // Step 11 creates 3 installments per student.
+   738→    // Installment #2 for student i has deterministic UUID:
+   739→    // 00000000-0000-0000-0009-(studentIndex * 3 + 2)
+   740→    const installmentId =
+   741→      `00000000-0000-0000-0009-${(p.studentIdx * 3 + 2)
+   742→        .toString()
+   743→        .padStart(12, "0")}`;
+   744→
+   745→    const paymentId =
+   746→      `00000000-0000-0000-0008-${(i + 1)
+   747→        .toString()
+   748→        .padStart(12, "0")}`;
+   749→
+   750→    await prisma.feePayment.upsert({
+   751→      where: {
+   752→        id: paymentId,
+   753→      },
+   754→      update: {},
+   755→      create: {
+   756→        id: paymentId,
+   757→        organization_id: org.id,
+   758→        branch_id: IDS.branchDhaka,
+   759→        student_id: sid,
+   760→        installment_id: installmentId,
+   761→        amount: p.amount,
+   762→        method: p.method,
+   763→        account_id: p.accountId,
+   764→        receipt_no: p.receiptNo,
+   765→        collected_by: IDS.userAccountant,
+   766→        collected_at: new Date(p.collectedAt),
+   767→      } as any,
+   768→    });
+   769→  }
+   770→
+   771→  console.log(`  ✅ ${paymentsData.length} fee payments created`);
+   772→
+   773→  // --- 13. Ledger Entries (12 entries) ---
+   774→  console.log("\n[13/14] Creating ledger entries (12 entries)...");
+   775→  const ledgerData = [
+   776→    { voucherNo: "JV-2026-001", date: "2026-09-16", narration: "Fee collection — January batch", debit: IDS.accCash, credit: IDS.accIncomeFees, amount: 45000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   777→    { voucherNo: "JV-2026-002", date: "2026-09-15", narration: "Maintenance expense — electrical repair", debit: IDS.accExpense, credit: IDS.accCash, amount: 12000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   778→    { voucherNo: "JV-2026-003", date: "2026-09-15", narration: "Salary payment — teaching staff", debit: IDS.accSalary, credit: IDS.accBank, amount: 285000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   779→    { voucherNo: "JV-2026-004", date: "2026-09-14", narration: "Bank transfer — Cash→Bank", debit: IDS.accBank, credit: IDS.accCash, amount: 50000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   780→    { voucherNo: "JV-2026-005", date: "2026-09-14", narration: "Zakat distribution — 5 needy students", debit: IDS.accZakatFund, credit: IDS.accCash, amount: 15000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   781→    { voucherNo: "JV-2026-006", date: "2026-09-13", narration: "Donation received — anonymous", debit: IDS.accCash, credit: IDS.accDonation, amount: 5000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   782→    { voucherNo: "JV-2026-007", date: "2026-09-13", narration: "Library books purchase", debit: IDS.accExpense, credit: IDS.accCash, amount: 8500, status: LedgerStatus.pending, postedBy: IDS.userAccountant },
+   783→    { voucherNo: "JV-2026-008", date: "2026-09-12", narration: "Transport fuel — September", debit: IDS.accExpense, credit: IDS.accCash, amount: 3000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   784→    { voucherNo: "JV-2026-009", date: "2026-09-12", narration: "Food expense — hostel meals", debit: IDS.accExpense, credit: IDS.accCash, amount: 18000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   785→    { voucherNo: "JV-2026-010", date: "2026-09-11", narration: "Asset disposal — old computer", debit: IDS.accExpense, credit: IDS.accCash, amount: 0, status: LedgerStatus.posted, postedBy: IDS.userAdministrator },
+   786→    { voucherNo: "JV-2026-011", date: "2026-09-11", narration: "Mobile banking deposit", debit: IDS.accBank, credit: IDS.accMobile, amount: 15000, status: LedgerStatus.posted, postedBy: IDS.userAccountant },
+   787→    { voucherNo: "JV-2026-012", date: "2026-09-10", narration: "Purchase — stationery from ABC Supplier", debit: IDS.accExpense, credit: IDS.accCash, amount: 22000, status: LedgerStatus.pending, postedBy: IDS.userAccountant },
+   788→  ];
+   789→  for (let i = 0; i < ledgerData.length; i++) {
+   790→    const e = ledgerData[i];
+   791→    if (!e) continue;
+   792→    await prisma.ledgerEntry.upsert({
+   793→      where: { id: `00000000-0000-0000-0009-${(i + 1).toString().padStart(12, "0")}` },
+   794→      update: {},
+   795→      create: {
+   796→        id: `00000000-0000-0000-0009-${(i + 1).toString().padStart(12, "0")}`,
+   797→        organization_id: org.id, branch_id: IDS.branchDhaka,
+   798→        voucher_no: e.voucherNo, date: new Date(e.date), narration: e.narration,
+   799→        debit_account_id: e.debit, credit_account_id: e.credit,
+   800→        amount: e.amount, status: e.status, posted_by: e.postedBy,
+   801→        fund: FundType.general,
+   802→      } as any,
+   803→    });
+   804→  }
+   805→  console.log(`  ✅ ${ledgerData.length} ledger entries created (2 pending)`);
+   806→
+   807→  
+   808→  // --- 14. Attendance Sessions (4 sessions for Class 5-A) ---
+   809→  console.log("\n[14/14] Creating attendance sessions (Class 5-A × 4 days)...");
+   810→
+   811→  const class5AStudents = studentIds.slice(18, 30);
+   812→  const attendanceDates = [
+   813→    "2026-09-13",
+   814→    "2026-09-14",
+   815→    "2026-09-15",
+   816→    "2026-09-16",
+   817→  ];
+   818→
+   819→  for (let d = 0; d < attendanceDates.length; d++) {
+   820→    const sessionId =
+   821→      `00000000-0000-0000-0010-${(d + 1)
+   822→        .toString()
+   823→        .padStart(12, "0")}`;
+   824→
+   825→    await prisma.attendanceSession.upsert({
+   826→      where: {
+   827→        id: sessionId,
+   828→      },
+   829→      update: {},
+   830→      create: {
+   831→        id: sessionId,
+   832→        organization_id: org.id,
+   833→        branch_id: IDS.branchDhaka,
+   834→class_id: IDS.class5,
+   835→section_id: IDS.section5A,
+   836→date: new Date(attendanceDates[d]!),
+   837→        taken_by: IDS.userTeacher,
+   838→submitted_at: new Date(attendanceDates[d]!),
+   839→academic_year: 2026,
+   840→      } as any,
+   841→    });
+   842→
+   843→    // Attendance records for each Class 5-A student
+   844→    for (let i = 0; i < class5AStudents.length; i++) {
+   845→      const sid = class5AStudents[i];
+   846→      if (!sid) continue;
+   847→
+   848→      let status: AttendanceStatus = AttendanceStatus.present;
+   849→
+   850→      if (d === 0 && i % 7 === 0) {
+   851→        status = AttendanceStatus.absent;
+   852→      } else if (d === 0 && i % 11 === 0) {
+   853→        status = AttendanceStatus.late;
+   854→      } else if (d === 1 && i % 5 === 0) {
+   855→        status = AttendanceStatus.absent;
+   856→      } else if (d === 1 && i % 9 === 0) {
+   857→        status = AttendanceStatus.leave;
+   858→      } else if (d === 2 && i % 11 === 0) {
+   859→        status = AttendanceStatus.absent;
+   860→      } else if (d === 2 && i % 13 === 0) {
+   861→        status = AttendanceStatus.late;
+   862→      } else if (d === 3 && i % 13 === 0) {
+   863→        status = AttendanceStatus.absent;
+   864→      }
+   865→
+   866→      // Deterministic valid UUID for each attendance record.
+   867→      // 4 sessions × 12 students = 48 unique records.
+   868→      const recordNumber = d * class5AStudents.length + i + 1;
+   869→
+   870→      const recordId =
+   871→        `00000000-0000-0000-0014-${recordNumber
+   872→          .toString()
+   873→          .padStart(12, "0")}`;
+   874→
+   875→      await prisma.attendanceRecord.upsert({
+   876→        where: {
+   877→          id: recordId,
+   878→        },
+   879→        update: {},
+   880→        create: {
+   881→          id: recordId,
+   882→          organization_id: org.id,
+   883→          branch_id: IDS.branchDhaka,
+   884→          session_id: sessionId,
+   885→          student_id: sid,
+   886→          status,
+   887→        } as any,
+   888→      });
+   889→    }
+   890→  }
+   891→
+   892→  console.log(
+   893→    `  ✅ 4 attendance sessions + ${class5AStudents.length * 4} records created`
+   894→  );
+   895→
+   896→
+   897→
+   898→
+   899→
+   900→
+   901→  // --- 15. Inventory Items (10 items, 3 low-stock) ---
+   902→  console.log("\n[15/15] Creating inventory items...");
+   903→  const inventoryData = [
+   904→    { code: "STN-001", name: "Notebook (200pg)", name_bn: "খাতা (২০০ পৃষ্ঠা)", category: "Stationery", unit: "pcs", qty: 245, reorder: 50 },
+   905→    { code: "STN-002", name: "Pen (Blue)", name_bn: "কলম (নীল)", category: "Stationery", unit: "pcs", qty: 32, reorder: 50 },
+   906→    { code: "STN-003", name: "Pencil", name_bn: "পেন্সিল", category: "Stationery", unit: "pcs", qty: 180, reorder: 60 },
+   907→    { code: "STN-004", name: "Eraser", name_bn: "ইরেজার", category: "Stationery", unit: "pcs", qty: 95, reorder: 40 },
+   908→    { code: "FOD-001", name: "Rice (Sella)", name_bn: "চাল (সেলা)", category: "Food", unit: "kg", qty: 145, reorder: 50 },
+   909→    { code: "FOD-002", name: "Lentils (Masoor)", name_bn: "মসুর ডাল", category: "Food", unit: "kg", qty: 28, reorder: 30 },
+   910→    { code: "FOD-003", name: "Cooking Oil", name_bn: "রান্নার তেল", category: "Food", unit: "ltr", qty: 65, reorder: 20 },
+   911→    { code: "CLN-001", name: "Detergent", name_bn: "ডিটারজেন্ট", category: "Cleaning", unit: "kg", qty: 12, reorder: 15 },
+   912→    { code: "CLN-002", name: "Floor Cleaner", name_bn: "ফ্লোর ক্লিনার", category: "Cleaning", unit: "ltr", qty: 28, reorder: 10 },
+   913→    { code: "MED-001", name: "First Aid Kit", name_bn: "ফার্স্ট এইড কিট", category: "Medical", unit: "set", qty: 8, reorder: 5 },
+   914→  ];
+   915→  for (let i = 0; i < inventoryData.length; i++) {
+   916→    const item = inventoryData[i];
+   917→    if (!item) continue;
+   918→    await prisma.inventoryItem.upsert({
+   919→      where: { id: `00000000-0000-0000-0011-${(i + 1).toString().padStart(12, "0")}` },
+   920→      update: {},
+   921→      create: {
+   922→        id: `00000000-0000-0000-0011-${(i + 1).toString().padStart(12, "0")}`,
+   923→        organization_id: org.id, branch_id: IDS.branchDhaka,
+   924→        code: item.code, name: item.name, name_bn: item.name_bn,
+   925→        category: item.category, unit: item.unit,
+   926→        qty_in_stock: item.qty, reorder_level: item.reorder,
+   927→      } as any,
+   928→    });
+   929→  }
+   930→  console.log(`  ✅ ${inventoryData.length} inventory items created (3 low-stock)`);
+   931→
+   932→  // --- 16. Notices (5) ---
+   933→  console.log("\n[16/16] Creating notices...");
+   934→  const noticeData = [
+   935→    { title: "Result Publication — Mid-term", title_bn: "মধ্যমেয়াদী ফলাফল প্রকাশ", body: "Mid-term results will be published on 20 September 2026.", body_bn: "মধ্যমেয়াদী ফলাফল ২০ সেপ্টেম্বর ২০২৬ তারিখে প্রকাশিত হবে।", audience: NoticeAudience.guardians, recipientCount: 40, sentBy: IDS.userAdministrator, sentAt: "2026-09-15" },
+   936→    { title: "Holiday — Eid Milad", title_bn: "ছুটি — ঈদে মিলাদ", body: "The madrasha will remain closed on 18 September 2026.", body_bn: "১৮ সেপ্টেম্বর ২০২৬ তারিখে মাদরাসা বন্ধ থাকবে।", audience: NoticeAudience.all, recipientCount: 40, sentBy: IDS.userAdministrator, sentAt: "2026-09-14" },
+   937→    { title: "Fee Payment Reminder", title_bn: "ফি পরিশোধ রিমাইন্ডার", body: "Please clear the March 2026 installment by 10 September.", body_bn: "অনুগ্রহ করে ১০ সেপ্টেম্বরের মধ্যে মার্চ ২০২৬ কিস্তি পরিশোধ করুন।", audience: NoticeAudience.guardians, audienceFilter: "class-5", recipientCount: 22, sentBy: IDS.userAccountant, sentAt: "2026-09-13" },
+   938→    { title: "Parent-Teacher Meeting", title_bn: "অভিভাবক-শিক্ষক সভা", body: "PTM scheduled for 25 September 2026 at 10 AM.", body_bn: "২৫ সেপ্টেম্বর ২০২৬ সকাল ১০টায় অভিভাবক-শিক্ষক সভা অনুষ্ঠিত হবে।", audience: NoticeAudience.guardians, recipientCount: 40, sentBy: IDS.userAuthority, sentAt: "2026-09-12" },
+   939→    { title: "Staff Meeting", title_bn: "স্টাফ সভা", body: "Monthly staff meeting on 30 September at 2 PM in the conference room.", body_bn: "৩০ সেপ্টেম্বর বিকাল ২টায় কনফারেন্স রুমে মাসিক স্টাফ সভা।", audience: NoticeAudience.staff, recipientCount: 6, sentBy: IDS.userAdministrator, sentAt: "2026-09-11" },
+   940→  ];
+   941→  for (let i = 0; i < noticeData.length; i++) {
+   942→    const n = noticeData[i];
+   943→    if (!n) continue;
+   944→    await prisma.notice.upsert({
+   945→      where: { id: `00000000-0000-0000-0012-${(i + 1).toString().padStart(12, "0")}` },
+   946→      update: {},
+   947→      create: {
+   948→        id: `00000000-0000-0000-0012-${(i + 1).toString().padStart(12, "0")}`,
+   949→        organization_id: org.id, branch_id: IDS.branchDhaka,
+   950→        title: n.title, title_bn: n.title_bn, body: n.body, body_bn: n.body_bn,
+   951→        audience: n.audience, audience_filter: n.audienceFilter || null,
+   952→        recipient_count: n.recipientCount, sent_by: n.sentBy,
+   953→        sent_at: new Date(n.sentAt),
+   954→      } as any,
+   955→    });
+   956→  }
+   957→  console.log(`  ✅ ${noticeData.length} notices created`);
+   958→
+   959→  // --- 17. Approvals (6) ---
+   960→  console.log("\n[17/17] Creating approvals...");
+   961→  const approvalData = [
+   962→    { type: ApprovalType.expense, title: "Library books purchase — ৳8,500", amount: 8500, requestedBy: IDS.userAccountant, requestedAt: "2026-09-13", status: ApprovalStatus.pending, decidedBy: null, decidedAt: null },
+   963→    { type: ApprovalType.purchase, title: "Stationery from ABC Supplier — ৳22,000", amount: 22000, requestedBy: IDS.userAccountant, requestedAt: "2026-09-10", status: ApprovalStatus.pending, decidedBy: null, decidedAt: null },
+   964→    { type: ApprovalType.discount, title: "Fee discount — Student MOS-2026-005 — 50%", amount: 750, requestedBy: IDS.userAccountant, requestedAt: "2026-09-12", status: ApprovalStatus.pending, decidedBy: null, decidedAt: null },
+   965→    { type: ApprovalType.expense, title: "Maintenance expense — ৳25,000", amount: 25000, requestedBy: IDS.userAccountant, requestedAt: "2026-09-08", status: ApprovalStatus.approved, decidedBy: IDS.userAuthority, decidedAt: "2026-09-09" },
+   966→    { type: ApprovalType.admission, title: "Admission — new applicant MOS-2026-041", amount: null, requestedBy: IDS.userAdministrator, requestedAt: "2026-09-07", status: ApprovalStatus.approved, decidedBy: IDS.userAuthority, decidedAt: "2026-09-08" },
+   967→    { type: ApprovalType.purchase, title: "Sports equipment — ৳15,000", amount: 15000, requestedBy: IDS.userStorekeeper, requestedAt: "2026-09-05", status: ApprovalStatus.rejected, decidedBy: IDS.userAuthority, decidedAt: "2026-09-06" },
+   968→  ];
+   969→  for (let i = 0; i < approvalData.length; i++) {
+   970→    const a = approvalData[i];
+   971→    if (!a) continue;
+   972→    await prisma.approval.upsert({
+   973→      where: { id: `00000000-0000-0000-0013-${(i + 1).toString().padStart(12, "0")}` },
+   974→      update: {},
+   975→      create: {
+   976→        id: `00000000-0000-0000-0013-${(i + 1).toString().padStart(12, "0")}`,
+   977→        organization_id: org.id, branch_id: IDS.branchDhaka,
+   978→        type: a.type, title: a.title, amount: a.amount,
+   979→        requested_by: a.requestedBy, requested_at: new Date(a.requestedAt),
+   980→        status: a.status, decided_by: a.decidedBy,
+   981→        decided_at: a.decidedAt ? new Date(a.decidedAt) : null,
+   982→      } as any,
+   983→    });
+   984→  }
+   985→  console.log(`  ✅ ${approvalData.length} approvals created (3 pending)`);
+   986→
+   987→  // --- Summary ---
+   988→  console.log("\n═══════════════════════════════════════════════");
+   989→  console.log("  ✅ Database seed complete!");
+   990→  console.log("═══════════════════════════════════════════════");
+   991→  console.log("\nSeed data summary:");
+   992→  console.log("  1 organization (Darul Uloom Madrasha)");
+   993→  console.log("  3 branches (Dhaka, Chittagong, Sylhet)");
+   994→  console.log("  8 roles + 110+ permissions + role-permission assignments");
+   995→  console.log("  8 users (password: 'password123' for all)");
+   996→  console.log("  4 classes + 6 sections");
+   997→  console.log("  8 guardians");
+   998→  console.log("  40 students (with bn/en/ar names)");
+   999→  console.log("  8 accounts (incl. Zakat fund with fund='zakat')");
+  1000→  console.log("  40 fee plans + 120 installments");
+  1001→  console.log("  8 fee payments");
+  1002→  console.log("  12 ledger entries (2 pending)");
+  1003→  console.log("  4 attendance sessions + 48 records");
+  1004→  console.log("  10 inventory items (3 low-stock)");
+  1005→  console.log("  5 notices");
+  1006→  console.log("  6 approvals (3 pending)");
+  1007→  console.log("\nLogin credentials:");
+  1008→  console.log("  Email: admin@madrashaos.org");
+  1009→  console.log("  Password: password123");
+  1010→  console.log("  (same password for all 8 users)");
+  1011→}
+  1012→
+  1013→main()
+  1014→  .catch((e) => {
+  1015→    console.error("❌ Seed failed:", e);
+  1016→    process.exit(1);
+  1017→  })
+  1018→  .finally(async () => {
+  1019→    await prisma.$disconnect();
+  1020→  });
+  1021→
