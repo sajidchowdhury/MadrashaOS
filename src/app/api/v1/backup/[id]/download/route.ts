@@ -37,7 +37,7 @@ export const GET = withPermission("backup.run", async (req: Request, ctx) => {
       organization_id: tenant.organization_id,
       deleted_at: null,
     },
-    select: { id: true, storage_url: true, status: true },
+    select: { id: true, storage_url: true, status: true, started_at: true },
   });
   if (!backup) return errorResponse("Backup not found", 404);
 
@@ -45,9 +45,20 @@ export const GET = withPermission("backup.run", async (req: Request, ctx) => {
     return errorResponse("Backup is not available for download (status: " + backup.status + ")", 400);
   }
 
-  // The filename is the last segment of storage_url
-  if (!backup.storage_url) return errorResponse("Backup file path missing", 500);
-  const filename = basename(backup.storage_url);
+  // Resolve the actual filename on disk.
+  // The POST route names files as: madrashaos_<ISO-timestamp>.json.gz
+  // where the timestamp is derived from started_at (ISO → safe-for-filename).
+  // Older backups stored storage_url as /backups/<filename> — extract via basename.
+  // Newer backups store /api/v1/backup/<id>/download — reconstruct from started_at.
+  let filename: string;
+  if (backup.storage_url && backup.storage_url.startsWith("/backups/")) {
+    // Old format: /backups/madrashaos_<ts>.sql.gz or .json.gz
+    filename = basename(backup.storage_url);
+  } else {
+    // New format: reconstruct from started_at (matches POST route's naming)
+    const ts = backup.started_at.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    filename = `madrashaos_${ts}.json.gz`;
+  }
   const filepath = join(BACKUP_DIR, filename);
 
   // Verify the file exists

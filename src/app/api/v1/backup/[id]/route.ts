@@ -36,23 +36,30 @@ export const DELETE = withPermission("backup.run", async (req: Request, ctx) => 
       organization_id: tenant.organization_id,
       deleted_at: null,
     },
-    select: { id: true, storage_url: true, size_bytes: true, status: true },
+    select: { id: true, storage_url: true, size_bytes: true, status: true, started_at: true },
   });
   if (!backup) return errorResponse("Backup not found", 404);
 
   // Delete the physical file (if it exists)
+  // Resolve filename the same way the download route does:
+  //   - old format: /backups/<filename>  → basename()
+  //   - new format: /api/v1/backup/<id>/download → reconstruct from started_at
   let fileDeleted = false;
-  if (backup.storage_url) {
-    const filename = basename(backup.storage_url);
-    const filepath = join(BACKUP_DIR, filename);
-    try {
-      await stat(filepath);
-      await unlink(filepath);
-      fileDeleted = true;
-    } catch {
-      // File may have been manually removed already — that's OK
-      fileDeleted = false;
-    }
+  let filename: string;
+  if (backup.storage_url && backup.storage_url.startsWith("/backups/")) {
+    filename = basename(backup.storage_url);
+  } else {
+    const ts = backup.started_at.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    filename = `madrashaos_${ts}.json.gz`;
+  }
+  const filepath = join(BACKUP_DIR, filename);
+  try {
+    await stat(filepath);
+    await unlink(filepath);
+    fileDeleted = true;
+  } catch {
+    // File may have been manually removed already — that's OK
+    fileDeleted = false;
   }
 
   // Soft-delete the BackupRecord row
