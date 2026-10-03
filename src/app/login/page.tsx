@@ -43,6 +43,7 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Building2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,14 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Phase 2: madrasha-code login state
+  const [madrashaCode, setMadrashaCode] = React.useState("");
+  // Whether to show the madrasha-code field (auto-detected via check-email)
+  const [showCodeField, setShowCodeField] = React.useState(false);
+  // Whether the email exists in multiple orgs (requires the code)
+  const [emailMultiOrg, setEmailMultiOrg] = React.useState(false);
+  const [checkingEmail, setCheckingEmail] = React.useState(false);
+
   // If the middleware redirected with ?mfa=1, jump straight to the MFA step
   // (the user has an MFA-pending session cookie already).
   React.useEffect(() => {
@@ -90,25 +99,94 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
+  // Phase 2: debounced check-email — when the user types a valid email,
+  // call /api/v1/auth/check-email to determine if the madrasha-code field
+  // should be shown (email exists in multiple orgs → show field).
+  React.useEffect(() => {
+    // Only check if the email looks valid and we're in credentials mode
+    if (mode !== "credentials") return;
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@") || trimmed.length < 5) {
+      setShowCodeField(false);
+      setEmailMultiOrg(false);
+      return;
+    }
+
+    // Debounce 500ms after the user stops typing
+    const timer = setTimeout(async () => {
+      setCheckingEmail(true);
+      try {
+        const res = await fetch(
+          `/api/v1/auth/check-email?email=${encodeURIComponent(trimmed)}`,
+        );
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.multiOrg) {
+            // Email exists in multiple orgs — MUST provide the madrasha code
+            setShowCodeField(true);
+            setEmailMultiOrg(true);
+          } else if (data.exists) {
+            // Email exists in exactly 1 org — code is optional, hide the field
+            setShowCodeField(false);
+            setEmailMultiOrg(false);
+          } else {
+            // Email doesn't exist — keep the field hidden (error will show on submit)
+            setShowCodeField(false);
+            setEmailMultiOrg(false);
+          }
+        }
+      } catch {
+        // Network error — silently keep the field hidden
+      }
+      setCheckingEmail(false);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [email, mode]);
+
   // --- Step 1: email + password submit ------------------------------------
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Phase 2: if the email exists in multiple orgs, the madrasha code is required
+    if (emailMultiOrg && !madrashaCode.trim()) {
+      setError(
+        "Multiple accounts exist with this email. Please enter your Madrasha Code to identify your organization.",
+      );
+      setShowCodeField(true);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       // signIn() returns a result object — `ok: true` means the JWT was
       // issued successfully. We pass `redirect: false` so the page can
       // decide what to do next (MFA step OR /dashboard redirect).
+      // Phase 2: pass the madrasha code if provided (resolves the tenant org)
       const result = await signIn("credentials", {
         email: email.trim().toLowerCase(),
         password,
+        // Pass the madrasha code if the user typed it. NextAuth CredentialsProvider
+        // receives it as credentials.organizationCode (see config.ts Phase 0d fix)
+        organizationCode: madrashaCode.trim().toUpperCase() || undefined,
         redirect: false,
       });
 
       if (!result || result.error) {
+        // Phase 2: check for the MULTIPLE_ACCOUNTS error from the authorize callback
+        if (result?.error?.includes("MULTIPLE_ACCOUNTS")) {
+          setError(
+            "Multiple accounts exist with this email. Please enter your Madrasha Code below to identify your organization.",
+          );
+          setShowCodeField(true);
+          setEmailMultiOrg(true);
+          setSubmitting(false);
+          return;
+        }
         setError(
-          "Invalid credentials. Please check your email and password, then try again.",
+          "Invalid credentials. Please check your email, password, and madrasha code, then try again.",
         );
         setSubmitting(false);
         return;
@@ -194,6 +272,8 @@ export default function LoginPage() {
       const result = await signIn("credentials", {
         email: email.trim().toLowerCase(),
         password,
+        // Phase 2: pass the madrasha code again so the tenant is resolved correctly
+        organizationCode: madrashaCode.trim().toUpperCase() || undefined,
         redirect: false,
       });
 
@@ -359,6 +439,66 @@ export default function LoginPage() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Phase 2: Madrasha Code field — shown when:
+                        - the email exists in multiple orgs (auto-detected), OR
+                        - the user manually toggles it (link below) */}
+                    {(showCodeField || madrashaCode) && (
+                      <div className="space-y-2">
+                        <Label htmlFor="madrasha-code">
+                          Madrasha Code
+                          {emailMultiOrg && (
+                            <span className="ms-1 text-semantic-danger">*</span>
+                          )}
+                        </Label>
+                        <div className="relative">
+                          <Building2
+                            aria-hidden
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                          />
+                          <Input
+                            id="madrasha-code"
+                            name="organizationCode"
+                            type="text"
+                            autoComplete="off"
+                            autoCapitalize="characters"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            value={madrashaCode}
+                            onChange={(e) => setMadrashaCode(e.target.value.toUpperCase())}
+                            placeholder="e.g. DUM001"
+                            className="pl-9 font-mono uppercase"
+                            disabled={submitting}
+                            maxLength={10}
+                            autoFocus={emailMultiOrg}
+                          />
+                        </div>
+                        {emailMultiOrg && (
+                          <p className="text-caption text-semantic-warning">
+                            Your email is registered with multiple madrashas.
+                            Enter your 6-character code to identify your organization.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Toggle link to show/hide the madrasha-code field manually */}
+                    {!showCodeField && !madrashaCode && (
+                      <button
+                        type="button"
+                        onClick={() => setShowCodeField(true)}
+                        className="text-caption font-medium text-text-muted hover:text-primary-500"
+                      >
+                        Have a madrasha code? Enter it →
+                      </button>
+                    )}
+
+                    {checkingEmail && (
+                      <p className="flex items-center gap-1.5 text-caption text-text-muted">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Checking email…
+                      </p>
+                    )}
 
                     {error && (
                       <Alert variant="destructive">
